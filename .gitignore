@@ -11,6 +11,8 @@ app/release/
 plugin/com.dmtools.dnd-combat-tracker.sdPlugin/bin/
 plugin/dist/
 plugin/.test/
+# Intermediate HTML/bundle for the README deck previews; the PNGs are committed
+plugin/.preview/
 
 # Stream Deck writes its runtime logs inside the installed plugin folder
 plugin/com.dmtools.dnd-combat-tracker.sdPlugin/logs/

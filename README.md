@@ -12,7 +12,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v1.1.0-success)
+![Release](https://img.shields.io/badge/release-v1.1.1-success)
 
 </div>
 
@@ -69,7 +69,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 
 Grab both files from the [**latest release**](../../releases/latest):
 
-1. **App** — run `DnD Combat Tracker Setup 1.1.0.exe` (NSIS installer, choose your own directory).
+1. **App** — run `DnD Combat Tracker Setup 1.1.1.exe` (NSIS installer, choose your own directory).
 2. **Stream Deck plugin** — double-click `com.dmtools.dnd-combat-tracker.streamDeckPlugin`;
    the Stream Deck app installs it and registers the bundled picker profiles.
 3. Start the app. The plugin connects within a few seconds — the DM window's sidebar
@@ -501,7 +501,7 @@ cd app
 npm install
 npm run dev        # live-reload dev session
 npm run build      # compile main/preload/renderer to out/
-npm run dist       # → release/DnD Combat Tracker Setup 1.1.0.exe (NSIS)
+npm run dist       # → release/DnD Combat Tracker Setup 1.1.1.exe (NSIS)
 ```
 
 ```bash

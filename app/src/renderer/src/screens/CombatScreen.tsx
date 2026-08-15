@@ -1,0 +1,554 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { AppState, Combatant, Condition } from '../../../shared/types';
+import { CONDITIONS } from '../../../shared/types';
+import { api } from '../api';
+import { useConfirm } from '../Confirm';
+import { AttackText } from '../AttackText';
+import { AbilityTable } from '../AbilityTable';
+import { DiceRollerModal } from '../DiceRoller';
+import { MonsterAttackModal, hasRollableAttacks } from '../MonsterAttackModal';
+
+export function CombatScreen({
+  state,
+  preselectedTemplateId,
+}: {
+  state: AppState;
+  preselectedTemplateId?: string | null;
+}) {
+  const [showDice, setShowDice] = useState(false);
+  const openDice = () => setShowDice(true);
+
+  let body;
+  if (!state.combat) {
+    body = (
+      <StartCombatWizard
+        state={state}
+        preselectedTemplateId={preselectedTemplateId}
+        onOpenDice={openDice}
+      />
+    );
+  } else if (state.combat.phase === 'setup') {
+    body = <SetupPhase state={state} onOpenDice={openDice} />;
+  } else {
+    body = <ActivePhase state={state} onOpenDice={openDice} />;
+  }
+
+  return (
+    <>
+      {body}
+      {showDice && <DiceRollerModal state={state} onClose={() => setShowDice(false)} />}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- wizard
+
+function StartCombatWizard({
+  state,
+  preselectedTemplateId,
+  onOpenDice,
+}: {
+  state: AppState;
+  preselectedTemplateId?: string | null;
+  onOpenDice: () => void;
+}) {
+  const [templateId, setTemplateId] = useState<string | null>(preselectedTemplateId ?? null);
+
+  useEffect(() => {
+    if (preselectedTemplateId && state.encounterTemplates.some((t) => t.id === preselectedTemplateId)) {
+      setTemplateId(preselectedTemplateId);
+    }
+  }, [preselectedTemplateId, state.encounterTemplates]);
+  const [pcIds, setPcIds] = useState<Set<string>>(new Set(state.pcs.map((p) => p.id)));
+  const [rollMode, setRollMode] = useState<'all' | 'monstersOnly'>('monstersOnly');
+
+  const togglePc = (id: string) => {
+    const next = new Set(pcIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setPcIds(next);
+  };
+
+  const canStart = templateId !== null;
+
+  return (
+    <div className="screen">
+      <header className="screen-header">
+        <h1>Start Combat</h1>
+        <div className="header-actions">
+          <button className="btn" onClick={onOpenDice}>🎲 Dice Roller</button>
+        </div>
+      </header>
+
+      {state.encounterTemplates.length === 0 ? (
+        <p className="empty-note">
+          Combat starts from an encounter template. Build one on the Encounters screen first.
+        </p>
+      ) : (
+        <div className="wizard">
+          <section className="wizard-step">
+            <h2>1. Pick an encounter template</h2>
+            <div className="wizard-options">
+              {state.encounterTemplates.map((t) => (
+                <button
+                  key={t.id}
+                  className={`pick-btn large ${templateId === t.id ? 'picked' : ''}`}
+                  onClick={() => setTemplateId(t.id)}
+                >
+                  <strong>{t.name}</strong>
+                  <span className="muted">
+                    {t.entries.reduce((s, e) => s + e.quantity, 0)} monsters
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="wizard-step">
+            <h2>2. Choose the PCs joining the fight</h2>
+            {state.pcs.length === 0 && (
+              <p className="muted">No PCs in the party yet — you can still run a monsters-only combat.</p>
+            )}
+            <div className="wizard-options">
+              {state.pcs.map((pc) => (
+                <button
+                  key={pc.id}
+                  className={`pick-btn large ${pcIds.has(pc.id) ? 'picked' : ''}`}
+                  onClick={() => togglePc(pc.id)}
+                >
+                  <strong>{pc.name}</strong>
+                  <span className="muted">HP {pc.maxHp} · AC {pc.ac}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="wizard-step">
+            <h2>3. Initiative</h2>
+            <div className="wizard-options">
+              <button
+                className={`pick-btn large ${rollMode === 'all' ? 'picked' : ''}`}
+                onClick={() => setRollMode('all')}
+              >
+                <strong>Roll for all</strong>
+                <span className="muted">Auto-roll monsters and PCs (d20 + modifier)</span>
+              </button>
+              <button
+                className={`pick-btn large ${rollMode === 'monstersOnly' ? 'picked' : ''}`}
+                onClick={() => setRollMode('monstersOnly')}
+              >
+                <strong>Roll for monsters only</strong>
+                <span className="muted">Players roll at the table; you type in their results</span>
+              </button>
+            </div>
+          </section>
+
+          <button
+            className="btn primary big"
+            disabled={!canStart}
+            onClick={() => void api.startCombatSetup(templateId!, [...pcIds], rollMode)}
+          >
+            Roll Initiative →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- setup
+
+function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => void }) {
+  const combat = state.combat!;
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const allSet = combat.combatants.every((c) => c.initiative !== null);
+
+  return (
+    <div className="screen">
+      <header className="screen-header">
+        <h1>Initiative Order</h1>
+        <div className="header-actions">
+          <button className="btn" onClick={onOpenDice}>🎲 Dice Roller</button>
+          <button className="btn" onClick={() => void api.endCombat()}>Cancel</button>
+          <button
+            className="btn primary"
+            disabled={!allSet}
+            title={allSet ? '' : 'Enter initiative for every PC first'}
+            onClick={() => void api.beginCombat()}
+          >
+            ▶ Begin Combat
+          </button>
+        </div>
+      </header>
+
+      <p className="muted setup-hint">
+        Monsters are rolled automatically (🎲 to re-roll). Drag rows to break ties manually.
+      </p>
+
+      <ul className="setup-list">
+        {combat.combatants.map((c, i) => (
+          <li
+            key={c.id}
+            className={`setup-row ${c.type} ${dragIndex === i ? 'dragging' : ''}`}
+            draggable
+            onDragStart={() => setDragIndex(i)}
+            onDragEnd={() => setDragIndex(null)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (dragIndex !== null && dragIndex !== i) {
+                void api.reorderCombatant(dragIndex, i);
+                setDragIndex(i);
+              }
+            }}
+          >
+            <span className="drag-handle">⋮⋮</span>
+            <span className="setup-name">
+              {c.displayName}
+              <span className="muted"> · mod {c.initMod >= 0 ? `+${c.initMod}` : c.initMod}</span>
+            </span>
+            {c.type === 'monster' ? (
+              <span className="setup-init">
+                <strong>{c.initiative}</strong>
+                <button
+                  className="btn small"
+                  title="Re-roll"
+                  onClick={() => void api.rerollInitiative(c.id)}
+                >
+                  🎲
+                </button>
+              </span>
+            ) : (
+              <span className="setup-init">
+                <input
+                  type="number"
+                  className="init-input"
+                  placeholder="—"
+                  value={c.initiative ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    void api.setInitiative(c.id, v === '' ? null : parseInt(v, 10));
+                  }}
+                />
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- active
+
+function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => void }) {
+  const combat = state.combat!;
+  const confirm = useConfirm();
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [conditionsFor, setConditionsFor] = useState<string | null>(null);
+  const [attacksFor, setAttacksFor] = useState<string | null>(null);
+  const [addingMonster, setAddingMonster] = useState(false);
+  const [attackModalFor, setAttackModalFor] = useState<string | null>(null);
+
+  const currentId = combat.combatants[combat.currentIndex]?.id;
+  const scrollPendingRef = useRef<string | null>(null);
+
+  /**
+   * The row whose quick reference the auto-open setting wants showing, or
+   * null when the setting is off or the current actor has nothing to show.
+   * Panels that temporarily replace the reference restore it from here.
+   */
+  const autoReferenceId = (() => {
+    if (!state.settings.autoOpenAttacks) return null;
+    const cur = combat.combatants[combat.currentIndex];
+    return cur && cur.type === 'monster' && cur.attacks.length > 0 ? cur.id : null;
+  })();
+  useEffect(() => {
+    // Follow the turn with the quick reference (Settings → DM Combat Screen).
+    if (!state.settings.autoOpenAttacks) return;
+    const cur = combat.combatants[combat.currentIndex];
+    if (cur && cur.type === 'monster' && cur.attacks.length > 0) {
+      setAttacksFor(cur.id);
+      setConditionsFor(null);
+      scrollPendingRef.current = cur.id;
+    } else {
+      setAttacksFor(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, state.settings.autoOpenAttacks]);
+
+  useLayoutEffect(() => {
+    // After the auto-opened reference is in the DOM, bring the whole card
+    // (row + reference) into view — minimally, and only when needed. Cards
+    // taller than the viewport align to the top so the reference's start
+    // (ability table) is visible below the sticky header.
+    if (scrollPendingRef.current && attacksFor === scrollPendingRef.current) {
+      scrollPendingRef.current = null;
+      const el = document.querySelector(`[data-cid="${attacksFor}"]`);
+      if (!el) return;
+      const viewH = el.closest('.content')?.clientHeight ?? window.innerHeight;
+      const oversized = el.getBoundingClientRect().height > viewH - 88;
+      el.scrollIntoView({ block: oversized ? 'start' : 'nearest', behavior: 'smooth' });
+    }
+  }, [attacksFor]);
+
+  const amountFor = (id: string) => {
+    const n = parseInt(amounts[id] ?? '', 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
+  const applyAmount = (id: string, kind: 'damage' | 'heal') => {
+    const n = amountFor(id);
+    if (n === null) return;
+    if (kind === 'damage') void api.applyDamage(id, n);
+    else void api.applyHeal(id, n);
+    setAmounts({ ...amounts, [id]: '' });
+  };
+
+  return (
+    <div className="screen">
+      <header className="screen-header combat-sticky">
+        <h1>
+          Combat <span className="round-badge">Round {combat.round}</span>
+        </h1>
+        <div className="header-actions">
+          <button className="btn" onClick={onOpenDice}>🎲 Dice Roller</button>
+          <button className="btn" onClick={() => setAddingMonster(true)}>+ Add Monster</button>
+          <button className="btn" onClick={() => void api.prevTurn()}>⬅ Prev</button>
+          <button className="btn primary" onClick={() => void api.nextTurn()}>Next Turn ➡</button>
+          <button
+            className="btn danger"
+            onClick={async () => {
+              if (await confirm('End this combat?', 'End Combat')) void api.endCombat();
+            }}
+          >
+            End Combat
+          </button>
+        </div>
+      </header>
+
+      <ul className="combat-list">
+        {combat.combatants.map((c, i) => {
+          const isCurrent = i === combat.currentIndex;
+          return (
+            <li
+              key={c.id}
+              data-cid={c.id}
+              className={`combat-row ${c.type} ${isCurrent ? 'current' : ''} ${c.isDowned ? 'downed' : ''}`}
+            >
+              <div
+                className={`combat-row-main ${c.type === 'monster' && c.attacks.length > 0 ? 'clickable' : ''}`}
+                onClick={(e) => {
+                  // Clicking a monster row toggles its attack preview; leave
+                  // buttons and inputs to do their own thing.
+                  if ((e.target as HTMLElement).closest('button, input')) return;
+                  if (c.type === 'monster' && c.attacks.length > 0) {
+                    setAttacksFor(attacksFor === c.id ? null : c.id);
+                    setConditionsFor(null);
+                  }
+                }}
+              >
+                <span className="init-badge">{c.initiative}</span>
+                <span className="combat-name">
+                  {isCurrent && <span className="turn-arrow">▶ </span>}
+                  {c.displayName}
+                  {c.isDowned && <span className="downed-tag"> ✝ downed</span>}
+                </span>
+                <span className="ac-badge" title="Armor Class">AC {c.ac}</span>
+                <span className={`hp ${c.currentHp <= c.maxHp / 2 ? 'low' : ''}`}>
+                  {c.currentHp}/{c.maxHp}
+                </span>
+                <span className="hp-controls">
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="0"
+                    className="amount-input"
+                    value={amounts[c.id] ?? ''}
+                    onChange={(e) => setAmounts({ ...amounts, [c.id]: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') applyAmount(c.id, e.shiftKey ? 'heal' : 'damage');
+                    }}
+                  />
+                  <button
+                    className="btn small danger"
+                    disabled={amountFor(c.id) === null}
+                    onClick={() => applyAmount(c.id, 'damage')}
+                    title="Apply damage (Enter)"
+                  >
+                    ⚔ Dmg
+                  </button>
+                  <button
+                    className="btn small heal"
+                    disabled={amountFor(c.id) === null}
+                    onClick={() => applyAmount(c.id, 'heal')}
+                    title="Apply healing (Shift+Enter)"
+                  >
+                    ✚ Heal
+                  </button>
+                </span>
+                <span className="row-tools">
+                  {c.type === 'monster' && isCurrent && hasRollableAttacks(c) && (
+                    <button
+                      className="btn small primary"
+                      title="Roll this monster's attack (same flow as the Stream Deck)"
+                      onClick={() => setAttackModalFor(c.id)}
+                    >
+                      🎲 Attack
+                    </button>
+                  )}
+                  <button
+                    className={`btn small ${conditionsFor === c.id ? 'primary' : ''}`}
+                    onClick={() => {
+                      const closing = conditionsFor === c.id;
+                      setConditionsFor(closing ? null : c.id);
+                      // Closing conditions hands the row back to the
+                      // auto-opened quick reference, if there is one.
+                      setAttacksFor(closing ? autoReferenceId : null);
+                    }}
+                  >
+                    ☰ Conditions
+                  </button>
+                  {c.type === 'monster' && c.attacks.length > 0 && (
+                    <button
+                      className={`btn small ${attacksFor === c.id ? 'primary' : ''}`}
+                      onClick={() => {
+                        setAttacksFor(attacksFor === c.id ? null : c.id);
+                        setConditionsFor(null);
+                      }}
+                    >
+                      ⚔ Attacks
+                    </button>
+                  )}
+                </span>
+              </div>
+
+              {c.conditions.length > 0 && (
+                <div className="condition-badges">
+                  {c.conditions.map((cond) => (
+                    <span key={cond} className="condition-badge" title="Click to remove"
+                      onClick={() => void api.toggleCondition(c.id, cond)}>
+                      {cond}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {conditionsFor === c.id && (
+                <div className="condition-picker">
+                  {CONDITIONS.map((cond) => (
+                    <button
+                      key={cond}
+                      className={`pick-btn ${c.conditions.includes(cond) ? 'picked' : ''}`}
+                      onClick={() => void api.toggleCondition(c.id, cond)}
+                    >
+                      {cond}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {attacksFor === c.id && <AttackPanel combatant={c} />}
+            </li>
+          );
+        })}
+      </ul>
+      {combat.combatants.length === 0 && (
+        <p className="empty-note">No combatants left. End the combat when you're done.</p>
+      )}
+
+      {addingMonster && <AddMonsterModal state={state} onClose={() => setAddingMonster(false)} />}
+      {attackModalFor && (
+        <MonsterAttackModal
+          state={state}
+          attackerId={attackModalFor}
+          onClose={() => setAttackModalFor(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => void }) {
+  const [filter, setFilter] = useState('');
+  const [quantity, setQuantity] = useState('1');
+
+  const monsters = state.monsters.filter((m) =>
+    m.name.toLowerCase().includes(filter.toLowerCase()),
+  );
+  const qty = Math.max(1, parseInt(quantity, 10) || 1);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Add Monster to Combat</h2>
+        <p className="muted" style={{ marginBottom: 10 }}>
+          Initiative is rolled automatically; the monster joins the order at its roll.
+        </p>
+        <div className="form-row">
+          <label>
+            Quantity
+            <input
+              type="number"
+              min={1}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+          </label>
+          <label>
+            Search library
+            <input
+              autoFocus
+              placeholder="Search monsters…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="monster-pick-list">
+          {monsters.slice(0, 60).map((m) => (
+            <button
+              key={m.id}
+              className="pick-btn"
+              title={`HP ${m.maxHp} · AC ${m.ac}`}
+              onClick={async () => {
+                await api.addMonsterToCombat(m.id, qty);
+                onClose();
+              }}
+            >
+              {qty > 1 ? `${qty}× ` : ''}{m.name}
+            </button>
+          ))}
+          {monsters.length > 60 && (
+            <span className="muted">…{monsters.length - 60} more, refine search</span>
+          )}
+        </div>
+        <div className="modal-actions">
+          <button className="btn" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AttackPanel({ combatant }: { combatant: Combatant }) {
+  return (
+    <div className="attack-panel">
+      {combatant.abilities && <AbilityTable abilities={combatant.abilities} />}
+      {combatant.attacks.map((a) => {
+        // Attack rolls render compactly; save/other actions live in their text.
+        const showText = a.type !== 'attack' && a.display.text;
+        return (
+          <div key={a.id} className="attack-panel-row" title={a.display.text}>
+            <strong>{a.name}</strong>
+            {a.display.toHit && <span>{a.display.toHit} to hit</span>}
+            {a.save && <span>{a.save.ability} save DC {a.save.dc}</span>}
+            {a.display.range && <span>{a.display.range}</span>}
+            {a.display.damage && <span>{a.display.damage}</span>}
+            {a.attack?.usage?.type === 'recharge' && <span className="muted">Recharge {a.attack.usage.min}+</span>}
+            {showText && <AttackText text={a.display.text} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

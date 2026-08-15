@@ -1,0 +1,136 @@
+import { BrowserWindow, screen, shell } from 'electron';
+import * as path from 'path';
+import { JsonValue } from './storage';
+
+interface PlayerWindowState {
+  bounds: { x: number; y: number; width: number; height: number } | null;
+  fullscreen: boolean;
+}
+
+let dmWindow: BrowserWindow | null = null;
+let playerWindow: BrowserWindow | null = null;
+let playerWindowState: JsonValue<PlayerWindowState>;
+
+export function initWindowState(userDataDir: string): Promise<void> {
+  playerWindowState = new JsonValue<PlayerWindowState>(
+    path.join(userDataDir, 'data', 'player-window.json'),
+    { bounds: null, fullscreen: false },
+  );
+  return playerWindowState.load();
+}
+
+function loadRenderer(win: BrowserWindow, hash: string): void {
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${hash}`);
+  } else {
+    win.loadFile(path.join(__dirname, '../renderer/index.html'), { hash });
+  }
+}
+
+export function createDmWindow(): BrowserWindow {
+  dmWindow = new BrowserWindow({
+    width: 1280,
+    height: 860,
+    minWidth: 900,
+    minHeight: 600,
+    show: false,
+    autoHideMenuBar: true,
+    title: 'D&D Combat Tracker — DM',
+    backgroundColor: '#14101c',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  dmWindow.on('ready-to-show', () => dmWindow?.show());
+  dmWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  dmWindow.on('closed', () => {
+    dmWindow = null;
+    // The Player View is useless without the DM window; close it too.
+    playerWindow?.close();
+  });
+  loadRenderer(dmWindow, 'dm');
+  return dmWindow;
+}
+
+/** True if the saved bounds are visibly on some connected display. */
+function boundsVisible(b: { x: number; y: number; width: number; height: number }): boolean {
+  return screen.getAllDisplays().some((d) => {
+    const a = d.workArea;
+    return (
+      b.x + b.width > a.x + 40 &&
+      b.x < a.x + a.width - 40 &&
+      b.y + b.height > a.y + 40 &&
+      b.y < a.y + a.height - 40
+    );
+  });
+}
+
+export function togglePlayerView(): void {
+  if (playerWindow) {
+    playerWindow.close();
+    return;
+  }
+  const saved = playerWindowState.get();
+  const useSaved = saved.bounds && boundsVisible(saved.bounds);
+
+  playerWindow = new BrowserWindow({
+    width: useSaved ? saved.bounds!.width : 1024,
+    height: useSaved ? saved.bounds!.height : 768,
+    x: useSaved ? saved.bounds!.x : undefined,
+    y: useSaved ? saved.bounds!.y : undefined,
+    show: false,
+    autoHideMenuBar: true,
+    title: 'D&D Combat Tracker — Player View',
+    backgroundColor: '#1a1423',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  // Always open windowed — fullscreen is a per-session toggle, never restored.
+  playerWindow.on('ready-to-show', () => playerWindow?.show());
+
+  const saveState = () => {
+    if (!playerWindow) return;
+    // Don't record fullscreen bounds as the window's floating bounds.
+    const bounds = playerWindow.isFullScreen()
+      ? playerWindowState.get().bounds
+      : playerWindow.getBounds();
+    void playerWindowState.set({ bounds, fullscreen: false });
+  };
+  playerWindow.on('moved', saveState);
+  playerWindow.on('resized', saveState);
+  playerWindow.on('closed', () => {
+    playerWindow = null;
+    notifyPlayerViewChanged();
+  });
+  loadRenderer(playerWindow, 'player');
+  notifyPlayerViewChanged();
+}
+
+export function togglePlayerFullscreen(): void {
+  if (!playerWindow) return;
+  playerWindow.setFullScreen(!playerWindow.isFullScreen());
+}
+
+export function isPlayerViewOpen(): boolean {
+  return playerWindow !== null;
+}
+
+let playerViewChangedCb: (() => void) | null = null;
+export function onPlayerViewChanged(cb: () => void): void {
+  playerViewChangedCb = cb;
+}
+function notifyPlayerViewChanged(): void {
+  playerViewChangedCb?.();
+}
+
+export function getAllWindows(): BrowserWindow[] {
+  return [dmWindow, playerWindow].filter((w): w is BrowserWindow => w !== null);
+}

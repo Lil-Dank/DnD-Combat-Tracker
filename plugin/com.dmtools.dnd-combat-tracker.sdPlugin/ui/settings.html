@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body {
+      margin: 0;
+      padding: 12px;
+      background: #2d2d2d;
+      color: #d8d8d8;
+      font-family: "Segoe UI", sans-serif;
+      font-size: 13px;
+    }
+    label { display: block; margin-bottom: 6px; }
+    input {
+      width: 120px;
+      background: #3d3d3d;
+      color: #fff;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 5px 8px;
+    }
+    .hint { color: #999; font-size: 11.5px; margin-top: 8px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <label for="port">Tracker app bridge port</label>
+  <input id="port" type="number" min="1024" max="65535" placeholder="57321" />
+  <p class="hint">
+    Must match the WebSocket port in the D&amp;D Combat Tracker app's Settings
+    screen (default 57321). Only change this on a port conflict.
+  </p>
+
+  <script>
+    let websocket = null;
+    let pluginUUID = null;
+
+    function connectElgatoStreamDeckSocket(inPort, inUUID, inRegisterEvent, inInfo) {
+      pluginUUID = inUUID;
+      websocket = new WebSocket('ws://127.0.0.1:' + inPort);
+      websocket.onopen = () => {
+        websocket.send(JSON.stringify({ event: inRegisterEvent, uuid: inUUID }));
+        websocket.send(JSON.stringify({ event: 'getGlobalSettings', context: inUUID }));
+      };
+      websocket.onmessage = (evt) => {
+        const msg = JSON.parse(evt.data);
+        if (msg.event === 'didReceiveGlobalSettings') {
+          const port = msg.payload?.settings?.port;
+          if (port) document.getElementById('port').value = port;
+        }
+      };
+    }
+
+    document.getElementById('port').addEventListener('change', (e) => {
+      const port = parseInt(e.target.value, 10);
+      if (!websocket || !Number.isInteger(port) || port < 1024 || port > 65535) return;
+      websocket.send(JSON.stringify({
+        event: 'setGlobalSettings',
+        context: pluginUUID,
+        payload: { port },
+      }));
+    });
+  </script>
+</body>
+</html>

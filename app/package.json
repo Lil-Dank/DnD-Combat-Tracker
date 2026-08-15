@@ -1,0 +1,57 @@
+{
+  "name": "dnd-combat-tracker",
+  "version": "1.0.0",
+  "description": "D&D Combat Tracker for Dungeon Masters — DM window, Player View, Stream Deck integration",
+  "main": "out/main/index.js",
+  "author": "DM Tools",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dist": "electron-vite build && electron-builder --win"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.5.12",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.0",
+    "electron-vite": "^4.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^7.0.0"
+  },
+  "build": {
+    "appId": "com.dmtools.dnd-combat-tracker",
+    "productName": "DnD Combat Tracker",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/srd",
+        "to": "srd"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

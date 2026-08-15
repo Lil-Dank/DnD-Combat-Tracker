@@ -1,0 +1,172 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.dmtools.dnd-combat-tracker",
+  "Name": "D&D Combat Tracker",
+  "Version": "1.0.0.23",
+  "Author": "DM Tools",
+  "Description": "Control the D&D Combat Tracker desktop app: turns, damage, healing, and conditions from your Stream Deck.",
+  "Icon": "imgs/plugin/icon",
+  "CodePath": "bin/plugin.js",
+  "Category": "D&D Combat Tracker",
+  "CategoryIcon": "imgs/plugin/category",
+  "Nodejs": {
+    "Version": "20",
+    "Debug": ""
+  },
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.5"
+  },
+  "Profiles": [
+    {
+      "Name": "profiles/DnD Combat Picker XL",
+      "DeviceType": 2,
+      "Readonly": true,
+      "DontAutoSwitchWhenInstalled": true
+    },
+    {
+      "Name": "profiles/DnD Combat Picker",
+      "DeviceType": 0,
+      "Readonly": true,
+      "DontAutoSwitchWhenInstalled": true
+    }
+  ],
+  "Actions": [
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.next-turn",
+      "Name": "Next Turn",
+      "Icon": "imgs/actions/next",
+      "Tooltip": "Advance to the next combatant's turn",
+      "PropertyInspectorPath": "ui/settings.html",
+      "States": [
+        {
+          "Image": "imgs/actions/next",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.prev-turn",
+      "Name": "Previous Turn",
+      "Icon": "imgs/actions/prev",
+      "Tooltip": "Go back to the previous combatant's turn",
+      "PropertyInspectorPath": "ui/settings.html",
+      "States": [
+        {
+          "Image": "imgs/actions/prev",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.current-turn",
+      "Name": "Current Turn",
+      "Icon": "imgs/actions/current",
+      "Tooltip": "Shows whose turn it is right now (display only — pressing does nothing)",
+      "PropertyInspectorPath": "ui/settings.html",
+      "States": [
+        {
+          "Image": "imgs/actions/current",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.damage",
+      "Name": "Damage",
+      "Icon": "imgs/actions/damage",
+      "Tooltip": "Pick a combatant, then enter damage on the numpad",
+      "PropertyInspectorPath": "ui/settings.html",
+      "States": [
+        {
+          "Image": "imgs/actions/damage",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.heal",
+      "Name": "Heal",
+      "Icon": "imgs/actions/heal",
+      "Tooltip": "Pick a combatant, then enter healing on the numpad",
+      "PropertyInspectorPath": "ui/settings.html",
+      "States": [
+        {
+          "Image": "imgs/actions/heal",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.condition",
+      "Name": "Condition",
+      "Icon": "imgs/actions/condition",
+      "Tooltip": "Pick a combatant, then toggle conditions",
+      "PropertyInspectorPath": "ui/settings.html",
+      "States": [
+        {
+          "Image": "imgs/actions/condition",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.dice",
+      "Name": "Dice Roller",
+      "Icon": "imgs/actions/dice",
+      "Tooltip": "Roll custom dice (NdX + modifier), then optionally apply the result as damage or healing",
+      "PropertyInspectorPath": "ui/settings.html",
+      "States": [
+        {
+          "Image": "imgs/actions/dice",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.attack",
+      "Name": "Monster Attack",
+      "Icon": "imgs/actions/roll",
+      "Tooltip": "Pick one of the current monster's attacks, then roll attack and damage",
+      "PropertyInspectorPath": "ui/settings.html",
+      "States": [
+        {
+          "Image": "imgs/actions/roll",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.end-combat",
+      "Name": "End Combat",
+      "Icon": "imgs/actions/end",
+      "Tooltip": "End the current combat (asks for confirmation on the deck)",
+      "PropertyInspectorPath": "ui/settings.html",
+      "States": [
+        {
+          "Image": "imgs/actions/end",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "UUID": "com.dmtools.dnd-combat-tracker.slot",
+      "Name": "Picker Slot",
+      "Icon": "imgs/actions/slot",
+      "Tooltip": "Used internally by the D&D Picker profiles — you don't need to place this key yourself",
+      "States": [
+        {
+          "Image": "imgs/actions/blank",
+          "FontSize": 11,
+          "TitleAlignment": "middle"
+        }
+      ]
+    }
+  ]
+}

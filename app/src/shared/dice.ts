@@ -1,0 +1,52 @@
+/** "2d8+2" / "1d4" / "3d6-1" (spaces tolerated) → parts, or null. */
+export function parseDice(s: string): { count: number; die: number; bonus: number } | null {
+  const m = s.replace(/\s/g, '').match(/^(\d+)d(\d+)([+-]\d+)?$/i);
+  if (!m) return null;
+  return { count: parseInt(m[1], 10), die: parseInt(m[2], 10), bonus: m[3] ? parseInt(m[3], 10) : 0 };
+}
+
+export function formatDice(count: number, die: number, bonus: number): string {
+  return `${count}d${die}${bonus > 0 ? `+${bonus}` : bonus < 0 ? `${bonus}` : ''}`;
+}
+
+/** SRD-style average: floor(count * (die + 1) / 2) + bonus. */
+export function averageOf(count: number, die: number, bonus: number): number {
+  return Math.floor((count * (die + 1)) / 2) + bonus;
+}
+
+export interface DicePoolPart {
+  count: number;
+  die: number;
+}
+
+export interface PoolRoll {
+  total: number;
+  /** Individual die results, one array per pool part. */
+  perPart: number[][];
+}
+
+/**
+ * Roll a pool of mixed dice ("2d8 + 1d4 + …") plus one flat modifier.
+ * The total never goes below 0.
+ */
+export function rollPool(parts: DicePoolPart[], modifier: number): PoolRoll {
+  const perPart: number[][] = [];
+  let sum = 0;
+  for (const part of parts) {
+    const rolls: number[] = [];
+    for (let i = 0; i < part.count; i++) {
+      rolls.push(Math.floor(Math.random() * part.die) + 1);
+    }
+    perPart.push(rolls);
+    sum += rolls.reduce((a, b) => a + b, 0);
+  }
+  return { total: Math.max(0, sum + modifier), perPart };
+}
+
+/** "2d8+1 +1d4 +2d6" — first part carries the modifier. */
+export function formatPool(parts: DicePoolPart[], modifier: number): string {
+  if (parts.length === 0) return '';
+  const modStr = modifier > 0 ? `+${modifier}` : modifier < 0 ? `${modifier}` : '';
+  const first = `${parts[0].count}d${parts[0].die}${modStr}`;
+  return [first, ...parts.slice(1).map((p) => `+${p.count}d${p.die}`)].join(' ');
+}

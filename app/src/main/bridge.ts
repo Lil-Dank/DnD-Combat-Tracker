@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { store } from './state';
 import type { AppState } from '../shared/types';
+import { monsterName } from '../shared/i18n';
 
 /**
  * Local WebSocket bridge for the Stream Deck plugin. The app is the server;
@@ -27,12 +28,17 @@ interface BridgeCommand {
 function stateMessage(state: AppState): string {
   const combat = state.combat;
   const active = combat !== null && combat.phase === 'active';
+  // Actor names are localized here rather than in the plugin: the German SRD
+  // name map is app-side data, and this keeps the deck and the DM window
+  // showing the same name for the same creature.
+  const lang = state.settings.language;
   return JSON.stringify({
     type: 'state',
+    language: lang,
     combatants: active
       ? combat!.combatants.map((c, i) => ({
           id: c.id,
-          displayName: c.displayName,
+          displayName: monsterName(lang, c.displayName),
           currentHp: c.currentHp,
           maxHp: c.maxHp,
           ac: c.ac,

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AppState, Combatant, MonsterAction } from '../../shared/types';
 import { rollPool } from '../../shared/dice';
 import { api } from './api';
+import { useI18n } from './i18n';
 
 /**
  * DM-side Monster Attack workflow, mirroring the Stream Deck flow:
@@ -40,6 +41,7 @@ export function MonsterAttackModal({
   attackerId: string;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const combat = state.combat;
   const attacker = combat?.combatants.find((c) => c.id === attackerId);
 
@@ -127,7 +129,7 @@ export function MonsterAttackModal({
 
         {step === 'attack' && (
           <>
-            <h3>Pick an attack</h3>
+            <h3>{t('attack.pickAttack')}</h3>
             <div className="monster-pick-list">
               {attacker.attacks.filter(isRollable).map((a) => (
                 <button key={a.id} className="pick-btn" title={a.display.text} onClick={() => pickAttack(a)}>
@@ -138,7 +140,7 @@ export function MonsterAttackModal({
               ))}
             </div>
             <div className="modal-actions">
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
             </div>
           </>
         )}
@@ -168,8 +170,8 @@ export function MonsterAttackModal({
               ))}
             </div>
             <div className="modal-actions">
-              <button className="btn" onClick={() => setStep('attack')}>← Back</button>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={() => setStep('attack')}>{t('common.back')}</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               {isSave && (
                 <button
                   className="btn primary"
@@ -197,7 +199,7 @@ export function MonsterAttackModal({
 
             {attack.attack && (
               <div className="dice-result">
-                <button className="btn primary" onClick={rollAttack}>🎲 Roll Attack</button>
+                <button className="btn primary" onClick={rollAttack}>{t('attack.rollAttack')}</button>
                 {atkRoll && (
                   <span className="dice-total atk-result">
                     {' '}ATK {atkRoll.total}
@@ -218,7 +220,7 @@ export function MonsterAttackModal({
 
             {attack.onHit.damage.length > 0 && (
               <div className="dice-result">
-                <button className="btn primary" onClick={rollDamage}>🎲 Roll Damage</button>
+                <button className="btn primary" onClick={rollDamage}>{t('attack.rollDamage')}</button>
                 {dmgRoll && (
                   <span className="dice-total atk-result">
                     {' '}DMG {dmgRoll.total}
@@ -237,7 +239,7 @@ export function MonsterAttackModal({
               <button className="btn" onClick={() => { setStep('target'); setDmgRoll(null); setAtkRoll(null); }}>
                 ← Back
               </button>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               {dmgRoll && (
                 <button
                   className="btn danger"
@@ -246,7 +248,7 @@ export function MonsterAttackModal({
                     else void apply();
                   }}
                 >
-                  {isSave ? 'Who saved? →' : `⚔ Apply ${dmgRoll.total}`}
+                  {isSave ? t('attack.whoSaved') : t('attack.apply', { total: dmgRoll.total })}
                 </button>
               )}
             </div>
@@ -276,8 +278,8 @@ export function MonsterAttackModal({
               ))}
             </div>
             <div className="modal-actions">
-              <button className="btn" onClick={() => setStep('roll')}>← Back</button>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={() => setStep('roll')}>{t('common.back')}</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button className="btn danger" onClick={() => void apply()}>
                 ⚔ Apply ({targets.length - saved.size}×{dmgRoll.total}, {saved.size}×{Math.floor(dmgRoll.total / 2)})
               </button>

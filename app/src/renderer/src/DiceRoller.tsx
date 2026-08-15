@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AppState } from '../../shared/types';
 import { formatPool, rollPool, type DicePoolPart } from '../../shared/dice';
 import { api } from './api';
+import { useI18n } from './i18n';
 
 const DICE = [4, 6, 8, 10, 12, 20, 100];
 
@@ -15,6 +16,7 @@ interface PartForm {
  * (e.g. 2d8+1 +1d4) → roll → optionally apply the total as damage or healing.
  */
 export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: () => void }) {
+  const { t } = useI18n();
   const [parts, setParts] = useState<PartForm[]>([{ count: '1', die: '20' }]);
   const [mod, setMod] = useState('0');
   const [result, setResult] = useState<{ total: number; perPart: number[][]; expr: string } | null>(null);
@@ -64,11 +66,11 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>🎲 Dice Roller</h2>
+        <h2>{t('dice.title')}</h2>
         {parts.map((p, i) => (
           <div key={i} className="form-row">
             <label>
-              {i === 0 ? 'Amount' : 'Extra amount'}
+              {t(i === 0 ? 'dice.amount' : 'dice.extraAmount')}
               <input
                 autoFocus={i === 0}
                 type="number"
@@ -139,7 +141,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
 
         {combatants.length > 0 && (
           <>
-            <h3>Apply to <span className="muted">(pick one or more)</span></h3>
+            <h3>{t('dice.applyTo')} <span className="muted">{t('dice.pickOneOrMore')}</span></h3>
             <div className="monster-pick-list">
               {combatants.map((c) => (
                 <button
@@ -152,11 +154,11 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
               ))}
             </div>
             <div className="modal-actions">
-              <button className="btn" onClick={onClose}>Close</button>
+              <button className="btn" onClick={onClose}>{t('common.close')}</button>
               <button
                 className="btn danger"
                 disabled={!result || targets.size === 0}
-                title={!result ? 'Roll first' : ''}
+                title={!result ? t('dice.rollFirst') : ''}
                 onClick={() => void apply('damage')}
               >
                 ⚔ Damage {result && targets.size > 0 ? `(${result.total})` : ''}
@@ -164,7 +166,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
               <button
                 className="btn heal"
                 disabled={!result || targets.size === 0}
-                title={!result ? 'Roll first' : ''}
+                title={!result ? t('dice.rollFirst') : ''}
                 onClick={() => void apply('heal')}
               >
                 ✚ Heal {result && targets.size > 0 ? `(${result.total})` : ''}
@@ -174,7 +176,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
         )}
         {combatants.length === 0 && (
           <div className="modal-actions">
-            <button className="btn" onClick={onClose}>Close</button>
+            <button className="btn" onClick={onClose}>{t('common.close')}</button>
           </div>
         )}
       </div>

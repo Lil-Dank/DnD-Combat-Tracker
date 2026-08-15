@@ -15,6 +15,7 @@ import { api } from '../api';
 import { useConfirm } from '../Confirm';
 import { AttackText } from '../AttackText';
 import { AbilityTable } from '../AbilityTable';
+import { useI18n } from '../i18n';
 
 // ---- editable action form model (strings while typing) ----
 
@@ -202,6 +203,7 @@ function formToAction(f: ActionForm, order: number, existing?: MonsterAction): M
 }
 
 export function MonsterScreen({ state }: { state: AppState }) {
+  const { t, mon } = useI18n();
   const [form, setForm] = useState<MonsterFormData | null>(null);
   const confirm = useConfirm();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -266,10 +268,10 @@ export function MonsterScreen({ state }: { state: AppState }) {
   return (
     <div className="screen">
       <header className="screen-header">
-        <h1>Monster Library</h1>
+        <h1>{t('monsters.title')}</h1>
         <div className="header-actions">
           <button className="btn" disabled={importing} onClick={() => void runImport()}>
-            {importing ? 'Importing…' : '⬇ Import SRD Monsters'}
+            {t(importing ? 'monsters.importing' : 'monsters.import')}
           </button>
           <button
             className="btn primary"
@@ -289,7 +291,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
 
       <input
         className="search-box"
-        placeholder="Search monsters…"
+        placeholder={t('monsters.search')}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
       />
@@ -305,12 +307,12 @@ export function MonsterScreen({ state }: { state: AppState }) {
         {monsters.length > 0 && (
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Max HP</th>
-              <th>AC</th>
-              <th>Init mod</th>
-              <th>Actions</th>
-              <th>Source</th>
+              <th>{t('common.name')}</th>
+              <th>{t('common.maxHp')}</th>
+              <th>{t('common.ac')}</th>
+              <th>{t('common.initMod')}</th>
+              <th>{t('monsters.actions')}</th>
+              <th>{t('monsters.source')}</th>
               <th></th>
             </tr>
           </thead>
@@ -323,9 +325,9 @@ export function MonsterScreen({ state }: { state: AppState }) {
                   <button
                     className="link-btn"
                     onClick={() => setExpanded(expanded === m.id ? null : m.id)}
-                    title="Show actions"
+                    title={t('monsters.showActions')}
                   >
-                    {expanded === m.id ? '▾' : '▸'} {m.name}
+                    {expanded === m.id ? '▾' : '▸'} {mon(m.name)}
                   </button>
                 </td>
                 <td>{m.maxHp}</td>
@@ -333,14 +335,14 @@ export function MonsterScreen({ state }: { state: AppState }) {
                 <td>{m.initMod >= 0 ? `+${m.initMod}` : m.initMod}</td>
                 <td>{m.attacks.length}</td>
                 <td>
-                  <span className={`tag ${m.source}`}>{m.source === 'srd' ? 'SRD' : 'Manual'}</span>
+                  <span className={`tag ${m.source}`}>{m.source === 'srd' ? 'SRD' : t('monsters.manual')}</span>
                 </td>
                 <td className="row-actions">
-                  <button className="btn small" onClick={() => startEdit(m)}>Edit</button>
+                  <button className="btn small" onClick={() => startEdit(m)}>{t('common.edit')}</button>
                   <button
                     className="btn small danger"
                     onClick={async () => {
-                      if (await confirm(`Delete ${m.name}? It will also be removed from encounter templates.`, 'Delete'))
+                      if (await confirm(t('monsters.deleteConfirm', { name: m.name }), t('common.delete')))
                         void api.deleteMonster(m.id);
                     }}
                   >
@@ -353,7 +355,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                   <td colSpan={7}>
                     {m.abilities && <AbilityTable abilities={m.abilities} />}
                     {m.attacks.length === 0 ? (
-                      <em>No actions recorded.</em>
+                      <em>{t('monsters.noActions')}</em>
                     ) : (
                       <ul className="attack-list">
                         {m.attacks.map((a) => (
@@ -381,7 +383,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
       {form && (
         <div className="modal-backdrop" onClick={() => setForm(null)}>
           <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-            <h2>{form.id ? 'Edit Monster' : 'Add Monster'}</h2>
+            <h2>{t(form.id ? 'monsters.editMonster' : 'monsters.addMonster')}</h2>
             <label>
               Name
               <input
@@ -418,7 +420,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
               </label>
             </div>
 
-            <h3>Ability scores <span className="muted">(optional — modifiers derive automatically)</span></h3>
+            <h3>{t('monsters.abilities')} <span className="muted">{t('monsters.abilitiesNote')}</span></h3>
             <div className="form-row">
               {ABILITY_KEYS.map((k) => (
                 <label key={k}>
@@ -435,7 +437,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
               ))}
             </div>
 
-            <h3>Actions <span className="muted">(attacks, saves, abilities — DM-only reference)</span></h3>
+            <h3>{t('monsters.actions')} <span className="muted">{t('monsters.actionsNote')}</span></h3>
             {form.actions.map((a, i) => (
               <div key={a.id} className="attack-form">
                 <div className="form-row">
@@ -460,9 +462,9 @@ export function MonsterScreen({ state }: { state: AppState }) {
                       value={a.type}
                       onChange={(e) => patchAction(i, { type: e.target.value as ActionKind })}
                     >
-                      <option value="attack">Attack roll</option>
-                      <option value="save">Saving throw</option>
-                      <option value="other">Other</option>
+                      <option value="attack">{t('monsters.type.attack')}</option>
+                      <option value="save">{t('monsters.type.save')}</option>
+                      <option value="other">{t('monsters.type.other')}</option>
                     </select>
                   </label>
                   <button
@@ -483,9 +485,9 @@ export function MonsterScreen({ state }: { state: AppState }) {
                         value={a.kind}
                         onChange={(e) => patchAction(i, { kind: e.target.value as AttackKind })}
                       >
-                        <option value="melee">Melee</option>
-                        <option value="ranged">Ranged</option>
-                        <option value="melee_or_ranged">Melee or Ranged</option>
+                        <option value="melee">{t('monsters.kind.melee')}</option>
+                        <option value="ranged">{t('monsters.kind.ranged')}</option>
+                        <option value="melee_or_ranged">{t('monsters.kind.melee_or_ranged')}</option>
                       </select>
                     </label>
                     <label>
@@ -651,7 +653,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
             </button>
 
             <div className="modal-actions">
-              <button className="btn" onClick={() => setForm(null)}>Cancel</button>
+              <button className="btn" onClick={() => setForm(null)}>{t('common.cancel')}</button>
               <button className="btn primary" disabled={!form.name.trim()} onClick={() => void submit()}>
                 Save
               </button>

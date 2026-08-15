@@ -1,49 +1,69 @@
 import type { AppState, ThemeId } from '../../../shared/types';
 import { THEMES } from '../../../shared/types';
+import { LANGUAGES, type Lang } from '../../../shared/i18n';
 import { api } from '../api';
+import { useI18n } from '../i18n';
 
 export function SettingsScreen({ state }: { state: AppState }) {
+  const { t, lang } = useI18n();
+
   return (
     <div className="screen">
       <header className="screen-header">
-        <h1>Settings</h1>
+        <h1>{t('settings.title')}</h1>
       </header>
 
       <section className="settings-section">
-        <h2>Appearance</h2>
+        <h2>{t('settings.appearance')}</h2>
         <label className="inline-label">
-          Theme
+          {t('settings.language')}
+          <select
+            className="theme-select"
+            value={state.settings.language}
+            onChange={(e) => void api.updateSettings({ language: e.target.value as Lang })}
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">{t('settings.languageNote')}</p>
+
+        <label className="inline-label">
+          {t('settings.theme')}
           <select
             className="theme-select"
             value={state.settings.theme}
             onChange={(e) => void api.updateSettings({ theme: e.target.value as ThemeId })}
           >
-            {THEMES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
+            {THEMES.map((th) => (
+              <option key={th.id} value={th.id}>
+                {th.label}
               </option>
             ))}
           </select>
         </label>
-        <p className="muted">Applies to the DM window. The Player View keeps its own look.</p>
+        <p className="muted">{t('settings.themeNote')}</p>
       </section>
 
       <section className="settings-section">
-        <h2>DM Combat Screen</h2>
+        <h2>{t('settings.combatScreen')}</h2>
         <label className="inline-label checkbox-label">
           <input
             type="checkbox"
             checked={state.settings.autoOpenAttacks}
             onChange={(e) => void api.updateSettings({ autoOpenAttacks: e.target.checked })}
           />
-          Automatically open the attack quick reference for the monster whose turn it is
+          {t('settings.autoOpen')}
         </label>
       </section>
 
       <section className="settings-section">
-        <h2>Player View</h2>
+        <h2>{t('settings.playerView')}</h2>
         <label className="inline-label">
-          Background color
+          {t('settings.bgColor')}
           <input
             type="color"
             value={state.settings.playerViewBgColor}
@@ -53,9 +73,9 @@ export function SettingsScreen({ state }: { state: AppState }) {
       </section>
 
       <section className="settings-section">
-        <h2>Stream Deck bridge</h2>
+        <h2>{t('settings.bridge')}</h2>
         <label className="inline-label">
-          WebSocket port
+          {t('settings.port')}
           <input
             type="number"
             defaultValue={state.settings.bridgePort}
@@ -68,20 +88,22 @@ export function SettingsScreen({ state }: { state: AppState }) {
           />
         </label>
         <p className="muted">
-          Default 57321. Change only on a port conflict, and set the same port in the Stream
-          Deck plugin settings. Status: {state.bridgeClientCount > 0 ? 'connected' : 'no plugin connected'}.
+          {t('settings.portNote', {
+            status: t(state.bridgeClientCount > 0 ? 'settings.connected' : 'settings.noPlugin'),
+          })}
         </p>
       </section>
 
       <section className="settings-section">
-        <h2>About / Credits</h2>
+        <h2>{t('settings.about')}</h2>
         <p>
           Monster data: <strong>SRD 5.2.1</strong> by Wizards of the Coast, licensed under{' '}
           <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
             CC-BY-4.0
           </a>
-          . Dataset: 5e-bits/5e-database (2025 SRD files).
+          . Dataset: Open5e (srd-2024).
         </p>
+        {lang === 'de' && <p className="muted">{t('settings.creditsNote')}</p>}
       </section>
     </div>
   );

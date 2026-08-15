@@ -24,6 +24,26 @@ interface BundledMonster {
   attacks: MonsterAction[];
 }
 
+/** Same lookup as the monster data, for the German name map beside it. */
+export function srdGermanNamesPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'srd', 'monsters.de.json')
+    : path.join(app.getAppPath(), 'resources', 'srd', 'monsters.de.json');
+}
+
+/**
+ * Loads the English->German monster names so the bridge can localize the actor
+ * labels it pushes to the deck. Missing or unreadable file is not fatal: names
+ * simply stay English.
+ */
+export async function loadGermanMonsterNames(): Promise<Record<string, string>> {
+  try {
+    return JSON.parse(await fs.readFile(srdGermanNamesPath(), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
 function srdDataPath(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'srd', 'monsters.json')

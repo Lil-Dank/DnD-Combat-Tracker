@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AppState, PC } from '../../../shared/types';
 import { api } from '../api';
 import { useConfirm } from '../Confirm';
+import { useI18n } from '../i18n';
 
 interface PcFormData {
   id?: string;
@@ -14,6 +15,7 @@ interface PcFormData {
 const emptyForm: PcFormData = { name: '', maxHp: '10', ac: '10', initMod: '0' };
 
 export function PcScreen({ state }: { state: AppState }) {
+  const { t } = useI18n();
   const [form, setForm] = useState<PcFormData | null>(null);
   const confirm = useConfirm();
 
@@ -41,24 +43,24 @@ export function PcScreen({ state }: { state: AppState }) {
   return (
     <div className="screen">
       <header className="screen-header">
-        <h1>Party — Player Characters</h1>
+        <h1>{t('pcs.titleFull')}</h1>
         <button className="btn primary" onClick={() => setForm({ ...emptyForm })}>
           + Add PC
         </button>
       </header>
 
       {state.pcs.length === 0 && !form && (
-        <p className="empty-note">No player characters yet. Add your party here once — they persist and can join any combat.</p>
+        <p className="empty-note">{t('pcs.emptyFull')}</p>
       )}
 
       <table className="data-table">
         {state.pcs.length > 0 && (
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Max HP</th>
-              <th>AC</th>
-              <th>Init mod</th>
+              <th>{t('common.name')}</th>
+              <th>{t('common.maxHp')}</th>
+              <th>{t('common.ac')}</th>
+              <th>{t('common.initMod')}</th>
               <th></th>
             </tr>
           </thead>
@@ -71,11 +73,11 @@ export function PcScreen({ state }: { state: AppState }) {
               <td>{pc.ac}</td>
               <td>{pc.initMod >= 0 ? `+${pc.initMod}` : pc.initMod}</td>
               <td className="row-actions">
-                <button className="btn small" onClick={() => startEdit(pc)}>Edit</button>
+                <button className="btn small" onClick={() => startEdit(pc)}>{t('common.edit')}</button>
                 <button
                   className="btn small danger"
                   onClick={async () => {
-                    if (await confirm(`Delete ${pc.name}?`, 'Delete')) void api.deletePc(pc.id);
+                    if (await confirm(t('pcs.deleteConfirm', { name: pc.name }), t('common.delete'))) void api.deletePc(pc.id);
                   }}
                 >
                   Delete
@@ -89,7 +91,7 @@ export function PcScreen({ state }: { state: AppState }) {
       {form && (
         <div className="modal-backdrop" onClick={() => setForm(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{form.id ? 'Edit PC' : 'Add PC'}</h2>
+            <h2>{t(form.id ? 'pcs.editPc' : 'pcs.addPc')}</h2>
             <label>
               Name
               <input
@@ -127,7 +129,7 @@ export function PcScreen({ state }: { state: AppState }) {
               </label>
             </div>
             <div className="modal-actions">
-              <button className="btn" onClick={() => setForm(null)}>Cancel</button>
+              <button className="btn" onClick={() => setForm(null)}>{t('common.cancel')}</button>
               <button className="btn primary" disabled={!form.name.trim()} onClick={() => void submit()}>
                 Save
               </button>

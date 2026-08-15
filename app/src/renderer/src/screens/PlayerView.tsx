@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import type { AppState, Combatant } from '../../../shared/types';
+import type { AppState, Combatant, Condition } from '../../../shared/types';
+import { useI18n } from '../i18n';
 
 /**
  * Display-only window for the players' screen. Monster HP is never shown;
@@ -140,6 +141,7 @@ export function chooseLayout(count: number, w: number, h: number): PvLayout {
 }
 
 export function PlayerView({ state }: { state: AppState }) {
+  const { t } = useI18n();
   const [stageRef, stage] = useStageSize();
   const gridRef = useRef<HTMLDivElement | null>(null);
   const combat = state.combat;
@@ -185,7 +187,7 @@ export function PlayerView({ state }: { state: AppState }) {
       {active && (
         <>
           <div className="pv-header">
-            <span className="pv-round">Round {combat.round}</span>
+            <span className="pv-round">{t('combat.round', { n: combat.round })}</span>
           </div>
           <div className="pv-stage" ref={stageRef}>
           <div
@@ -224,27 +226,29 @@ export function PlayerView({ state }: { state: AppState }) {
 }
 
 function ConditionBadges({ conditions }: { conditions: string[] }) {
+  const { cond: label } = useI18n();
   if (conditions.length === 0) return null;
   return (
     <div className="pv-conditions">
-      {conditions.map((cond) => (
-        <span key={cond} className="pv-condition">{cond}</span>
+      {conditions.map((c) => (
+        <span key={c} className="pv-condition">{label(c as Condition)}</span>
       ))}
     </div>
   );
 }
 
 function PlayerCard({ c, isCurrent }: { c: Combatant; isCurrent: boolean }) {
+  const { t } = useI18n();
   return (
     <div className={`pv-card pc ${isCurrent ? 'current' : ''} ${c.isDowned ? 'downed' : ''}`}>
       <div className="pv-card-name"><span>{c.displayName}</span></div>
-      {isCurrent && <span className="pv-turn-chip">⚔ Turn</span>}
+      {isCurrent && <span className="pv-turn-chip">{t('pv.turn')}</span>}
       <div
         className={`pv-hp ${
           c.isDowned ? 'zero' : c.currentHp < c.maxHp / 2 ? 'hurt' : ''
         }`}
       >
-        {c.isDowned ? '💀 Downed' : `${c.currentHp} / ${c.maxHp}`}
+        {c.isDowned ? t('pv.downed') : `${c.currentHp} / ${c.maxHp}`}
       </div>
       <ConditionBadges conditions={c.conditions} />
     </div>
@@ -261,6 +265,7 @@ function MonsterGroupCard({
   isCurrent: boolean;
 }) {
   // Members share bloodied state + conditions (that's the grouping criterion).
+  const { t, mon } = useI18n();
   const bloodied = isBloodied(members[0]);
   const severity = members.reduce((sum, m) => sum + severityOf(m), 0) / members.length;
   // Fully opaque reds — this replaces the card's own background, so any alpha
@@ -281,14 +286,14 @@ function MonsterGroupCard({
   return (
     <div className={`pv-card monster ${isCurrent ? 'current' : ''}`} style={style}>
       <div className="pv-card-name">
-        <span>{name}</span>
+        <span>{mon(name)}</span>
         {numbers.length > 0 && (
           <span className="pv-nums">{formatNumbers(numbers)}</span>
         )}
         {members.length > 1 && <span className="pv-count">×{members.length}</span>}
       </div>
-      {isCurrent && <span className="pv-turn-chip">⚔ Turn</span>}
-      <div className="pv-hp monster-hp">{bloodied ? 'Bloodied' : ' '}</div>
+      {isCurrent && <span className="pv-turn-chip">{t('pv.turn')}</span>}
+      <div className="pv-hp monster-hp">{bloodied ? t('pv.bloodied') : ' '}</div>
       <ConditionBadges conditions={members[0].conditions} />
     </div>
   );

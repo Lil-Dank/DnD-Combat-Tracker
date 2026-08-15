@@ -8,15 +8,17 @@ import { CombatScreen } from './screens/CombatScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { PlayerView } from './screens/PlayerView';
 import { ConfirmProvider } from './Confirm';
+import { I18nProvider } from './i18n';
+import { translate } from '../../shared/i18n';
 
 type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'settings';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'combat', label: '⚔ Combat' },
-  { id: 'pcs', label: '🛡 Party' },
-  { id: 'monsters', label: '🐉 Monsters' },
-  { id: 'templates', label: '📜 Encounters' },
-  { id: 'settings', label: '⚙ Settings' },
+const TABS: { id: Tab; key: string }[] = [
+  { id: 'combat', key: 'nav.combat' },
+  { id: 'pcs', key: 'nav.party' },
+  { id: 'monsters', key: 'nav.monsters' },
+  { id: 'templates', key: 'nav.encounters' },
+  { id: 'settings', key: 'nav.settings' },
 ];
 
 export function App() {
@@ -25,12 +27,13 @@ export function App() {
   const [playerViewOpen, setPlayerViewOpen] = useState(false);
   const [combatTemplateId, setCombatTemplateId] = useState<string | null>(null);
   const isPlayerView = window.location.hash.replace('#', '') === 'player';
+  const lang = state?.settings.language ?? 'en';
 
   useEffect(() => {
     // The page <title> overrides the BrowserWindow title, so distinguish the
     // Player View here (helps OBS window capture tell the two apart).
-    if (isPlayerView) document.title = 'D&D Combat Tracker - Player View';
-  }, [isPlayerView]);
+    if (isPlayerView) document.title = translate(lang, 'app.playerViewTitle');
+  }, [isPlayerView, lang]);
 
   useEffect(() => {
     // Theme presets swap the CSS variables via this attribute (DM window UI
@@ -60,19 +63,24 @@ export function App() {
     };
   }, []);
 
-  if (!state) return <div className="loading">Loading…</div>;
+  if (!state) return <div className="loading">{translate(lang, 'app.loading')}</div>;
 
   if (isPlayerView) {
-    return <PlayerView state={state} />;
+    return (
+      <I18nProvider lang={lang}>
+        <PlayerView state={state} />
+      </I18nProvider>
+    );
   }
 
   return (
+    <I18nProvider lang={lang}>
     <ConfirmProvider>
     <div className="app">
       <nav className="sidebar">
         <div className="app-title">
           <span className="app-title-icon">🎲</span>
-          <span>Combat Tracker</span>
+          <span>{translate(lang, 'app.title')}</span>
         </div>
         {TABS.map((t) => (
           <button
@@ -80,7 +88,7 @@ export function App() {
             className={`nav-btn ${tab === t.id ? 'active' : ''}`}
             onClick={() => setTab(t.id)}
           >
-            {t.label}
+            {translate(lang, t.key)}
           </button>
         ))}
         <div className="sidebar-footer">
@@ -88,15 +96,15 @@ export function App() {
             className={`nav-btn pv-toggle ${playerViewOpen ? 'active' : ''}`}
             onClick={() => void api.togglePlayerView()}
           >
-            🖥 {playerViewOpen ? 'Close Player View' : 'Open Player View'}
+            🖥 {translate(lang, playerViewOpen ? 'nav.closePlayerView' : 'nav.openPlayerView')}
           </button>
           {playerViewOpen && (
             <button className="nav-btn" onClick={() => void api.togglePlayerFullscreen()}>
-              ⛶ Fullscreen
+              {translate(lang, 'nav.fullscreen')}
             </button>
           )}
           <div className={`bridge-status ${state.bridgeClientCount > 0 ? 'on' : ''}`}>
-            {state.bridgeClientCount > 0 ? '● Stream Deck connected' : '○ Stream Deck offline'}
+            {translate(lang, state.bridgeClientCount > 0 ? 'nav.deckConnected' : 'nav.deckOffline')}
           </div>
         </div>
       </nav>
@@ -117,5 +125,6 @@ export function App() {
       </main>
     </div>
     </ConfirmProvider>
+    </I18nProvider>
   );
 }

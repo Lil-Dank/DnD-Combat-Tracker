@@ -2,6 +2,7 @@ import streamDeck, { type KeyAction, type Device } from '@elgato/streamdeck';
 import { bridge, type BridgeAttack, type BridgeCombatant } from './bridge';
 import { rollD20, rollDice, rollPool } from './dice';
 import { pickerKeyImage, type KeyRole } from './key-image';
+import { L, conditionLabel, setPluginLang } from './i18n';
 
 /** A rendered key: what it says and what kind of key it is. */
 interface KeySpec {
@@ -117,26 +118,26 @@ function numpadLayout(cols: number, rows: number): Map<number, NumKey> | null {
   const map = new Map<number, NumKey>();
   const digit = (d: string): NumKey => ({ kind: 'digit', label: d, value: d });
   if (cols >= 8 && rows >= 4) {
-    map.set(at(0, 0), { kind: 'back', label: '← Back' });
+    map.set(at(0, 0), { kind: 'back', label: L('back') });
     map.set(at(1, 1), { kind: 'display', label: '' });
-    map.set(at(0, rows - 1), { kind: 'cancel', label: '✕\nCancel' });
+    map.set(at(0, rows - 1), { kind: 'cancel', label: L('cancel') });
     map.set(at(3, 0), digit('7')); map.set(at(4, 0), digit('8')); map.set(at(5, 0), digit('9'));
     map.set(at(3, 1), digit('4')); map.set(at(4, 1), digit('5')); map.set(at(5, 1), digit('6'));
     map.set(at(3, 2), digit('1')); map.set(at(4, 2), digit('2')); map.set(at(5, 2), digit('3'));
     map.set(at(4, 3), digit('0'));
     map.set(at(cols - 1, 0), { kind: 'clear', label: 'C' });
-    map.set(at(cols - 1, rows - 1), { kind: 'enter', label: '✓\nEnter' });
+    map.set(at(cols - 1, rows - 1), { kind: 'enter', label: L('enter') });
     return map;
   }
   if (cols >= 5 && rows >= 3) {
-    map.set(at(0, 0), { kind: 'back', label: '← Back' });
+    map.set(at(0, 0), { kind: 'back', label: L('back') });
     map.set(at(0, 1), { kind: 'display', label: '' });
-    map.set(at(0, 2), { kind: 'cancel', label: '✕\nCancel' });
+    map.set(at(0, 2), { kind: 'cancel', label: L('cancel') });
     map.set(at(1, 0), digit('7')); map.set(at(2, 0), digit('8')); map.set(at(3, 0), digit('9'));
     map.set(at(1, 1), digit('4')); map.set(at(2, 1), digit('5')); map.set(at(3, 1), digit('6'));
     map.set(at(1, 2), digit('1')); map.set(at(2, 2), digit('2')); map.set(at(3, 2), digit('3'));
     map.set(at(4, 0), { kind: 'clear', label: 'C' });
-    map.set(at(4, 1), { kind: 'enter', label: '✓\nEnter' });
+    map.set(at(4, 1), { kind: 'enter', label: L('enter') });
     map.set(at(4, 2), digit('0'));
     return map;
   }
@@ -193,7 +194,10 @@ class Picker {
   private lastImage = new Map<number, string>();
 
   constructor() {
-    bridge.onState(() => this.onBridgeState());
+    bridge.onState(() => {
+      setPluginLang(bridge.state.language);
+      this.onBridgeState();
+    });
   }
 
   private get cols(): number {
@@ -556,14 +560,14 @@ class Picker {
       // Damage, Heal, and Condition all select several actors at once.
       // Cancel lives at the bottom-left on every screen; this screen has no
       // previous step, so slot 0 carries the first actor instead of a Back key.
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       const { map, paged, pageSlot } = this.listLayout(this.alive(), true, [], false);
       if (slot === this.doneSlot) {
         return this.targets.length > 0
-          ? K(`✓ Next\n(${this.targets.length})`, 'confirm')
-          : K('✓ Next', 'confirm');
+          ? K(`${L('next')}\n(${this.targets.length})`, 'confirm')
+          : K(L('next'), 'confirm');
       }
-      if (paged && slot === pageSlot) return K('▶\nMore', 'page');
+      if (paged && slot === pageSlot) return K(L('more'), 'page');
       const c = map.get(slot);
       if (!c) return BLANK;
       const picked = this.targets.includes(c.id);
@@ -588,24 +592,24 @@ class Picker {
           }
           return K(`${icon} ${digits}\n${wrapTitle(base, 7, 2)}`, 'display');
         }
-        return K(`${icon} ${digits}\n${this.targets.length}\ntargets`, 'display');
+        return K(`${icon} ${digits}\n${this.targets.length}\n${L('targets')}`, 'display');
       }
       return K(key.label, numpadRole(key.kind));
     }
 
     if (this.mode === 'confirmEnd') {
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
-      if (slot === this.confirmYesSlot) return K('✓\nEnd\nCombat', 'confirm');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
+      if (slot === this.confirmYesSlot) return K(L('endCombat'), 'confirm');
       if (slot === this.confirmDisplaySlot) {
-        return K(`End\ncombat?\nRound ${bridge.state.round}`, 'display');
+        return K(L('endPrompt', { round: bridge.state.round }), 'display');
       }
       return BLANK;
     }
 
     if (this.mode === 'attackSelect') {
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       const { map, paged, pageSlot } = this.listLayout(this.attackList, false, [], false);
-      if (paged && slot === pageSlot) return K('▶\nMore', 'page');
+      if (paged && slot === pageSlot) return K(L('more'), 'page');
       const atk = map.get(slot);
       if (!atk) return BLANK;
       // Name only — to-hit/DC detail lives on the roll screen and DM view.
@@ -613,15 +617,15 @@ class Picker {
     }
 
     if (this.mode === 'targetSelect') {
-      if (slot === 0) return K('← Back', 'back');
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
+      if (slot === 0) return K(L('back'), 'back');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       const { map, paged, pageSlot } = this.targetLayout();
       if (this.isAoe && slot === this.doneSlot) {
         return this.targets.length > 0
-          ? K(`✓ Done\n(${this.targets.length})`, 'confirm')
-          : K('✓ Done', 'confirm');
+          ? K(`${L('done')}\n(${this.targets.length})`, 'confirm')
+          : K(L('done'), 'confirm');
       }
-      if (paged && slot === pageSlot) return K('▶\nMore', 'page');
+      if (paged && slot === pageSlot) return K(L('more'), 'page');
       const c = map.get(slot);
       if (!c) return BLANK;
       const picked = this.targets.includes(c.id);
@@ -634,8 +638,8 @@ class Picker {
     if (this.mode === 'attackRoll') {
       const atk = this.selectedAttack;
       if (!atk) return BLANK;
-      if (slot === 0) return K('← Back', 'back');
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
+      if (slot === 0) return K(L('back'), 'back');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       if (slot === this.confirmDisplaySlot) {
         return K(`${wrapTitle(atk.name, 7, 1)}\n${this.lastRoll || '—'}`, 'display');
       }
@@ -649,18 +653,18 @@ class Picker {
         if (this.targets.length === 1) {
           const target = this.alive().find((c) => c.id === this.targets[0]);
           if (!target) return BLANK;
-          return K(`${this.targetName(target, 2)}\nAC ${target.ac ?? '?'}`, 'display');
+          return K(`${this.targetName(target, 2)}\n${L('ac')} ${target.ac ?? '?'}`, 'display');
         }
-        return K(`${this.targets.length}\ntargets`, 'display');
+        return K(`${this.targets.length}\n${L('targets')}`, 'display');
       }
-      if (slot === this.rollAttackSlot && atk.toHit !== null) return K('🎲\nAttack', 'confirm');
-      if (slot === this.rollDamageSlot && atk.damage.length > 0) return K('🎲\nDamage', 'confirm');
+      if (slot === this.rollAttackSlot && atk.toHit !== null) return K(L('rollAttack'), 'confirm');
+      if (slot === this.rollDamageSlot && atk.damage.length > 0) return K(L('rollDamage'), 'confirm');
       return BLANK;
     }
 
     if (this.mode === 'saveResult') {
-      if (slot === 0) return K('← Back', 'back');
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
+      if (slot === 0) return K(L('back'), 'back');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       const { map, paged, pageSlot } = this.listLayout(
         this.selectedTargetCombatants(),
         true,
@@ -668,13 +672,13 @@ class Picker {
       );
       if (slot === this.confirmDisplaySlot) {
         if (this.applyTimer) return K(this.lastRoll, 'display');
-        return K(`DMG ${this.pendingDamage}\nwho\nsaved?`, 'display');
+        return K(L('whoSaved', { amount: this.pendingDamage }), 'display');
       }
       if (slot === this.doneSlot) {
         const half = Math.floor(this.pendingDamage / 2);
         return K(`⚔ Apply\n${this.savedTargets.length}×½(${half})`, 'confirm');
       }
-      if (paged && slot === pageSlot) return K('▶\nMore', 'page');
+      if (paged && slot === pageSlot) return K(L('more'), 'page');
       const c = map.get(slot);
       if (!c) return BLANK;
       const saved = this.savedTargets.includes(c.id);
@@ -693,12 +697,12 @@ class Picker {
         // dedicated key at the bottom-left, so leave this one blank.
         return this.mode === 'diceAmount' && this.diceStage === 'first'
           ? BLANK
-          : K('← Back', 'back');
+          : K(L('back'), 'back');
       }
       if (key.kind === 'display') {
         if (this.mode === 'diceAmount') {
           // Kept to three lines so the value stays large on a 72px key.
-          const header = this.diceStage === 'extra' ? 'Extra\ndice:' : 'How\nmany?';
+          const header = this.diceStage === 'extra' ? L('extraDice') : L('howMany');
           return K(`${header}\n${this.digits === '' ? '_' : this.digits}`, 'display');
         }
         // Pressing this key flips the modifier's sign, so it's a real button.
@@ -711,15 +715,15 @@ class Picker {
     }
 
     if (this.mode === 'diceType') {
-      if (slot === 0) return K('← Back', 'back');
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
+      if (slot === 0) return K(L('back'), 'back');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       const die = DICE_TYPES[slot - 1];
       return die !== undefined ? K(`${this.diceCount}\nd${die}`) : BLANK;
     }
 
     if (this.mode === 'diceMore') {
-      if (slot === 0) return K('← Back', 'back');
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
+      if (slot === 0) return K(L('back'), 'back');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       if (slot === this.confirmDisplaySlot) {
         return K([...this.diceExprLines(2), 'more', 'dice?'].join('\n'), 'display');
       }
@@ -729,8 +733,8 @@ class Picker {
     }
 
     if (this.mode === 'diceRoll') {
-      if (slot === 0) return K('← Back', 'back');
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
+      if (slot === 0) return K(L('back'), 'back');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       if (slot === this.confirmDisplaySlot) {
         return K(
           [
@@ -740,16 +744,16 @@ class Picker {
           'display',
         );
       }
-      if (slot === this.diceAddSlot) return K('＋\nDice', 'item');
-      if (slot === this.diceRollSlot) return K('🎲\nRoll', 'confirm');
-      if (slot === this.diceDamageSlot) return K('⚔\nDamage', 'item');
-      if (slot === this.diceHealSlot) return K('✚\nHeal', 'item');
+      if (slot === this.diceAddSlot) return K(L('addDice'), 'item');
+      if (slot === this.diceRollSlot) return K(L('roll'), 'confirm');
+      if (slot === this.diceDamageSlot) return K(L('applyDamage'), 'item');
+      if (slot === this.diceHealSlot) return K(L('applyHeal'), 'item');
       return BLANK;
     }
 
     if (this.mode === 'diceTargets') {
-      if (slot === 0) return K('← Back', 'back');
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
+      if (slot === 0) return K(L('back'), 'back');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       const { map, paged, pageSlot } = this.targetLayout();
       if (slot === this.doneSlot) {
         const op = this.applyOp === 'damage' ? '⚔' : '✚';
@@ -760,7 +764,7 @@ class Picker {
           'confirm',
         );
       }
-      if (paged && slot === pageSlot) return K('▶\nMore', 'page');
+      if (paged && slot === pageSlot) return K(L('more'), 'page');
       const c = map.get(slot);
       if (!c) return BLANK;
       const picked = this.targets.includes(c.id);
@@ -771,12 +775,12 @@ class Picker {
     }
 
     if (this.mode === 'conditions') {
-      if (slot === 0) return K('← Back', 'back');
-      if (slot === this.cancelSlot) return K('✕\nCancel', 'cancel');
-      if (slot === this.doneSlot) return K('✓\nDone', 'confirm');
+      if (slot === 0) return K(L('back'), 'back');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
+      if (slot === this.doneSlot) return K(L('doneKey'), 'confirm');
       // multi=true only reserves the Done key's slot for the layout.
       const { map, paged, pageSlot } = this.listLayout([...CONDITIONS], true);
-      if (paged && slot === pageSlot) return K('▶\nMore', 'page');
+      if (paged && slot === pageSlot) return K(L('more'), 'page');
       const cond = map.get(slot);
       if (!cond) return BLANK;
       const selected = this.selectedTargetCombatants();
@@ -784,7 +788,7 @@ class Picker {
       // ✓ = all selected actors have it; ~ = only some (mixed).
       const marker = haveCount === 0 ? '' : haveCount === selected.length ? '✓\n' : '~\n';
       return K(
-        `${marker}${wrapTitle(cond, 7, marker ? 2 : 3)}`,
+        `${marker}${wrapTitle(conditionLabel(cond), 7, marker ? 2 : 3)}`,
         haveCount === 0 ? 'item' : 'selected',
       );
     }

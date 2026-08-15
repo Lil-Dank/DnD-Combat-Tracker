@@ -12,7 +12,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v1.0.0-success)
+![Release](https://img.shields.io/badge/release-v1.1.0-success)
 
 </div>
 
@@ -43,6 +43,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 - [Using the app](#using-the-app)
 - [Stream Deck plugin](#stream-deck-plugin)
 - [Build from source](#build-from-source)
+- [Releasing](#releasing)
 - [Monster data & license](#monster-data--license)
 - [Behaviour notes](#behaviour-notes)
 
@@ -58,6 +59,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 | 📺 **Player View** | Display-only second-monitor window. Monsters show no numbers — just a progressive "bloodied" reddening. Auto-fits any actor count. **Styled for chroma keying.** |
 | 🎛️ **Stream Deck plugin** | Turn control, damage/heal numpad, multi-actor conditions, monster attack rolls, and a dice roller — all on hardware keys that render their own labels. |
 | 🎨 **Themes** | PHB Style (default), Default Electron, Dark, Light. |
+| 🗣 **English & German** | Full UI localization. Game terms follow the SRD 5.2.1 in each language, and monster names use their German SRD names. |
 | 💾 **Local-only storage** | Plain JSON in `%APPDATA%`, written atomically. Your data never leaves the machine. |
 
 ---
@@ -66,7 +68,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 
 Grab both files from the [**latest release**](../../releases/latest):
 
-1. **App** — run `DnD Combat Tracker Setup 1.0.0.exe` (NSIS installer, choose your own directory).
+1. **App** — run `DnD Combat Tracker Setup 1.1.0.exe` (NSIS installer, choose your own directory).
 2. **Stream Deck plugin** — double-click `com.dmtools.dnd-combat-tracker.streamDeckPlugin`;
    the Stream Deck app installs it and registers the bundled picker profiles.
 3. Start the app. The plugin connects within a few seconds — the DM window's sidebar
@@ -120,7 +122,8 @@ as it happens.
 | `app/` | Electron + TypeScript + React app (DM Window + Player View) |
 | `plugin/` | Stream Deck plugin (Elgato SDK v2, TypeScript) |
 | `app/srd-source/` | Open5e dataset fixtures the monster importer compiles from |
-| `app/resources/srd/` | Generated `monsters.json`, bundled into the installer |
+| `app/resources/srd/` | Generated `monsters.json` + `monsters.de.json`, bundled into the installer |
+| `scripts/publish.mjs` | Tags and publishes a GitHub release with both artifacts |
 
 Build outputs (`node_modules`, `app/out`, `app/release`, `plugin/dist`,
 `plugin/…sdPlugin/bin`) are gitignored. Shippable artifacts are published as
@@ -129,6 +132,15 @@ Build outputs (`node_modules`, `app/out`, `app/release`, `plugin/dist`,
 ---
 
 ## Using the app
+
+**Language** lives under Settings → Appearance: **English** or **Deutsch**. It switches
+the DM window, the Player View *and* the Stream Deck plugin at once — the app sends the
+chosen language over the bridge, so the deck relabels itself without a restart.
+Game terminology is taken from the SRD 5.2.1 in that language rather than translated
+loosely, so conditions read *Vergiftet* and *Kampfunfähig*, abilities read
+*Stä/Ges/Kon/Int/Wei/Cha*, and monsters use their German SRD names — *Owlbear* becomes
+*Eulenbär*, *Ettercap* becomes *Atterkopp*. Names the German SRD does not contain stay
+in English rather than being machine-translated.
 
 **Themes** live under Settings → Appearance: **PHB Style (Default)** (parchment and
 dark-red headings, styled after official 5e books / Homebrewery), **Default Electron**
@@ -434,7 +446,7 @@ cd app
 npm install
 npm run dev        # live-reload dev session
 npm run build      # compile main/preload/renderer to out/
-npm run dist       # → release/DnD Combat Tracker Setup 1.0.0.exe (NSIS)
+npm run dist       # → release/DnD Combat Tracker Setup 1.1.0.exe (NSIS)
 ```
 
 ```bash
@@ -481,6 +493,25 @@ Electron does the rasterising because it already ships with the app.
 
 ---
 
+## Releasing
+
+Build both artifacts, copy them into `release/`, then:
+
+```bash
+node scripts/publish.mjs
+```
+
+That is a **dry run**: it prints the repo, branch, versions, tag and assets it would
+publish, warns about an unclean tree, and exits without touching anything. Add `--yes`
+to actually tag, push and create the GitHub release, `--draft` to publish a draft, or
+`--notes FILE` to supply release notes instead of generating them.
+
+The tag is derived from `app/package.json`, so bump the version there (and the plugin
+manifest's four-part `Version`) before publishing. The script refuses to run with
+uncommitted changes, or if a release for that tag already exists.
+
+---
+
 ## Monster data & license
 
 Monster data is compiled by `app/scripts/build-srd.mjs` from the
@@ -517,6 +548,14 @@ to this schema automatically on app start.
 > <https://www.dndbeyond.com/srd>. The SRD 5.2.1 is licensed under the
 > [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/legalcode)
 > (CC-BY-4.0).
+
+German rules terminology and monster names come from the German SRD 5.2.1, parsed by
+`app/scripts/build-srd-de.mjs` into `app/resources/srd/monsters.de.json`. Names are
+matched onto the English dataset by stat signature rather than by translating the
+words, because a German name is often not a literal rendering of the English one.
+Two independent parsers must agree before a mapping is accepted — 199 of the 331
+monsters currently qualify, and the rest keep their English names rather than being
+guessed at.
 
 The same attribution is shown in-app under **Settings → About / Credits**.
 

@@ -7,6 +7,7 @@ import { AttackText } from '../AttackText';
 import { AbilityTable } from '../AbilityTable';
 import { DiceRollerModal } from '../DiceRoller';
 import { MonsterAttackModal, hasRollableAttacks } from '../MonsterAttackModal';
+import { useI18n } from '../i18n';
 
 export function CombatScreen({
   state,
@@ -52,6 +53,7 @@ function StartCombatWizard({
   preselectedTemplateId?: string | null;
   onOpenDice: () => void;
 }) {
+  const { t } = useI18n();
   const [templateId, setTemplateId] = useState<string | null>(preselectedTemplateId ?? null);
 
   useEffect(() => {
@@ -74,7 +76,7 @@ function StartCombatWizard({
   return (
     <div className="screen">
       <header className="screen-header">
-        <h1>Start Combat</h1>
+        <h1>{t('combat.startCombat')}</h1>
         <div className="header-actions">
           <button className="btn" onClick={onOpenDice}>🎲 Dice Roller</button>
         </div>
@@ -107,7 +109,7 @@ function StartCombatWizard({
           <section className="wizard-step">
             <h2>2. Choose the PCs joining the fight</h2>
             {state.pcs.length === 0 && (
-              <p className="muted">No PCs in the party yet — you can still run a monsters-only combat.</p>
+              <p className="muted">{t('combat.noPcs')}</p>
             )}
             <div className="wizard-options">
               {state.pcs.map((pc) => (
@@ -130,15 +132,15 @@ function StartCombatWizard({
                 className={`pick-btn large ${rollMode === 'all' ? 'picked' : ''}`}
                 onClick={() => setRollMode('all')}
               >
-                <strong>Roll for all</strong>
-                <span className="muted">Auto-roll monsters and PCs (d20 + modifier)</span>
+                <strong>{t('combat.rollAll')}</strong>
+                <span className="muted">{t('combat.rollAllNote')}</span>
               </button>
               <button
                 className={`pick-btn large ${rollMode === 'monstersOnly' ? 'picked' : ''}`}
                 onClick={() => setRollMode('monstersOnly')}
               >
-                <strong>Roll for monsters only</strong>
-                <span className="muted">Players roll at the table; you type in their results</span>
+                <strong>{t('combat.rollMonsters')}</strong>
+                <span className="muted">{t('combat.rollMonstersNote')}</span>
               </button>
             </div>
           </section>
@@ -159,6 +161,7 @@ function StartCombatWizard({
 // ---------------------------------------------------------------- setup
 
 function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => void }) {
+  const { t, mon } = useI18n();
   const combat = state.combat!;
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const allSet = combat.combatants.every((c) => c.initiative !== null);
@@ -166,14 +169,14 @@ function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => 
   return (
     <div className="screen">
       <header className="screen-header">
-        <h1>Initiative Order</h1>
+        <h1>{t('combat.initiativeOrder')}</h1>
         <div className="header-actions">
           <button className="btn" onClick={onOpenDice}>🎲 Dice Roller</button>
-          <button className="btn" onClick={() => void api.endCombat()}>Cancel</button>
+          <button className="btn" onClick={() => void api.endCombat()}>{t('common.cancel')}</button>
           <button
             className="btn primary"
             disabled={!allSet}
-            title={allSet ? '' : 'Enter initiative for every PC first'}
+            title={allSet ? '' : t('combat.enterInitFirst')}
             onClick={() => void api.beginCombat()}
           >
             ▶ Begin Combat
@@ -203,7 +206,7 @@ function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => 
           >
             <span className="drag-handle">⋮⋮</span>
             <span className="setup-name">
-              {c.displayName}
+              {mon(c.displayName)}
               <span className="muted"> · mod {c.initMod >= 0 ? `+${c.initMod}` : c.initMod}</span>
             </span>
             {c.type === 'monster' ? (
@@ -211,7 +214,7 @@ function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => 
                 <strong>{c.initiative}</strong>
                 <button
                   className="btn small"
-                  title="Re-roll"
+                  title={t('combat.reroll')}
                   onClick={() => void api.rerollInitiative(c.id)}
                 >
                   🎲
@@ -241,6 +244,7 @@ function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => 
 // ---------------------------------------------------------------- active
 
 function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => void }) {
+  const { t, mon, cond: cond2 } = useI18n();
   const combat = state.combat!;
   const confirm = useConfirm();
   const [amounts, setAmounts] = useState<Record<string, string>>({});
@@ -312,13 +316,13 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
         </h1>
         <div className="header-actions">
           <button className="btn" onClick={onOpenDice}>🎲 Dice Roller</button>
-          <button className="btn" onClick={() => setAddingMonster(true)}>+ Add Monster</button>
-          <button className="btn" onClick={() => void api.prevTurn()}>⬅ Prev</button>
-          <button className="btn primary" onClick={() => void api.nextTurn()}>Next Turn ➡</button>
+          <button className="btn" onClick={() => setAddingMonster(true)}>{t('combat.addMonster')}</button>
+          <button className="btn" onClick={() => void api.prevTurn()}>{t('combat.prev')}</button>
+          <button className="btn primary" onClick={() => void api.nextTurn()}>{t('combat.next')}</button>
           <button
             className="btn danger"
             onClick={async () => {
-              if (await confirm('End this combat?', 'End Combat')) void api.endCombat();
+              if (await confirm(t('combat.endThisCombat'), t('combat.end'))) void api.endCombat();
             }}
           >
             End Combat
@@ -350,10 +354,10 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                 <span className="init-badge">{c.initiative}</span>
                 <span className="combat-name">
                   {isCurrent && <span className="turn-arrow">▶ </span>}
-                  {c.displayName}
+                  {mon(c.displayName)}
                   {c.isDowned && <span className="downed-tag"> ✝ downed</span>}
                 </span>
-                <span className="ac-badge" title="Armor Class">AC {c.ac}</span>
+                <span className="ac-badge" title={t('combat.armorClass')}>{t('common.ac')} {c.ac}</span>
                 <span className={`hp ${c.currentHp <= c.maxHp / 2 ? 'low' : ''}`}>
                   {c.currentHp}/{c.maxHp}
                 </span>
@@ -373,7 +377,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                     className="btn small danger"
                     disabled={amountFor(c.id) === null}
                     onClick={() => applyAmount(c.id, 'damage')}
-                    title="Apply damage (Enter)"
+                    title={t('combat.applyDamage')}
                   >
                     ⚔ Dmg
                   </button>
@@ -381,7 +385,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                     className="btn small heal"
                     disabled={amountFor(c.id) === null}
                     onClick={() => applyAmount(c.id, 'heal')}
-                    title="Apply healing (Shift+Enter)"
+                    title={t('combat.applyHealing')}
                   >
                     ✚ Heal
                   </button>
@@ -390,7 +394,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                   {c.type === 'monster' && isCurrent && hasRollableAttacks(c) && (
                     <button
                       className="btn small primary"
-                      title="Roll this monster's attack (same flow as the Stream Deck)"
+                      title={t('combat.rollMonsterAttack')}
                       onClick={() => setAttackModalFor(c.id)}
                     >
                       🎲 Attack
@@ -425,9 +429,9 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
               {c.conditions.length > 0 && (
                 <div className="condition-badges">
                   {c.conditions.map((cond) => (
-                    <span key={cond} className="condition-badge" title="Click to remove"
+                    <span key={cond} className="condition-badge" title={t('combat.clickToRemove')}
                       onClick={() => void api.toggleCondition(c.id, cond)}>
-                      {cond}
+                      {cond2(cond)}
                     </span>
                   ))}
                 </div>
@@ -453,7 +457,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
         })}
       </ul>
       {combat.combatants.length === 0 && (
-        <p className="empty-note">No combatants left. End the combat when you're done.</p>
+        <p className="empty-note">{t('combat.noCombatants')}</p>
       )}
 
       {addingMonster && <AddMonsterModal state={state} onClose={() => setAddingMonster(false)} />}
@@ -469,6 +473,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
 }
 
 function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => void }) {
+  const { t, mon } = useI18n();
   const [filter, setFilter] = useState('');
   const [quantity, setQuantity] = useState('1');
 
@@ -480,7 +485,7 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Add Monster to Combat</h2>
+        <h2>{t('combat.addMonsterToCombat')}</h2>
         <p className="muted" style={{ marginBottom: 10 }}>
           Initiative is rolled automatically; the monster joins the order at its roll.
         </p>
@@ -498,7 +503,7 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
             Search library
             <input
               autoFocus
-              placeholder="Search monsters…"
+              placeholder={t('monsters.search')}
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
@@ -515,7 +520,7 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
                 onClose();
               }}
             >
-              {qty > 1 ? `${qty}× ` : ''}{m.name}
+              {qty > 1 ? `${qty}× ` : ''}{mon(m.name)}
             </button>
           ))}
           {monsters.length > 60 && (
@@ -523,7 +528,7 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
           )}
         </div>
         <div className="modal-actions">
-          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
         </div>
       </div>
     </div>
@@ -531,6 +536,7 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
 }
 
 function AttackPanel({ combatant }: { combatant: Combatant }) {
+  const { t } = useI18n();
   return (
     <div className="attack-panel">
       {combatant.abilities && <AbilityTable abilities={combatant.abilities} />}

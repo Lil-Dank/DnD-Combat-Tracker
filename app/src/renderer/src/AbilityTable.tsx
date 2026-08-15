@@ -1,14 +1,16 @@
 import type { AbilityScores } from '../../shared/types';
 import { ABILITY_KEYS, abilityMod } from '../../shared/types';
+import { useI18n } from './i18n';
 
 /** Stat-block style ability row: score + derived modifier per attribute. */
 export function AbilityTable({ abilities }: { abilities: AbilityScores }) {
+  const { abilities: labels } = useI18n();
   return (
     <table className="ability-table">
       <thead>
         <tr>
           {ABILITY_KEYS.map((k) => (
-            <th key={k}>{k.toUpperCase()}</th>
+            <th key={k}>{labels[k] ?? k.toUpperCase()}</th>
           ))}
         </tr>
       </thead>

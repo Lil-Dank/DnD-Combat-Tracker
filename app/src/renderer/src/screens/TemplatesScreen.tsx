@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { AppState, EncounterEntry, EncounterTemplate } from '../../../shared/types';
 import { api } from '../api';
 import { useConfirm } from '../Confirm';
+import { useI18n } from '../i18n';
 
 interface TemplateFormData {
   id?: string;
@@ -16,6 +17,7 @@ export function TemplatesScreen({
   state: AppState;
   onStartCombat: (templateId: string) => void;
 }) {
+  const { t: tr, mon } = useI18n();
   const [form, setForm] = useState<TemplateFormData | null>(null);
   const [monsterFilter, setMonsterFilter] = useState('');
   const confirm = useConfirm();
@@ -64,7 +66,7 @@ export function TemplatesScreen({
   return (
     <div className="screen">
       <header className="screen-header">
-        <h1>Encounter Templates</h1>
+        <h1>{tr('templates.title')}</h1>
         <button
           className="btn primary"
           onClick={() => setForm({ name: '', entries: [] })}
@@ -92,16 +94,16 @@ export function TemplatesScreen({
           <div key={t.id} className="template-card">
             <div className="template-card-head">
               <h3>{t.name}</h3>
-              <span className="muted">{totalMonsters(t)} monsters</span>
+              <span className="muted">{totalMonsters(t)} {tr('templates.monsters')}</span>
             </div>
             <ul className="template-entries">
               {t.entries.map((e) => (
                 <li key={e.monsterTemplateId}>
                   <span className="qty">{e.quantity}×</span>{' '}
-                  {monstersById.get(e.monsterTemplateId)?.name ?? '(deleted monster)'}
+                  {mon(monstersById.get(e.monsterTemplateId)?.name ?? '') || '(deleted monster)'}
                 </li>
               ))}
-              {t.entries.length === 0 && <li className="muted">Empty template</li>}
+              {t.entries.length === 0 && <li className="muted">{tr('templates.emptyTemplate')}</li>}
             </ul>
             <div className="template-card-actions">
               <button
@@ -109,7 +111,7 @@ export function TemplatesScreen({
                 disabled={t.entries.length === 0}
                 onClick={async () => {
                   if (state.combat) {
-                    if (!(await confirm('A combat is already in progress. End it and start a new one?', 'End & Start New'))) return;
+                    if (!(await confirm(tr('templates.combatInProgress'), tr('templates.endAndStart')))) return;
                     await api.endCombat();
                   }
                   onStartCombat(t.id);
@@ -117,14 +119,14 @@ export function TemplatesScreen({
               >
                 ⚔ Start Combat
               </button>
-              <button className="btn small" onClick={() => startEdit(t)}>Edit</button>
+              <button className="btn small" onClick={() => startEdit(t)}>{tr('common.edit')}</button>
               <button className="btn small" onClick={() => void api.duplicateTemplate(t.id)}>
                 Duplicate
               </button>
               <button
                 className="btn small danger"
                 onClick={async () => {
-                  if (await confirm(`Delete template "${t.name}"?`, 'Delete')) void api.deleteTemplate(t.id);
+                  if (await confirm(tr('templates.deleteConfirm', { name: t.name }), tr('common.delete'))) void api.deleteTemplate(t.id);
                 }}
               >
                 Delete
@@ -137,12 +139,12 @@ export function TemplatesScreen({
       {form && (
         <div className="modal-backdrop" onClick={() => setForm(null)}>
           <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-            <h2>{form.id ? 'Edit Template' : 'New Template'}</h2>
+            <h2>{tr(form.id ? 'templates.editTemplate' : 'templates.newTemplate')}</h2>
             <label>
               Template name
               <input
                 autoFocus
-                placeholder="e.g. Goblin Ambush"
+                placeholder={tr('templates.namePlaceholder')}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
@@ -150,7 +152,7 @@ export function TemplatesScreen({
 
             {form.entries.length > 0 && (
               <>
-                <h3>In this encounter</h3>
+                <h3>{tr('templates.inThisEncounter')}</h3>
                 <ul className="picked-entries">
                   {form.entries.map((e) => (
                     <li key={e.monsterTemplateId}>
@@ -182,10 +184,10 @@ export function TemplatesScreen({
               </>
             )}
 
-            <h3>Add monsters</h3>
+            <h3>{tr('templates.addMonsters')}</h3>
             <input
               className="search-box"
-              placeholder="Search library…"
+              placeholder={tr('templates.searchLibrary')}
               value={monsterFilter}
               onChange={(e) => setMonsterFilter(e.target.value)}
             />
@@ -199,7 +201,7 @@ export function TemplatesScreen({
                     onClick={() => setQuantity(m.id, (entry?.quantity ?? 0) + 1)}
                     title={`HP ${m.maxHp} · AC ${m.ac}`}
                   >
-                    {entry ? `${entry.quantity}× ` : ''}{m.name}
+                    {entry ? `${entry.quantity}× ` : ''}{mon(m.name)}
                   </button>
                 );
               })}
@@ -209,7 +211,7 @@ export function TemplatesScreen({
             </div>
 
             <div className="modal-actions">
-              <button className="btn" onClick={() => setForm(null)}>Cancel</button>
+              <button className="btn" onClick={() => setForm(null)}>{tr('common.cancel')}</button>
               <button
                 className="btn primary"
                 disabled={!form.name.trim()}

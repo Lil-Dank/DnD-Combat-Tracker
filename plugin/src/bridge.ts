@@ -35,6 +35,8 @@ export interface BridgeState {
   combatants: BridgeCombatant[];
   currentIndex: number;
   round: number;
+  /** UI language chosen in the app; drives the picker's own key labels. */
+  language?: 'en' | 'de';
 }
 
 export type BridgeCommand =

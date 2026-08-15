@@ -1,3 +1,5 @@
+import { DEFAULT_LANG, type Lang } from './i18n';
+
 // Shared data model used by main, preload, and renderer.
 
 // ---- Monster actions (schema derived from SRD 5.2.1, see docs/monster-attack-schema) ----
@@ -198,6 +200,8 @@ export interface Settings {
   theme: ThemeId;
   /** Auto-open the attack quick reference for the monster whose turn it is. */
   autoOpenAttacks: boolean;
+  /** UI language for both windows and the Stream Deck plugin. */
+  language: Lang;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -205,6 +209,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bridgePort: 57321,
   theme: 'phb',
   autoOpenAttacks: true,
+  language: DEFAULT_LANG,
 };
 
 /** Full snapshot pushed to every window on any change. */

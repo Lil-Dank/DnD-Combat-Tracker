@@ -12,9 +12,12 @@
 //   tiny (16)            - bare red d20 filling the frame, bold outline
 //
 // Outputs:
-//   build/icon.ico       - electron-builder exe/installer icon
-//   resources/icon.ico   - same file, shipped so BrowserWindows use it too
-//   resources/icon.png   - 256 px PNG (fallback for non-Windows / docs)
+//   build/icon.ico              - electron-builder exe/installer icon
+//   resources/icon.ico          - same file, shipped so BrowserWindows use it too
+//   resources/icon.png          - 256 px PNG (fallback for non-Windows)
+//   ../docs/images/logo.png     - 512 px logo for the README header
+//   ../docs/images/social-preview.png - 1280x640 banner for GitHub's social
+//     preview (upload manually: repo Settings -> Social preview)
 const { app, BrowserWindow, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -86,6 +89,27 @@ function d20Svg(variant) {
 </svg>`;
 }
 
+
+/** 1280x640 GitHub social-preview banner: the d20 beside the app name. */
+function bannerSvg(d20) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640">
+  <defs>
+    <linearGradient id="bbg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#221936"/>
+      <stop offset="1" stop-color="#120d1d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bbg)"/>
+  <g transform="translate(120, 64) scale(1)">${d20}</g>
+  <text x="660" y="280" font-family="Georgia, 'Times New Roman', serif"
+        font-weight="bold" font-size="56" fill="#f2ead8">D&amp;D Combat Tracker</text>
+  <text x="660" y="348" font-family="Segoe UI, sans-serif" font-size="30"
+        fill="#b8aecb">DM window \u00b7 Player View \u00b7 Stream Deck</text>
+  <text x="660" y="400" font-family="Segoe UI, sans-serif" font-size="30"
+        fill="#b8aecb">English \u00b7 Deutsch \u00b7 SRD 5.2.1</text>
+</svg>`;
+}
+
 /** Packs PNG buffers into a .ico container (PNG entries; Vista+). */
 function packIco(pngs) {
   const header = Buffer.alloc(6);
@@ -151,6 +175,25 @@ app.whenReady().then(async () => {
   for (const { size, buf } of pngs) {
     fs.writeFileSync(path.join(root, 'build', `icon-${size}.png`), buf);
   }
+
+  // README logo (512, transparent corners) and the GitHub social banner.
+  const docsImages = path.join(root, '..', 'docs', 'images');
+  fs.mkdirSync(docsImages, { recursive: true });
+  fs.writeFileSync(path.join(docsImages, 'logo.png'), masters.full.toPNG());
+  const bannerWin = new BrowserWindow({
+    width: 1280,
+    height: 640,
+    show: false,
+    frame: false,
+    transparent: true,
+  });
+  const bannerHtml = `<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent;overflow:hidden}svg{display:block}</style>${bannerSvg(d20Svg('full'))}`;
+  await bannerWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(bannerHtml));
+  await new Promise((r) => setTimeout(r, 400));
+  const banner = await bannerWin.webContents.capturePage({ x: 0, y: 0, width: 1280, height: 640 });
+  fs.writeFileSync(path.join(docsImages, 'social-preview.png'), banner.toPNG());
+  bannerWin.destroy();
   console.log('wrote build/icon.ico + resources/icon.{ico,png}  (' +
     PLAN.map((p) => `${p.size}:${p.variant}`).join(', ') + ')');
   win.destroy();

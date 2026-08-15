@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { store } from './state';
 import type { AppState } from '../shared/types';
-import { monsterName } from '../shared/i18n';
+import { abilityCodeLabel, monsterName } from '../shared/i18n';
 
 /**
  * Local WebSocket bridge for the Stream Deck plugin. The app is the server;
@@ -32,6 +32,7 @@ function stateMessage(state: AppState): string {
   // name map is app-side data, and this keeps the deck and the DM window
   // showing the same name for the same creature.
   const lang = state.settings.language;
+  const templates = new Map(state.monsters.map((m) => [m.id, m]));
   return JSON.stringify({
     type: 'state',
     language: lang,
@@ -51,9 +52,16 @@ function stateMessage(state: AppState): string {
             .filter((a) => a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0))
             .map((a) => ({
               id: a.id,
-              name: a.name,
+              // Deck labels use the German SRD action name when the template
+              // carries one; manual monsters have no l10n and stay as typed.
+              name:
+                (lang === 'de' &&
+                  templates.get(c.sourceId)?.l10n?.de?.actions[a.name]?.name) ||
+                a.name,
               toHit: a.attack?.toHit ?? null,
-              save: a.save ? `${a.save.ability} ${a.save.dc}` : null,
+              save: a.save
+                ? `${abilityCodeLabel(lang, a.save.ability)} ${a.save.dc}`
+                : null,
               damage: a.onHit.damage.map((d) => ({
                 dice: d.dice,
                 average: d.average,

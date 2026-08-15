@@ -203,7 +203,7 @@ function formToAction(f: ActionForm, order: number, existing?: MonsterAction): M
 }
 
 export function MonsterScreen({ state }: { state: AppState }) {
-  const { t, mon } = useI18n();
+  const { t, mon, abilityCode, locAction } = useI18n();
   const [form, setForm] = useState<MonsterFormData | null>(null);
   const confirm = useConfirm();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -261,8 +261,12 @@ export function MonsterScreen({ state }: { state: AppState }) {
     setForm({ ...form, actions });
   };
 
-  const monsters = state.monsters.filter((m) =>
-    m.name.toLowerCase().includes(filter.toLowerCase()),
+  // Search matches the English name and, in German, the SRD name too - a
+  // German-speaking DM types "Eulenbär", not "Owlbear".
+  const monsters = state.monsters.filter(
+    (m) =>
+      m.name.toLowerCase().includes(filter.toLowerCase()) ||
+      mon(m.name).toLowerCase().includes(filter.toLowerCase()),
   );
 
   return (
@@ -357,18 +361,20 @@ export function MonsterScreen({ state }: { state: AppState }) {
                       <em>{t('monsters.noActions')}</em>
                     ) : (
                       <ul className="attack-list">
-                        {m.attacks.map((a) => (
-                          <li key={a.id} title={a.display.text}>
-                            <strong>{a.name}</strong>
-                            {a.display.toHit && ` ${a.display.toHit} to hit`}
-                            {a.save && ` ${a.save.ability} save DC ${a.save.dc}`}
-                            {a.display.range && `, ${a.display.range}`}
-                            {a.display.damage && `, ${a.display.damage}`}
-                            {a.type !== 'attack' && a.display.text && (
-                              <AttackText text={a.display.text} />
-                            )}
-                          </li>
-                        ))}
+                        {m.attacks.map((a) => {
+                          const loc = locAction(m.l10n?.de, a);
+                          return (
+                            <li key={a.id} title={loc.text}>
+                              <strong>{loc.name}</strong>
+                              {a.display.toHit && ` ${a.display.toHit} ${t('combat.toHit')}`}
+                              {a.save &&
+                                ` ${t('combat.saveDc', { ability: abilityCode(a.save.ability), dc: a.save.dc })}`}
+                              {loc.range && `, ${loc.range}`}
+                              {loc.damage && `, ${loc.damage}`}
+                              {a.type !== 'attack' && loc.text && <AttackText text={loc.text} />}
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </td>

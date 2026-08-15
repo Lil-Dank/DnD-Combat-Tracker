@@ -238,6 +238,23 @@ const en: Dict = {
   'dice.applyTo': 'Apply to',
   'dice.pickOneOrMore': '(pick one or more)',
   'dice.rollFirst': 'Roll first',
+  'attack.heading': '🎲 {name} attacks',
+  'attack.pickTargetsFor': '{name} — pick targets',
+  'attack.pickTargetFor': '{name} — pick a target',
+  'attack.severalAllowed': '(save-based: several allowed)',
+  'attack.vsTarget': 'vs {name} — AC {ac}',
+  'attack.whoSucceeded': 'Who succeeded the {ability} save DC {dc}?',
+  'attack.savedTakeHalf': '(saved take {half} instead of {full})',
+  'attack.recharge': 'Recharge {min}+',
+  'combat.step1': '1. Pick an encounter template',
+  'combat.step2': '2. Choose the PCs joining the fight',
+  'combat.step3': '3. Initiative',
+  'combat.hpAc': 'HP {hp} · AC {ac}',
+  'combat.setupHint':
+    'Monsters are rolled automatically (🎲 to re-roll). Drag rows to break ties manually.',
+  'combat.mod': 'mod',
+
+
 
   'common.ok': 'OK',
   'common.section': 'Section',
@@ -471,6 +488,23 @@ const de: Dict = {
   'dice.applyTo': 'Anwenden auf',
   'dice.pickOneOrMore': '(eine oder mehrere auswählen)',
   'dice.rollFirst': 'Zuerst würfeln',
+  'attack.heading': '🎲 {name} greift an',
+  'attack.pickTargetsFor': '{name} – Ziele wählen',
+  'attack.pickTargetFor': '{name} – Ziel wählen',
+  'attack.severalAllowed': '(Rettungswurf: mehrere möglich)',
+  'attack.vsTarget': 'gegen {name} – RK {ac}',
+  'attack.whoSucceeded': 'Wer hat den {ability}-Rettungswurf SG {dc} bestanden?',
+  'attack.savedTakeHalf': '(Bestandene erleiden {half} statt {full})',
+  'attack.recharge': 'Aufladung {min}+',
+  'combat.step1': '1. Begegnungsvorlage wählen',
+  'combat.step2': '2. Teilnehmende Charaktere wählen',
+  'combat.step3': '3. Initiative',
+  'combat.hpAc': 'TP {hp} · RK {ac}',
+  'combat.setupHint':
+    'Monster werden automatisch ausgewürfelt (🎲 zum Neuwürfeln). Ziehe Zeilen, um Gleichstände manuell zu klären.',
+  'combat.mod': 'Mod.',
+
+
 
   'common.ok': 'OK',
   'common.section': 'Abschnitt',
@@ -553,24 +587,53 @@ export function damageTypeLabel(lang: Lang, type: string | null | undefined): st
   return lang === 'de' ? DAMAGE_TYPE_DE[type.toLowerCase()] ?? type : type;
 }
 
-/**
- * Monster names from the German SRD, injected at startup from
- * resources/srd/monsters.de.json. Names missing from that file keep their
- * English form rather than being machine-translated.
- */
-let monsterNames: Record<string, string> = {};
+/** German ability codes as printed in SRD stat blocks (STR -> STÄ). */
+const ABILITY_CODES_DE: Record<string, string> = {
+  STR: 'STÄ', DEX: 'GES', CON: 'KON', INT: 'INT', WIS: 'WEI', CHA: 'CHA',
+};
 
-export function setMonsterNameMap(map: Record<string, string>): void {
-  monsterNames = map ?? {};
+export function abilityCodeLabel(lang: Lang, code: string): string {
+  return lang === 'de' ? ABILITY_CODES_DE[code.toUpperCase()] ?? code : code;
+}
+
+/** Localized name + rules text for one monster action. */
+export interface MonsterActionL10n {
+  name: string;
+  text: string;
+}
+
+/** Everything the German SRD provides for one monster. */
+export interface MonsterL10n {
+  name: string;
+  actions: Record<string, MonsterActionL10n>;
+}
+
+/**
+ * Monster localization from the German SRD, injected at startup from
+ * resources/srd/monsters.de.json and stored on imported monster templates.
+ * Anything missing from it keeps its English form rather than being
+ * machine-translated.
+ */
+let monsterMap: Record<string, MonsterL10n> = {};
+
+export function setMonsterNameMap(map: Record<string, MonsterL10n | string>): void {
+  monsterMap = {};
+  for (const [k, v] of Object.entries(map ?? {})) {
+    monsterMap[k] = typeof v === 'string' ? { name: v, actions: {} } : v;
+  }
+}
+
+export function monsterL10n(englishName: string): MonsterL10n | undefined {
+  return monsterMap[englishName];
 }
 
 export function monsterName(lang: Lang, englishName: string): string {
   if (lang !== 'de') return englishName;
-  const direct = monsterNames[englishName];
-  if (direct) return direct;
+  const direct = monsterMap[englishName];
+  if (direct) return direct.name;
   // Combat instances carry a trailing number ("Goblin Warrior 3"): translate
   // the base name and keep the number, so the deck and the DM list agree.
   const m = englishName.match(/^(.*?)(\s+\d+)$/);
-  if (m && monsterNames[m[1]]) return monsterNames[m[1]] + m[2];
+  if (m && monsterMap[m[1]]) return monsterMap[m[1]].name + m[2];
   return englishName;
 }

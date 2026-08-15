@@ -1,4 +1,4 @@
-import { DEFAULT_LANG, type Lang } from './i18n';
+import { DEFAULT_LANG, type Lang, type MonsterL10n } from './i18n';
 
 // Shared data model used by main, preload, and renderer.
 
@@ -121,6 +121,12 @@ export interface MonsterTemplate {
   abilities?: AbilityScores | null;
   attacks: MonsterAction[];
   source: MonsterSource;
+  /**
+   * Localized name/action data, attached at import time for SRD monsters.
+   * Manual monsters never carry it, so a language change only affects their
+   * surrounding UI text - exactly the intended split.
+   */
+  l10n?: { de?: MonsterL10n } | null;
 }
 
 export interface EncounterEntry {

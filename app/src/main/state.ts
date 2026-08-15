@@ -106,6 +106,19 @@ export class AppStore {
 
   // ---- Monsters ----
 
+  /**
+   * Attaches German SRD localization to imported monsters that predate the
+   * l10n field, so existing libraries pick the feature up without a re-import.
+   * Manual monsters are never touched.
+   */
+  async backfillMonsterL10n(map: Record<string, import('../shared/i18n').MonsterL10n>): Promise<void> {
+    for (const m of this.monsters.list()) {
+      if (m.source !== 'srd' || m.l10n?.de) continue;
+      const entry = map[m.name];
+      if (entry) await this.monsters.put({ ...m, l10n: { de: entry } });
+    }
+  }
+
   async saveMonster(m: Omit<MonsterTemplate, 'id'> & { id?: string }): Promise<void> {
     await this.monsters.put({ ...m, id: m.id ?? randomUUID() });
     this.notify();

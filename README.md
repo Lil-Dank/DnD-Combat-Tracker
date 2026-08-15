@@ -12,7 +12,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v1.1.0-success)
+![Release](https://img.shields.io/badge/release-v1.2.0-success)
 
 </div>
 
@@ -69,7 +69,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 
 Grab both files from the [**latest release**](../../releases/latest):
 
-1. **App** — run `DnD Combat Tracker Setup 1.1.0.exe` (NSIS installer, choose your own directory).
+1. **App** — run `DnD Combat Tracker Setup 1.2.0.exe` (NSIS installer, choose your own directory).
 2. **Stream Deck plugin** — double-click `com.dmtools.dnd-combat-tracker.streamDeckPlugin`;
    the Stream Deck app installs it and registers the bundled picker profiles.
 3. Start the app. The plugin connects within a few seconds — the DM window's sidebar
@@ -170,13 +170,25 @@ so the app agrees with what a German-speaking table reads in the rules:
 Condition keys on the deck show the German label but still send the canonical English
 value back to the app, so your saved data never depends on which language you were using.
 
+
+
+**Imported monsters carry localization fields.** Importing the SRD attaches an `l10n`
+block to each monster — its German name plus, per action, the German action name and the
+full German rules text from the German SRD 5.2.1. The quick references, the attack
+modal and the Stream Deck's attack picker all read from it, so an Eulenbär's stat block
+shows *Mehrfachangriff* and *"Zerfetzen: Nahkampfangriffswurf: +7 … 14 (2W8+5)
+Hiebschaden"* rather than the English sentences. Libraries imported before this feature
+are backfilled automatically at startup, and the library search matches German names
+too. Manually created monsters never get the field: switching language changes only
+the UI around them, exactly as you'd expect for your own homebrew.
+
 > [!NOTE]
-> **What stays in English.** Monster *names* are translated for the 199 of 331 creatures
-> whose German names could be matched with confidence; the rest keep their English names
-> rather than being guessed at (`Goblin Warrior` in the screenshot above is one of them).
-> Monster **action names and their SRD prose** — *Multiattack*, *"The owlbear makes two
-> Rend attacks."* — also stay English: that is dataset content, not interface text, and
-> translating it needs the German stat blocks parsed rather than a dictionary.
+> **Coverage and honesty.** 327 of the 331 SRD monsters are matched to their German
+> stat blocks (by AC, HP and ability-score signatures — never by translating words),
+> and 854 individual actions carry German text. Anything the matcher could not pair
+> with confidence stays English rather than being guessed at, and the German prose can
+> carry small extraction artifacts from the two-column PDF (an occasional missing
+> hyphen). Stored data is always language-neutral: the German layer is display-only.
 
 Every user-visible string in the interface goes through the lookup in
 `app/src/shared/i18n.ts`. That is enforced empirically rather than by eye — see
@@ -486,7 +498,7 @@ cd app
 npm install
 npm run dev        # live-reload dev session
 npm run build      # compile main/preload/renderer to out/
-npm run dist       # → release/DnD Combat Tracker Setup 1.1.0.exe (NSIS)
+npm run dist       # → release/DnD Combat Tracker Setup 1.2.0.exe (NSIS)
 ```
 
 ```bash
@@ -608,13 +620,13 @@ to this schema automatically on app start.
 > [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/legalcode)
 > (CC-BY-4.0).
 
-German rules terminology and monster names come from the German SRD 5.2.1, parsed by
-`app/scripts/build-srd-de.mjs` into `app/resources/srd/monsters.de.json`. Names are
-matched onto the English dataset by stat signature rather than by translating the
-words, because a German name is often not a literal rendering of the English one.
-Two independent parsers must agree before a mapping is accepted — 199 of the 331
-monsters currently qualify, and the rest keep their English names rather than being
-guessed at.
+German rules terminology, monster names and per-action German rules text come from the
+German SRD 5.2.1, parsed by `app/scripts/build-srd-de.mjs` into
+`app/resources/srd/monsters.de.json` and attached to imported monsters as their `l10n`
+field. Monsters are matched onto the English dataset by stat signature (AC + HP + the
+six ability scores), actions by to-hit / save-DC / damage signatures plus a small
+fixed-name dictionary — never by translating words. 327 of 331 monsters and 854 actions
+currently qualify; anything ambiguous stays English rather than being guessed at.
 
 The same attribution is shown in-app under **Settings → About / Credits**.
 

@@ -41,9 +41,10 @@ export function MonsterAttackModal({
   attackerId: string;
   onClose: () => void;
 }) {
-  const { t, dmg } = useI18n();
+  const { t, dmg, mon, abilityCode, locAction } = useI18n();
   const combat = state.combat;
   const attacker = combat?.combatants.find((c) => c.id === attackerId);
+  const l10nDe = state.monsters.find((m) => m.id === attacker?.sourceId)?.l10n?.de;
 
   const [step, setStep] = useState<Step>('attack');
   const [attack, setAttack] = useState<MonsterAction | null>(null);
@@ -125,7 +126,7 @@ export function MonsterAttackModal({
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>🎲 {attacker.displayName} attacks</h2>
+        <h2>{t('attack.heading', { name: mon(attacker.displayName) })}</h2>
 
         {step === 'attack' && (
           <>
@@ -133,9 +134,9 @@ export function MonsterAttackModal({
             <div className="monster-pick-list">
               {attacker.attacks.filter(isRollable).map((a) => (
                 <button key={a.id} className="pick-btn" title={a.display.text} onClick={() => pickAttack(a)}>
-                  {a.name}
+                  {locAction(l10nDe, a).name}
                   {a.display.toHit && ` (${a.display.toHit})`}
-                  {a.save && ` (${a.save.ability} DC ${a.save.dc})`}
+                  {a.save && ` (${abilityCode(a.save.ability)} ${t('monsters.dc')} ${a.save.dc})`}
                 </button>
               ))}
             </div>
@@ -148,8 +149,10 @@ export function MonsterAttackModal({
         {step === 'target' && attack && (
           <>
             <h3>
-              {attack.name} — pick {isSave ? 'targets' : 'a target'}{' '}
-              {isSave && <span className="muted">(save-based: several allowed)</span>}
+              {t(isSave ? 'attack.pickTargetsFor' : 'attack.pickTargetFor', {
+                name: locAction(l10nDe, attack).name,
+              })}{' '}
+              {isSave && <span className="muted">{t('attack.severalAllowed')}</span>}
             </h3>
             <div className="monster-pick-list">
               {candidates.map((c) => (
@@ -187,14 +190,18 @@ export function MonsterAttackModal({
 
         {step === 'roll' && attack && (
           <>
-            <h3>{attack.name}</h3>
+            <h3>{locAction(l10nDe, attack).name}</h3>
             <p className="muted">
               {isSave
-                ? `${attack.save!.ability} save DC ${attack.save!.dc} — ${targets.length} target${targets.length === 1 ? '' : 's'}`
+                ? t('combat.targetsCount', {
+                    ability: abilityCode(attack.save!.ability),
+                    dc: attack.save!.dc,
+                    n: targets.length,
+                  })
                 : singleTarget
-                  ? `vs ${targetName(singleTarget)} — AC ${singleTarget.ac}`
+                  ? t('attack.vsTarget', { name: targetName(singleTarget), ac: singleTarget.ac })
                   : ''}
-              {attack.display.damage && ` · ${attack.display.damage}`}
+              {locAction(l10nDe, attack).damage && ` · ${locAction(l10nDe, attack).damage}`}
             </p>
 
             {attack.attack && (
@@ -258,8 +265,13 @@ export function MonsterAttackModal({
         {step === 'saves' && attack && dmgRoll && (
           <>
             <h3>
-              Who succeeded the {attack.save!.ability} DC {attack.save!.dc} save?{' '}
-              <span className="muted">(saved take {Math.floor(dmgRoll.total / 2)} instead of {dmgRoll.total})</span>
+              {t('attack.whoSucceeded', {
+                ability: abilityCode(attack.save!.ability),
+                dc: attack.save!.dc,
+              })}{' '}
+              <span className="muted">
+                {t('attack.savedTakeHalf', { half: Math.floor(dmgRoll.total / 2), full: dmgRoll.total })}
+              </span>
             </h3>
             <div className="monster-pick-list">
               {targetObjs.map((c) => (

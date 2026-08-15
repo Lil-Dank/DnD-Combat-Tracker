@@ -10,7 +10,9 @@ app.whenReady().then(async () => {
   const userData = app.getPath('userData');
   await store.init(userData);
   await initWindowState(userData);
-  setMonsterNameMap(await loadGermanMonsterNames());
+  const l10nDe = await loadGermanMonsterNames();
+  setMonsterNameMap(l10nDe);
+  await store.backfillMonsterL10n(l10nDe);
   registerIpc();
   onPlayerViewChanged(() => broadcastPlayerViewStatus());
   startBridge();

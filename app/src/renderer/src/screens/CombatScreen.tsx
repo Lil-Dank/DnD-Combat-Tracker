@@ -89,17 +89,17 @@ function StartCombatWizard({
       ) : (
         <div className="wizard">
           <section className="wizard-step">
-            <h2>1. Pick an encounter template</h2>
+            <h2>{t('combat.step1')}</h2>
             <div className="wizard-options">
-              {state.encounterTemplates.map((t) => (
+              {state.encounterTemplates.map((tpl) => (
                 <button
-                  key={t.id}
-                  className={`pick-btn large ${templateId === t.id ? 'picked' : ''}`}
-                  onClick={() => setTemplateId(t.id)}
+                  key={tpl.id}
+                  className={`pick-btn large ${templateId === tpl.id ? 'picked' : ''}`}
+                  onClick={() => setTemplateId(tpl.id)}
                 >
-                  <strong>{t.name}</strong>
+                  <strong>{tpl.name}</strong>
                   <span className="muted">
-                    {t.entries.reduce((s, e) => s + e.quantity, 0)} monsters
+                    {tpl.entries.reduce((s, e) => s + e.quantity, 0)} {t('templates.monsters')}
                   </span>
                 </button>
               ))}
@@ -107,7 +107,7 @@ function StartCombatWizard({
           </section>
 
           <section className="wizard-step">
-            <h2>2. Choose the PCs joining the fight</h2>
+            <h2>{t('combat.step2')}</h2>
             {state.pcs.length === 0 && (
               <p className="muted">{t('combat.noPcs')}</p>
             )}
@@ -119,14 +119,14 @@ function StartCombatWizard({
                   onClick={() => togglePc(pc.id)}
                 >
                   <strong>{pc.name}</strong>
-                  <span className="muted">HP {pc.maxHp} · AC {pc.ac}</span>
+                  <span className="muted">{t('combat.hpAc', { hp: pc.maxHp, ac: pc.ac })}</span>
                 </button>
               ))}
             </div>
           </section>
 
           <section className="wizard-step">
-            <h2>3. Initiative</h2>
+            <h2>{t('combat.step3')}</h2>
             <div className="wizard-options">
               <button
                 className={`pick-btn large ${rollMode === 'all' ? 'picked' : ''}`}
@@ -184,9 +184,7 @@ function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => 
         </div>
       </header>
 
-      <p className="muted setup-hint">
-        Monsters are rolled automatically (🎲 to re-roll). Drag rows to break ties manually.
-      </p>
+      <p className="muted setup-hint">{t('combat.setupHint')}</p>
 
       <ul className="setup-list">
         {combat.combatants.map((c, i) => (
@@ -207,7 +205,7 @@ function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => 
             <span className="drag-handle">⋮⋮</span>
             <span className="setup-name">
               {mon(c.displayName)}
-              <span className="muted"> · mod {c.initMod >= 0 ? `+${c.initMod}` : c.initMod}</span>
+              <span className="muted"> · {t('combat.mod')} {c.initMod >= 0 ? `+${c.initMod}` : c.initMod}</span>
             </span>
             {c.type === 'monster' ? (
               <span className="setup-init">
@@ -446,13 +444,18 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                       className={`pick-btn ${c.conditions.includes(cond) ? 'picked' : ''}`}
                       onClick={() => void api.toggleCondition(c.id, cond)}
                     >
-                      {cond}
+                      {cond2(cond)}
                     </button>
                   ))}
                 </div>
               )}
 
-              {attacksFor === c.id && <AttackPanel combatant={c} />}
+              {attacksFor === c.id && (
+                <AttackPanel
+                  combatant={c}
+                  l10n={state.monsters.find((m) => m.id === c.sourceId)?.l10n?.de}
+                />
+              )}
             </li>
           );
         })}
@@ -536,23 +539,30 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
   );
 }
 
-function AttackPanel({ combatant }: { combatant: Combatant }) {
-  const { t } = useI18n();
+function AttackPanel({
+  combatant,
+  l10n,
+}: {
+  combatant: Combatant;
+  l10n?: import('../../../shared/i18n').MonsterL10n;
+}) {
+  const { t, abilityCode, locAction } = useI18n();
   return (
     <div className="attack-panel">
       {combatant.abilities && <AbilityTable abilities={combatant.abilities} />}
       {combatant.attacks.map((a) => {
+        const loc = locAction(l10n, a);
         // Attack rolls render compactly; save/other actions live in their text.
-        const showText = a.type !== 'attack' && a.display.text;
+        const showText = a.type !== 'attack' && loc.text;
         return (
-          <div key={a.id} className="attack-panel-row" title={a.display.text}>
-            <strong>{a.name}</strong>
+          <div key={a.id} className="attack-panel-row" title={loc.text}>
+            <strong>{loc.name}</strong>
             {a.display.toHit && <span>{a.display.toHit} {t('combat.toHit')}</span>}
-            {a.save && <span>{t('combat.saveDc', { ability: a.save.ability, dc: a.save.dc })}</span>}
-            {a.display.range && <span>{a.display.range}</span>}
-            {a.display.damage && <span>{a.display.damage}</span>}
-            {a.attack?.usage?.type === 'recharge' && <span className="muted">Recharge {a.attack.usage.min}+</span>}
-            {showText && <AttackText text={a.display.text} />}
+            {a.save && <span>{t('combat.saveDc', { ability: abilityCode(a.save.ability), dc: a.save.dc })}</span>}
+            {loc.range && <span>{loc.range}</span>}
+            {loc.damage && <span>{loc.damage}</span>}
+            {a.attack?.usage?.type === 'recharge' && <span className="muted">{t('attack.recharge', { min: a.attack.usage.min })}</span>}
+            {showText && <AttackText text={loc.text} />}
           </div>
         );
       })}

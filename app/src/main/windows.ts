@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, shell } from 'electron';
+import { app, BrowserWindow, screen, shell } from 'electron';
 import * as path from 'path';
 import { JsonValue } from './storage';
 
@@ -10,6 +10,11 @@ interface PlayerWindowState {
 let dmWindow: BrowserWindow | null = null;
 let playerWindow: BrowserWindow | null = null;
 let playerWindowState: JsonValue<PlayerWindowState>;
+
+/** Window icon for dev runs; the packaged exe carries build/icon.ico. */
+function appIcon(): string {
+  return path.join(app.getAppPath(), 'resources', 'icon.png');
+}
 
 export function initWindowState(userDataDir: string): Promise<void> {
   playerWindowState = new JsonValue<PlayerWindowState>(
@@ -29,6 +34,7 @@ function loadRenderer(win: BrowserWindow, hash: string): void {
 
 export function createDmWindow(): BrowserWindow {
   dmWindow = new BrowserWindow({
+    icon: appIcon(),
     width: 1280,
     height: 860,
     minWidth: 900,
@@ -79,6 +85,7 @@ export function togglePlayerView(): void {
   const useSaved = saved.bounds && boundsVisible(saved.bounds);
 
   playerWindow = new BrowserWindow({
+    icon: appIcon(),
     width: useSaved ? saved.bounds!.width : 1024,
     height: useSaved ? saved.bounds!.height : 768,
     x: useSaved ? saved.bounds!.x : undefined,

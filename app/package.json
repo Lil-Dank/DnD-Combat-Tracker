@@ -1,7 +1,7 @@
 {
   "name": "dnd-combat-tracker",
   "version": "1.1.0",
-  "description": "D&D Combat Tracker for Dungeon Masters — DM window, Player View, Stream Deck integration",
+  "description": "D&D Combat Tracker for Dungeon Masters \u2014 DM window, Player View, Stream Deck integration",
   "main": "out/main/index.js",
   "author": "DM Tools",
   "license": "MIT",
@@ -47,7 +47,8 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,

@@ -25,6 +25,14 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 > Treat it accordingly: it works and it is tested, and it has not had the kind of
 > line-by-line human audit you might assume from a repository this size.
 
+<div align="center">
+
+![The DM window mid-combat: initiative order, the current monster's stat block expanded, conditions and HP on every row](docs/images/combat.png)
+
+<i>The DM window mid-combat — the current monster's quick reference opens automatically.</i>
+
+</div>
+
 ---
 
 ## Contents
@@ -145,6 +153,8 @@ in previews, with `**bold**` supported.
 The quick reference — in the library expander and the combat panel — opens with a
 STR/DEX/CON/INT/WIS/CHA table showing score and modifier.
 
+![The monster library with the Aboleth's stat block expanded, showing its ability table, structured attacks and save DCs](docs/images/monsters.png)
+
 </details>
 
 <details>
@@ -191,6 +201,13 @@ The highlighted current-turn row stays sticky as you scroll.
 The sidebar button opens the display-only window; drag it to the players' monitor and
 use the **Fullscreen** toggle. It remembers its position across restarts, falling back
 to the primary display if that monitor is gone.
+
+| On its normal background | On a green key |
+| --- | --- |
+| ![Player View showing PC hit points, bloodied monsters, a downed character and condition badges](docs/images/player-view.png) | ![The identical Player View over a pure green background, with no colour bleed into the cards](docs/images/player-view-chroma.png) |
+
+*The same view, unchanged, over `#1a1423` and over a pure green key — no bleed, no
+fringing, nothing in the key's hue.*
 
 **Layout.** The view measures the space it actually has and picks the column count
 yielding the largest readable card, then scales the text to fit — a narrow window

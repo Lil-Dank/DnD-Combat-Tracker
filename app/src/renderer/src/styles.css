@@ -216,6 +216,7 @@ input, button, select, textarea {
 
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -444,6 +445,7 @@ input, button, select, textarea {
 
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 18px;
@@ -592,7 +594,7 @@ input, button, select, textarea {
 
 .template-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
   gap: 14px;
 }
 
@@ -633,6 +635,9 @@ input, button, select, textarea {
 
 .template-card-actions {
   display: flex;
+  /* German labels are longer than English ones; wrap instead of spilling
+     out of the card. */
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: auto;
 }
@@ -874,8 +879,11 @@ input, button, select, textarea {
 
 .combat-row-main {
   display: flex;
+  /* Long German button labels wrap onto a second line in narrow windows
+     instead of pushing the row past the card edge. */
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
 }
 
 .init-badge {

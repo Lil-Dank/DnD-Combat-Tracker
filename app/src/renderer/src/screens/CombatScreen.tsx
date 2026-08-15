@@ -354,7 +354,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                 <span className="combat-name">
                   {isCurrent && <span className="turn-arrow">▶ </span>}
                   {mon(c.displayName)}
-                  {c.isDowned && <span className="downed-tag"> ✝ downed</span>}
+                  {c.isDowned && <span className="downed-tag"> ✝ {t('combat.downed')}</span>}
                 </span>
                 <span className="ac-badge" title={t('combat.armorClass')}>{t('common.ac')} {c.ac}</span>
                 <span className={`hp ${c.currentHp <= c.maxHp / 2 ? 'low' : ''}`}>

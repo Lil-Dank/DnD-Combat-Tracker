@@ -75,7 +75,7 @@ export function App() {
 
   return (
     <I18nProvider lang={lang}>
-    <ConfirmProvider>
+    <ConfirmProvider cancelLabel={translate(lang, 'common.cancel')}>
     <div className="app">
       <nav className="sidebar">
         <div className="app-title">

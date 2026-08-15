@@ -165,6 +165,8 @@ const en: Dict = {
   'settings.connected': 'connected',
   'settings.noPlugin': 'no plugin connected',
   'settings.about': 'About / Credits',
+  'settings.credits': 'Monster data: SRD 5.2.1 by Wizards of the Coast, licensed under',
+  'settings.creditsDataset': '. Dataset: Open5e (srd-2024).',
   'settings.creditsNote':
     'German rules terminology is taken from the German SRD 5.2.1. Monster names absent from it stay in English.',
 
@@ -236,6 +238,56 @@ const en: Dict = {
   'dice.applyTo': 'Apply to',
   'dice.pickOneOrMore': '(pick one or more)',
   'dice.rollFirst': 'Roll first',
+
+  'common.ok': 'OK',
+  'common.section': 'Section',
+  'common.type': 'Type',
+  'common.kind': 'Kind',
+  'common.dc': 'DC',
+
+  'pcs.save': 'Save',
+
+  'monsters.libraryEmpty':
+    'The library is empty. Add monsters manually, or import the bundled SRD 5.2.1 set.',
+  'monsters.f.toHit': 'To hit',
+  'monsters.f.longRange': 'Long range',
+  'monsters.f.saveAbility': 'Save ability',
+  'monsters.f.damageDice': 'Damage dice',
+  'monsters.f.flatDamage': 'Flat damage',
+  'monsters.f.onlyIf': 'Only if…',
+  'monsters.f.addDamage': '+ Add damage',
+  'monsters.f.addAction': '+ Add action',
+
+  'templates.noLibrary':
+    'Add monsters to the library first — templates are built from monster-library entries.',
+  'templates.emptyNote':
+    'No encounter templates yet. A template is a reusable blueprint of monsters with quantities.',
+  'templates.nameLabel': 'Template name',
+  'templates.saveTemplate': 'Save Template',
+
+  'combat.header': 'Combat',
+  'combat.roundBadge': 'Round {n}',
+  'combat.needTemplate':
+    'Combat starts from an encounter template. Build one on the Encounters screen first.',
+  'combat.rollInitiative': 'Roll Initiative →',
+  'combat.beginCombat': '▶ Begin Combat',
+  'combat.dmgBtn': '⚔ Dmg',
+  'combat.healBtn': '✚ Heal',
+  'combat.initiativeAuto':
+    'Initiative is rolled automatically; the monster joins the order at its roll.',
+  'combat.moreRefine': '…{n} more, refine search',
+  'combat.toHit': 'to hit',
+  'combat.saveDc': '{ability} save DC {dc}',
+  'combat.targetsCount': '{ability} save DC {dc} — {n} target(s)',
+
+  'dice.die': 'Die',
+  'dice.addExtra': '＋ Add extra dice',
+  'dice.rollPool': '🎲 Roll {pool}',
+
+  'attack.crit': '💥 CRIT!',
+  'attack.nat1': 'NAT 1 — MISS',
+  'attack.hit': '✔ HIT',
+  'attack.miss': '✘ MISS',
 };
 
 const de: Dict = {
@@ -345,6 +397,8 @@ const de: Dict = {
   'settings.connected': 'verbunden',
   'settings.noPlugin': 'kein Plugin verbunden',
   'settings.about': 'Über / Danksagungen',
+  'settings.credits': 'Monsterdaten: SRD 5.2.1 von Wizards of the Coast, lizenziert unter',
+  'settings.creditsDataset': '. Datensatz: Open5e (srd-2024).',
   'settings.creditsNote':
     'Die deutschen Regelbegriffe stammen aus dem deutschen SRD 5.2.1. Monsternamen, die dort nicht vorkommen, bleiben englisch.',
 
@@ -417,6 +471,56 @@ const de: Dict = {
   'dice.applyTo': 'Anwenden auf',
   'dice.pickOneOrMore': '(eine oder mehrere auswählen)',
   'dice.rollFirst': 'Zuerst würfeln',
+
+  'common.ok': 'OK',
+  'common.section': 'Abschnitt',
+  'common.type': 'Typ',
+  'common.kind': 'Art',
+  'common.dc': 'SG',
+
+  'pcs.save': 'Speichern',
+
+  'monsters.libraryEmpty':
+    'Die Bibliothek ist leer. Lege Monster manuell an oder importiere den mitgelieferten SRD-5.2.1-Satz.',
+  'monsters.f.toHit': 'Angriffsbonus',
+  'monsters.f.longRange': 'Weite Distanz',
+  'monsters.f.saveAbility': 'Rettungswurf-Attribut',
+  'monsters.f.damageDice': 'Schadenswürfel',
+  'monsters.f.flatDamage': 'Fester Schaden',
+  'monsters.f.onlyIf': 'Nur wenn…',
+  'monsters.f.addDamage': '+ Schaden hinzufügen',
+  'monsters.f.addAction': '+ Aktion hinzufügen',
+
+  'templates.noLibrary':
+    'Lege zuerst Monster in der Bibliothek an – Vorlagen werden aus Bibliothekseinträgen gebaut.',
+  'templates.emptyNote':
+    'Noch keine Begegnungsvorlagen. Eine Vorlage ist ein wiederverwendbarer Bauplan aus Monstern mit Anzahl.',
+  'templates.nameLabel': 'Vorlagenname',
+  'templates.saveTemplate': 'Vorlage speichern',
+
+  'combat.header': 'Kampf',
+  'combat.roundBadge': 'Runde {n}',
+  'combat.needTemplate':
+    'Ein Kampf beginnt mit einer Begegnungsvorlage. Lege zuerst eine im Bereich „Begegnungen“ an.',
+  'combat.rollInitiative': 'Initiative würfeln →',
+  'combat.beginCombat': '▶ Kampf beginnen',
+  'combat.dmgBtn': '⚔ Schaden',
+  'combat.healBtn': '✚ Heilen',
+  'combat.initiativeAuto':
+    'Die Initiative wird automatisch gewürfelt; das Monster reiht sich entsprechend ein.',
+  'combat.moreRefine': '…{n} weitere, Suche eingrenzen',
+  'combat.toHit': 'Angriffswurf',
+  'combat.saveDc': '{ability}-Rettungswurf SG {dc}',
+  'combat.targetsCount': '{ability}-Rettungswurf SG {dc} – {n} Ziel(e)',
+
+  'dice.die': 'Würfel',
+  'dice.addExtra': '＋ Weitere Würfel',
+  'dice.rollPool': '🎲 {pool} würfeln',
+
+  'attack.crit': '💥 KRITISCH!',
+  'attack.nat1': 'NAT 1 – DANEBEN',
+  'attack.hit': '✔ TREFFER',
+  'attack.miss': '✘ DANEBEN',
 };
 
 const DICTS: Record<Lang, Dict> = { en, de };

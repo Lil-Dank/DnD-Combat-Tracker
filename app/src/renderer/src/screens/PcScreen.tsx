@@ -45,7 +45,7 @@ export function PcScreen({ state }: { state: AppState }) {
       <header className="screen-header">
         <h1>{t('pcs.titleFull')}</h1>
         <button className="btn primary" onClick={() => setForm({ ...emptyForm })}>
-          + Add PC
+          {t('pcs.add')}
         </button>
       </header>
 
@@ -80,7 +80,7 @@ export function PcScreen({ state }: { state: AppState }) {
                     if (await confirm(t('pcs.deleteConfirm', { name: pc.name }), t('common.delete'))) void api.deletePc(pc.id);
                   }}
                 >
-                  Delete
+                  {t('common.delete')}
                 </button>
               </td>
             </tr>
@@ -93,7 +93,7 @@ export function PcScreen({ state }: { state: AppState }) {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>{t(form.id ? 'pcs.editPc' : 'pcs.addPc')}</h2>
             <label>
-              Name
+              {t('common.name')}
               <input
                 autoFocus
                 value={form.name}
@@ -103,7 +103,7 @@ export function PcScreen({ state }: { state: AppState }) {
             </label>
             <div className="form-row">
               <label>
-                Max HP
+                {t('common.maxHp')}
                 <input
                   type="number"
                   min={1}
@@ -112,7 +112,7 @@ export function PcScreen({ state }: { state: AppState }) {
                 />
               </label>
               <label>
-                AC
+                {t('common.ac')}
                 <input
                   type="number"
                   value={form.ac}
@@ -120,7 +120,7 @@ export function PcScreen({ state }: { state: AppState }) {
                 />
               </label>
               <label>
-                Init mod
+                {t('common.initMod')}
                 <input
                   type="number"
                   value={form.initMod}
@@ -131,7 +131,7 @@ export function PcScreen({ state }: { state: AppState }) {
             <div className="modal-actions">
               <button className="btn" onClick={() => setForm(null)}>{t('common.cancel')}</button>
               <button className="btn primary" disabled={!form.name.trim()} onClick={() => void submit()}>
-                Save
+                {t('pcs.save')}
               </button>
             </div>
           </div>

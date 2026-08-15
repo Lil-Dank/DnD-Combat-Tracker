@@ -72,19 +72,19 @@ export function TemplatesScreen({
           onClick={() => setForm({ name: '', entries: [] })}
           disabled={state.monsters.length === 0}
         >
-          + New Template
+          {tr('templates.new')}
         </button>
       </header>
 
       {state.monsters.length === 0 && (
         <p className="empty-note">
-          Add monsters to the library first — templates are built from monster-library entries.
+          {tr('templates.noLibrary')}
         </p>
       )}
 
       {state.encounterTemplates.length === 0 && state.monsters.length > 0 && !form && (
         <p className="empty-note">
-          No encounter templates yet. A template is a reusable blueprint of monsters with
+          {tr('templates.emptyNote')}
           quantities (e.g. 4× Goblin, 1× Bugbear) that you pick when starting combat.
         </p>
       )}
@@ -117,11 +117,11 @@ export function TemplatesScreen({
                   onStartCombat(t.id);
                 }}
               >
-                ⚔ Start Combat
+                {tr('templates.start')}
               </button>
               <button className="btn small" onClick={() => startEdit(t)}>{tr('common.edit')}</button>
               <button className="btn small" onClick={() => void api.duplicateTemplate(t.id)}>
-                Duplicate
+                {tr('common.duplicate')}
               </button>
               <button
                 className="btn small danger"
@@ -129,7 +129,7 @@ export function TemplatesScreen({
                   if (await confirm(tr('templates.deleteConfirm', { name: t.name }), tr('common.delete'))) void api.deleteTemplate(t.id);
                 }}
               >
-                Delete
+                {tr('common.delete')}
               </button>
             </div>
           </div>
@@ -141,7 +141,7 @@ export function TemplatesScreen({
           <div className="modal wide" onClick={(e) => e.stopPropagation()}>
             <h2>{tr(form.id ? 'templates.editTemplate' : 'templates.newTemplate')}</h2>
             <label>
-              Template name
+              {tr('templates.nameLabel')}
               <input
                 autoFocus
                 placeholder={tr('templates.namePlaceholder')}
@@ -206,7 +206,7 @@ export function TemplatesScreen({
                 );
               })}
               {filteredMonsters.length > 60 && (
-                <span className="muted">…{filteredMonsters.length - 60} more, refine search</span>
+                <span className="muted">{tr('combat.moreRefine', { n: filteredMonsters.length - 60 })}</span>
               )}
             </div>
 
@@ -217,7 +217,7 @@ export function TemplatesScreen({
                 disabled={!form.name.trim()}
                 onClick={() => void submit()}
               >
-                Save Template
+                {tr('templates.saveTemplate')}
               </button>
             </div>
           </div>

@@ -81,7 +81,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
               />
             </label>
             <label>
-              Die
+              {t('dice.die')}
               <select value={p.die} onChange={(e) => patchPart(i, { die: e.target.value })}>
                 {DICE.map((d) => (
                   <option key={d} value={d}>d{d}</option>
@@ -90,7 +90,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
             </label>
             {i === 0 ? (
               <label>
-                Modifier
+                {t('dice.modifier')}
                 <input
                   type="number"
                   value={mod}
@@ -122,10 +122,10 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
               setResult(null);
             }}
           >
-            ＋ Add extra dice
+            {t('dice.addExtra')}
           </button>
           <button className="btn primary dice-roll-btn" onClick={roll}>
-            🎲 Roll {formatPool(poolOf(), modNum)}
+            {t('dice.rollPool', { pool: formatPool(poolOf(), modNum) })}
           </button>
         </div>
 
@@ -161,7 +161,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
                 title={!result ? t('dice.rollFirst') : ''}
                 onClick={() => void apply('damage')}
               >
-                ⚔ Damage {result && targets.size > 0 ? `(${result.total})` : ''}
+                {t('dice.applyDamage')} {result && targets.size > 0 ? `(${result.total})` : ''}
               </button>
               <button
                 className="btn heal"
@@ -169,7 +169,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
                 title={!result ? t('dice.rollFirst') : ''}
                 onClick={() => void apply('heal')}
               >
-                ✚ Heal {result && targets.size > 0 ? `(${result.total})` : ''}
+                {t('dice.applyHeal')} {result && targets.size > 0 ? `(${result.total})` : ''}
               </button>
             </div>
           </>

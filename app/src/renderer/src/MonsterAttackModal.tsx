@@ -41,7 +41,7 @@ export function MonsterAttackModal({
   attackerId: string;
   onClose: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, dmg } = useI18n();
   const combat = state.combat;
   const attacker = combat?.combatants.find((c) => c.id === attackerId);
 
@@ -101,10 +101,10 @@ export function MonsterAttackModal({
           ? rollPool([{ count: d.count, die: d.die }], d.bonus ?? 0).total
           : (d.average ?? 0);
       if (d.condition) {
-        conditional.push(`+${value} ${d.type} (${d.condition})`);
+        conditional.push(`+${value} ${dmg(d.type)} (${d.condition})`);
       } else {
         total += value;
-        parts.push(`${value} ${d.type}`);
+        parts.push(`${value} ${dmg(d.type)}`);
       }
     }
     setDmgRoll({ total, parts, conditional });
@@ -205,13 +205,13 @@ export function MonsterAttackModal({
                     {' '}ATK {atkRoll.total}
                     <span className="muted"> (d20: {atkRoll.die})</span>{' '}
                     {atkRoll.crit
-                      ? '💥 CRIT!'
+                      ? t('attack.crit')
                       : atkRoll.nat1
-                        ? 'NAT 1 — MISS'
+                        ? t('attack.nat1')
                         : atkRoll.verdict === 'hit'
-                          ? '✔ HIT'
+                          ? t('attack.hit')
                           : atkRoll.verdict === 'miss'
-                            ? '✘ MISS'
+                            ? t('attack.miss')
                             : ''}
                   </span>
                 )}
@@ -237,7 +237,7 @@ export function MonsterAttackModal({
 
             <div className="modal-actions">
               <button className="btn" onClick={() => { setStep('target'); setDmgRoll(null); setAtkRoll(null); }}>
-                ← Back
+                {t('common.back')}
               </button>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               {dmgRoll && (

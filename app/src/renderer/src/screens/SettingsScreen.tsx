@@ -97,11 +97,11 @@ export function SettingsScreen({ state }: { state: AppState }) {
       <section className="settings-section">
         <h2>{t('settings.about')}</h2>
         <p>
-          Monster data: <strong>SRD 5.2.1</strong> by Wizards of the Coast, licensed under{' '}
+          {t('settings.credits')}{' '}
           <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
             CC-BY-4.0
           </a>
-          . Dataset: Open5e (srd-2024).
+          {t('settings.creditsDataset')}
         </p>
         {lang === 'de' && <p className="muted">{t('settings.creditsNote')}</p>}
       </section>

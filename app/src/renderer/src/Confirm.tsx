@@ -11,7 +11,14 @@ type ConfirmFn = (message: string, confirmLabel?: string) => Promise<boolean>;
 const ConfirmContext = createContext<ConfirmFn>(() => Promise.resolve(false));
 
 /** In-app replacement for window.confirm(), styled like the other modals. */
-export function ConfirmProvider({ children }: { children: ReactNode }) {
+export function ConfirmProvider({
+  children,
+  cancelLabel = 'Cancel',
+}: {
+  children: ReactNode;
+  /** Supplied by App so the dialog follows the chosen language. */
+  cancelLabel?: string;
+}) {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   const requestRef = useRef<ConfirmRequest | null>(null);
 
@@ -40,7 +47,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             <p className="confirm-message">{request.message}</p>
             <div className="modal-actions">
               <button className="btn" autoFocus onClick={() => answer(false)}>
-                Cancel
+                {cancelLabel}
               </button>
               <button className="btn danger" onClick={() => answer(true)}>
                 {request.confirmLabel}

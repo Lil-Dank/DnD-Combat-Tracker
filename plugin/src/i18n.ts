@@ -44,9 +44,14 @@ const en: Labels = {
   extraDice: 'Extra\ndice:',
   whoSaved: 'DMG {amount}\nwho\nsaved?',
   ac: 'AC',
-  yes: '✓ Yes',
-  no: '✕ No',
-  moreDice: 'More\ndice?',
+  yes: '✓ Yes\n+ dice',
+  no: '✕ No\n🎲',
+  moreDice: 'more\ndice?',
+  crit: 'CRIT!',
+  nat1: 'NAT 1',
+  hit: '✔ HIT',
+  miss: '✘ MISS',
+  atk: 'ATK',
 };
 
 const de: Labels = {
@@ -70,9 +75,14 @@ const de: Labels = {
   extraDice: 'Extra\nWürfel:',
   whoSaved: 'SCH {amount}\nwer hat\nbestanden?',
   ac: 'RK',
-  yes: '✓ Ja',
-  no: '✕ Nein',
-  moreDice: 'Mehr\nWürfel?',
+  yes: '✓ Ja\n+ Würfel',
+  no: '✕ Nein\n🎲',
+  moreDice: 'mehr\nWürfel?',
+  crit: 'KRIT!',
+  nat1: 'NAT 1',
+  hit: '✔ TREFFER',
+  miss: '✘ DANEBEN',
+  atk: 'ANG',
 };
 
 const DICTS: Record<PluginLang, Labels> = { en, de };

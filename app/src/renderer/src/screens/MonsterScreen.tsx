@@ -282,7 +282,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
               })
             }
           >
-            + Add Monster
+            {t('monsters.add')}
           </button>
         </div>
       </header>
@@ -298,8 +298,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
 
       {state.monsters.length === 0 && !form && (
         <p className="empty-note">
-          The library is empty. Add monsters manually, or import the bundled SRD 5.2.1 set
-          (openly licensed, includes attacks).
+          {t('monsters.libraryEmpty')}
         </p>
       )}
 
@@ -346,7 +345,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                         void api.deleteMonster(m.id);
                     }}
                   >
-                    Delete
+                    {t('common.delete')}
                   </button>
                 </td>
               </tr>
@@ -385,7 +384,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
           <div className="modal wide" onClick={(e) => e.stopPropagation()}>
             <h2>{t(form.id ? 'monsters.editMonster' : 'monsters.addMonster')}</h2>
             <label>
-              Name
+              {t('common.name')}
               <input
                 autoFocus
                 value={form.name}
@@ -394,7 +393,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
             </label>
             <div className="form-row">
               <label>
-                Max HP
+                {t('common.maxHp')}
                 <input
                   type="number"
                   min={1}
@@ -403,7 +402,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                 />
               </label>
               <label>
-                AC
+                {t('common.ac')}
                 <input
                   type="number"
                   value={form.ac}
@@ -411,7 +410,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                 />
               </label>
               <label>
-                Init mod
+                {t('common.initMod')}
                 <input
                   type="number"
                   value={form.initMod}
@@ -442,11 +441,11 @@ export function MonsterScreen({ state }: { state: AppState }) {
               <div key={a.id} className="attack-form">
                 <div className="form-row">
                   <label>
-                    Name
+                    {t('common.name')}
                     <input value={a.name} onChange={(e) => patchAction(i, { name: e.target.value })} />
                   </label>
                   <label>
-                    Section
+                    {t('common.section')}
                     <select
                       value={a.section}
                       onChange={(e) => patchAction(i, { section: e.target.value as ActionSection })}
@@ -457,7 +456,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                     </select>
                   </label>
                   <label>
-                    Type
+                    {t('common.type')}
                     <select
                       value={a.type}
                       onChange={(e) => patchAction(i, { type: e.target.value as ActionKind })}
@@ -480,7 +479,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                 {a.type === 'attack' && (
                   <div className="form-row">
                     <label>
-                      Kind
+                      {t('common.kind')}
                       <select
                         value={a.kind}
                         onChange={(e) => patchAction(i, { kind: e.target.value as AttackKind })}
@@ -491,7 +490,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                       </select>
                     </label>
                     <label>
-                      To hit
+                      {t('monsters.f.toHit')}
                       <input
                         type="number"
                         placeholder="+4"
@@ -521,7 +520,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                           />
                         </label>
                         <label>
-                          Long range
+                          {t('monsters.f.longRange')}
                           <input
                             type="number"
                             placeholder="320"
@@ -537,7 +536,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                 {a.type === 'save' && (
                   <div className="form-row">
                     <label>
-                      Save ability
+                      {t('monsters.f.saveAbility')}
                       <select
                         value={a.saveAbility}
                         onChange={(e) => patchAction(i, { saveAbility: e.target.value })}
@@ -548,7 +547,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                       </select>
                     </label>
                     <label>
-                      DC
+                      {t('common.dc')}
                       <input
                         type="number"
                         value={a.saveDc}
@@ -563,7 +562,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                     {a.damage.map((d, j) => (
                       <div key={j} className="form-row">
                         <label>
-                          Damage dice
+                          {t('monsters.f.damageDice')}
                           <input
                             placeholder="2d8+2 (or leave empty)"
                             value={d.dice}
@@ -575,7 +574,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                           />
                         </label>
                         <label>
-                          Flat damage
+                          {t('monsters.f.flatDamage')}
                           <input
                             type="number"
                             placeholder="if no dice"
@@ -588,7 +587,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                           />
                         </label>
                         <label>
-                          Type
+                          {t('common.type')}
                           <input
                             placeholder="slashing"
                             value={d.type}
@@ -600,7 +599,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                           />
                         </label>
                         <label>
-                          Only if…
+                          {t('monsters.f.onlyIf')}
                           <input
                             placeholder="optional condition"
                             value={d.condition}
@@ -629,7 +628,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                         })
                       }
                     >
-                      + Add damage
+                      {t('monsters.f.addDamage')}
                     </button>
                   </>
                 )}
@@ -649,13 +648,13 @@ export function MonsterScreen({ state }: { state: AppState }) {
               className="btn small"
               onClick={() => setForm({ ...form, actions: [...form.actions, emptyAction()] })}
             >
-              + Add action
+              {t('monsters.f.addAction')}
             </button>
 
             <div className="modal-actions">
               <button className="btn" onClick={() => setForm(null)}>{t('common.cancel')}</button>
               <button className="btn primary" disabled={!form.name.trim()} onClick={() => void submit()}>
-                Save
+                {t('pcs.save')}
               </button>
             </div>
           </div>

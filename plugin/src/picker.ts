@@ -970,7 +970,7 @@ class Picker {
       const ac = target?.ac ?? null;
       // Nat 20 always hits, nat 1 always misses; otherwise meet-or-beat AC.
       const hit = die === 20 ? true : die === 1 ? false : ac !== null ? total >= ac : null;
-      const note = die === 20 ? 'CRIT!' : die === 1 ? 'NAT 1' : `d20: ${die}`;
+      const note = die === 20 ? L('crit') : die === 1 ? L('nat1') : `d20: ${die}`;
       const verdict = hit === null ? '' : hit ? `\n✔ HIT` : `\n✘ MISS`;
       this.lastRoll = `ATK ${total}\n${note}${verdict}`;
       await action.showOk();

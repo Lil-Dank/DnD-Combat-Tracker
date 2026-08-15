@@ -78,13 +78,13 @@ function StartCombatWizard({
       <header className="screen-header">
         <h1>{t('combat.startCombat')}</h1>
         <div className="header-actions">
-          <button className="btn" onClick={onOpenDice}>🎲 Dice Roller</button>
+          <button className="btn" onClick={onOpenDice}>{t('combat.diceRoller')}</button>
         </div>
       </header>
 
       {state.encounterTemplates.length === 0 ? (
         <p className="empty-note">
-          Combat starts from an encounter template. Build one on the Encounters screen first.
+          {t('combat.needTemplate')}
         </p>
       ) : (
         <div className="wizard">
@@ -150,7 +150,7 @@ function StartCombatWizard({
             disabled={!canStart}
             onClick={() => void api.startCombatSetup(templateId!, [...pcIds], rollMode)}
           >
-            Roll Initiative →
+            {t('combat.rollInitiative')}
           </button>
         </div>
       )}
@@ -171,7 +171,7 @@ function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => 
       <header className="screen-header">
         <h1>{t('combat.initiativeOrder')}</h1>
         <div className="header-actions">
-          <button className="btn" onClick={onOpenDice}>🎲 Dice Roller</button>
+          <button className="btn" onClick={onOpenDice}>{t('combat.diceRoller')}</button>
           <button className="btn" onClick={() => void api.endCombat()}>{t('common.cancel')}</button>
           <button
             className="btn primary"
@@ -179,7 +179,7 @@ function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => 
             title={allSet ? '' : t('combat.enterInitFirst')}
             onClick={() => void api.beginCombat()}
           >
-            ▶ Begin Combat
+            {t('combat.beginCombat')}
           </button>
         </div>
       </header>
@@ -312,10 +312,11 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
     <div className="screen">
       <header className="screen-header combat-sticky">
         <h1>
-          Combat <span className="round-badge">Round {combat.round}</span>
+          {t('combat.header')}{' '}
+          <span className="round-badge">{t('combat.roundBadge', { n: combat.round })}</span>
         </h1>
         <div className="header-actions">
-          <button className="btn" onClick={onOpenDice}>🎲 Dice Roller</button>
+          <button className="btn" onClick={onOpenDice}>{t('combat.diceRoller')}</button>
           <button className="btn" onClick={() => setAddingMonster(true)}>{t('combat.addMonster')}</button>
           <button className="btn" onClick={() => void api.prevTurn()}>{t('combat.prev')}</button>
           <button className="btn primary" onClick={() => void api.nextTurn()}>{t('combat.next')}</button>
@@ -325,7 +326,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
               if (await confirm(t('combat.endThisCombat'), t('combat.end'))) void api.endCombat();
             }}
           >
-            End Combat
+            {t('combat.end')}
           </button>
         </div>
       </header>
@@ -379,7 +380,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                     onClick={() => applyAmount(c.id, 'damage')}
                     title={t('combat.applyDamage')}
                   >
-                    ⚔ Dmg
+                    {t('combat.dmgBtn')}
                   </button>
                   <button
                     className="btn small heal"
@@ -387,7 +388,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                     onClick={() => applyAmount(c.id, 'heal')}
                     title={t('combat.applyHealing')}
                   >
-                    ✚ Heal
+                    {t('combat.healBtn')}
                   </button>
                 </span>
                 <span className="row-tools">
@@ -397,7 +398,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                       title={t('combat.rollMonsterAttack')}
                       onClick={() => setAttackModalFor(c.id)}
                     >
-                      🎲 Attack
+                      {t('combat.attack')}
                     </button>
                   )}
                   <button
@@ -410,7 +411,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                       setAttacksFor(closing ? autoReferenceId : null);
                     }}
                   >
-                    ☰ Conditions
+                    {t('combat.conditions')}
                   </button>
                   {c.type === 'monster' && c.attacks.length > 0 && (
                     <button
@@ -420,7 +421,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                         setConditionsFor(null);
                       }}
                     >
-                      ⚔ Attacks
+                      {t('combat.attacks')}
                     </button>
                   )}
                 </span>
@@ -487,11 +488,11 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>{t('combat.addMonsterToCombat')}</h2>
         <p className="muted" style={{ marginBottom: 10 }}>
-          Initiative is rolled automatically; the monster joins the order at its roll.
+          {t('combat.initiativeAuto')}
         </p>
         <div className="form-row">
           <label>
-            Quantity
+            {t('common.quantity')}
             <input
               type="number"
               min={1}
@@ -500,7 +501,7 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
             />
           </label>
           <label>
-            Search library
+            {t('templates.searchLibrary')}
             <input
               autoFocus
               placeholder={t('monsters.search')}
@@ -524,7 +525,7 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
             </button>
           ))}
           {monsters.length > 60 && (
-            <span className="muted">…{monsters.length - 60} more, refine search</span>
+            <span className="muted">{t('combat.moreRefine', { n: monsters.length - 60 })}</span>
           )}
         </div>
         <div className="modal-actions">
@@ -546,8 +547,8 @@ function AttackPanel({ combatant }: { combatant: Combatant }) {
         return (
           <div key={a.id} className="attack-panel-row" title={a.display.text}>
             <strong>{a.name}</strong>
-            {a.display.toHit && <span>{a.display.toHit} to hit</span>}
-            {a.save && <span>{a.save.ability} save DC {a.save.dc}</span>}
+            {a.display.toHit && <span>{a.display.toHit} {t('combat.toHit')}</span>}
+            {a.save && <span>{t('combat.saveDc', { ability: a.save.ability, dc: a.save.dc })}</span>}
             {a.display.range && <span>{a.display.range}</span>}
             {a.display.damage && <span>{a.display.damage}</span>}
             {a.attack?.usage?.type === 'recharge' && <span className="muted">Recharge {a.attack.usage.min}+</span>}

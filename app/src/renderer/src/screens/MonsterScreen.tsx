@@ -203,7 +203,7 @@ function formToAction(f: ActionForm, order: number, existing?: MonsterAction): M
 }
 
 export function MonsterScreen({ state }: { state: AppState }) {
-  const { t, mon, abilityCode, locAction } = useI18n();
+  const { t, mon, abilityCode, locAction, fmtRange } = useI18n();
   const [form, setForm] = useState<MonsterFormData | null>(null);
   const confirm = useConfirm();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -369,7 +369,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                               {a.display.toHit && ` ${a.display.toHit} ${t('combat.toHit')}`}
                               {a.save &&
                                 ` ${t('combat.saveDc', { ability: abilityCode(a.save.ability), dc: a.save.dc })}`}
-                              {loc.range && `, ${loc.range}`}
+                              {loc.range && `, ${fmtRange(loc.range)}`}
                               {loc.damage && `, ${loc.damage}`}
                               {a.type !== 'attack' && loc.text && <AttackText text={loc.text} />}
                             </li>

@@ -12,7 +12,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v1.2.0-success)
+![Release](https://img.shields.io/badge/release-v1.2.1-success)
 
 </div>
 
@@ -69,7 +69,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 
 Grab both files from the [**latest release**](../../releases/latest):
 
-1. **App** — run `DnD Combat Tracker Setup 1.2.0.exe` (NSIS installer, choose your own directory).
+1. **App** — run `DnD Combat Tracker Setup 1.2.1.exe` (NSIS installer, choose your own directory).
 2. **Stream Deck plugin** — double-click `com.dmtools.dnd-combat-tracker.streamDeckPlugin`;
    the Stream Deck app installs it and registers the bundled picker profiles.
 3. Start the app. The plugin connects within a few seconds — the DM window's sidebar
@@ -215,7 +215,10 @@ automatically) and so are attacks; each attack carries an editable details text 
 in previews, with `**bold**` supported.
 
 The quick reference — in the library expander and the combat panel — opens with a
-STR/DEX/CON/INT/WIS/CHA table showing score and modifier.
+STR/DEX/CON/INT/WIS/CHA table showing score and modifier. Every reach and range is
+annotated with its size in **battle-grid squares** for play on a 1-inch tabletop grid —
+`reach 10 ft. (2 sq)`, `Reichweite 3 m (2 Felder)` — one square being the standard
+5 ft / 1,5 m.
 
 ![The monster library with the Aboleth's stat block expanded, showing its ability table, structured attacks and save DCs](docs/images/monsters.png)
 
@@ -498,7 +501,7 @@ cd app
 npm install
 npm run dev        # live-reload dev session
 npm run build      # compile main/preload/renderer to out/
-npm run dist       # → release/DnD Combat Tracker Setup 1.2.0.exe (NSIS)
+npm run dist       # → release/DnD Combat Tracker Setup 1.2.1.exe (NSIS)
 ```
 
 ```bash

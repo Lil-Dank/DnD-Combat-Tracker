@@ -7,6 +7,7 @@ import {
   abilityCodeLabel,
   damageTypeLabel,
   monsterName,
+  rangeWithSquares,
   setMonsterNameMap,
   type Lang,
   type MonsterL10n,
@@ -31,6 +32,8 @@ export interface I18n {
   mon: (englishName: string) => string;
   /** STR -> STÄ etc., for save-DC chrome. */
   abilityCode: (code: string) => string;
+  /** Range/reach string with grid squares appended ("reach 10 ft. (2 sq)"). */
+  fmtRange: (range: string | null) => string | null;
   /**
    * Localized rendering of one monster action, driven by the template's l10n
    * field (present on SRD imports only). Range and damage are pulled from the
@@ -50,6 +53,7 @@ const Ctx = createContext<I18n>({
   dmg: (d) => d ?? '',
   mon: (n) => n,
   abilityCode: (c) => c,
+  fmtRange: (r) => r,
   locAction: (_l, a) => ({
     name: a.name,
     text: a.display.text,
@@ -68,6 +72,7 @@ export function I18nProvider({ lang, children }: { lang: Lang; children: ReactNo
       dmg: (type) => damageTypeLabel(lang, type),
       mon: (name) => monsterName(lang, name),
       abilityCode: (code) => abilityCodeLabel(lang, code),
+      fmtRange: (range) => rangeWithSquares(lang, range),
       locAction: (l10n, a) => {
         const e = lang === 'de' ? l10n?.actions?.[a.name] : undefined;
         if (!e) {

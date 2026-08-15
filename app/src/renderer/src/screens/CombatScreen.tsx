@@ -546,7 +546,7 @@ function AttackPanel({
   combatant: Combatant;
   l10n?: import('../../../shared/i18n').MonsterL10n;
 }) {
-  const { t, abilityCode, locAction } = useI18n();
+  const { t, abilityCode, locAction, fmtRange } = useI18n();
   return (
     <div className="attack-panel">
       {combatant.abilities && <AbilityTable abilities={combatant.abilities} />}
@@ -559,7 +559,7 @@ function AttackPanel({
             <strong>{loc.name}</strong>
             {a.display.toHit && <span>{a.display.toHit} {t('combat.toHit')}</span>}
             {a.save && <span>{t('combat.saveDc', { ability: abilityCode(a.save.ability), dc: a.save.dc })}</span>}
-            {loc.range && <span>{loc.range}</span>}
+            {loc.range && <span>{fmtRange(loc.range)}</span>}
             {loc.damage && <span>{loc.damage}</span>}
             {a.attack?.usage?.type === 'recharge' && <span className="muted">{t('attack.recharge', { min: a.attack.usage.min })}</span>}
             {showText && <AttackText text={loc.text} />}

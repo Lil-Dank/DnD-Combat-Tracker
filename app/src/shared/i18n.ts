@@ -253,6 +253,8 @@ const en: Dict = {
   'combat.setupHint':
     'Monsters are rolled automatically (🎲 to re-roll). Drag rows to break ties manually.',
   'combat.mod': 'mod',
+  'unit.square': 'sq',
+  'unit.squares': 'sq',
 
 
 
@@ -503,6 +505,8 @@ const de: Dict = {
   'combat.setupHint':
     'Monster werden automatisch ausgewürfelt (🎲 zum Neuwürfeln). Ziehe Zeilen, um Gleichstände manuell zu klären.',
   'combat.mod': 'Mod.',
+  'unit.square': 'Feld',
+  'unit.squares': 'Felder',
 
 
 
@@ -572,6 +576,33 @@ export function translate(
   const raw = DICTS[lang]?.[key] ?? DICTS.en[key] ?? key;
   if (!params) return raw;
   return raw.replace(/\{(\w+)\}/g, (m, p) => (p in params ? String(params[p]) : m));
+}
+
+
+/** Feet or meters per battle-grid square (D&D squares are 5 ft = 1,5 m). */
+const FEET_PER_SQUARE = 5;
+const METERS_PER_SQUARE = 1.5;
+
+/**
+ * Annotates every distance in a range/reach string with its size in grid
+ * squares, for play on a 1-inch battle map: "reach 10 ft." becomes
+ * "reach 10 ft. (2 sq)", "Reichweite 3 m" becomes "Reichweite 3 m (2 Felder)".
+ * Compound strings annotate each segment ("reach 5 ft. (1 sq) or range
+ * 150 ft. (30 sq)"). Strings without a recognizable distance pass through.
+ */
+export function rangeWithSquares(lang: Lang, range: string | null): string | null {
+  if (!range) return range;
+  return range.replace(
+    /(\d+(?:[.,]\d+)?)(\s*\/\s*(\d+(?:[.,]\d+)?))?\s*(ft\.?|m)(?![A-Za-z])/gi,
+    (whole, first, _pair, second, unit) => {
+      const per = unit.toLowerCase().startsWith('m') ? METERS_PER_SQUARE : FEET_PER_SQUARE;
+      const toSq = (v: string) => Math.round(parseFloat(v.replace(',', '.')) / per);
+      const a = toSq(first);
+      const b = second ? toSq(second) : null;
+      const label = translate(lang, b !== null || a !== 1 ? 'unit.squares' : 'unit.square');
+      return `${whole} (${b !== null ? `${a}/${b}` : a} ${label})`;
+    },
+  );
 }
 
 export function conditionLabel(lang: Lang, c: Condition): string {

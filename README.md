@@ -209,6 +209,13 @@ to the primary display if that monitor is gone.
 *The same view, unchanged, over `#1a1423` and over a pure green key — no bleed, no
 fringing, nothing in the key's hue.*
 
+And the point of all that — the keyed overlay composited straight onto scene art in OBS:
+
+![The Player View keyed in OBS over cave artwork, the initiative order legible above the scene with downed, bloodied and current-turn states all readable](docs/images/player-view-obs.jpg)
+
+*Turn order, HP, bloodied and downed states all stay legible over a busy, high-contrast
+background.*
+
 **Layout.** The view measures the space it actually has and picks the column count
 yielding the largest readable card, then scales the text to fit — a narrow window
 stays in one column, a wide one spreads into several, and the result is verified by

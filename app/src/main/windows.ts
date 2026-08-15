@@ -11,9 +11,14 @@ let dmWindow: BrowserWindow | null = null;
 let playerWindow: BrowserWindow | null = null;
 let playerWindowState: JsonValue<PlayerWindowState>;
 
-/** Window icon for dev runs; the packaged exe carries build/icon.ico. */
+/**
+ * Window icon. On Windows the multi-size .ico matters: the title-bar corner
+ * is 16 px, and scaling the 256 px PNG down looks mushy - the .ico carries a
+ * simplified d20 drawn for that size, and Windows picks it directly.
+ */
 function appIcon(): string {
-  return path.join(app.getAppPath(), 'resources', 'icon.png');
+  const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+  return path.join(app.getAppPath(), 'resources', file);
 }
 
 export function initWindowState(userDataDir: string): Promise<void> {

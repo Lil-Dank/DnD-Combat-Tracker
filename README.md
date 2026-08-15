@@ -41,6 +41,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 - [Install](#install)
 - [How it fits together](#how-it-fits-together)
 - [Using the app](#using-the-app)
+  - [Language](#language)
 - [Stream Deck plugin](#stream-deck-plugin)
 - [Build from source](#build-from-source)
 - [Releasing](#releasing)
@@ -59,7 +60,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 | 📺 **Player View** | Display-only second-monitor window. Monsters show no numbers — just a progressive "bloodied" reddening. Auto-fits any actor count. **Styled for chroma keying.** |
 | 🎛️ **Stream Deck plugin** | Turn control, damage/heal numpad, multi-actor conditions, monster attack rolls, and a dice roller — all on hardware keys that render their own labels. |
 | 🎨 **Themes** | PHB Style (default), Default Electron, Dark, Light. |
-| 🗣 **English & German** | Full UI localization. Game terms follow the SRD 5.2.1 in each language, and monster names use their German SRD names. |
+| 🗣 **English & German** | [Full UI localization](#language) across both windows *and* the deck. Game terms follow the SRD 5.2.1 in each language. |
 | 💾 **Local-only storage** | Plain JSON in `%APPDATA%`, written atomically. Your data never leaves the machine. |
 
 ---
@@ -133,14 +134,53 @@ Build outputs (`node_modules`, `app/out`, `app/release`, `plugin/dist`,
 
 ## Using the app
 
-**Language** lives under Settings → Appearance: **English** or **Deutsch**. It switches
-the DM window, the Player View *and* the Stream Deck plugin at once — the app sends the
-chosen language over the bridge, so the deck relabels itself without a restart.
-Game terminology is taken from the SRD 5.2.1 in that language rather than translated
-loosely, so conditions read *Vergiftet* and *Kampfunfähig*, abilities read
-*Stä/Ges/Kon/Int/Wei/Cha*, and monsters use their German SRD names — *Owlbear* becomes
-*Eulenbär*, *Ettercap* becomes *Atterkopp*. Names the German SRD does not contain stay
-in English rather than being machine-translated.
+### Language
+
+**Settings → Appearance → Sprache/Language** switches between **English** and
+**Deutsch**. One setting moves all three surfaces at once — the DM window, the Player
+View, and the Stream Deck plugin, which relabels its keys live because the app sends the
+chosen language over the bridge. No restart.
+
+<div align="center">
+
+![The DM window running in German: Kampf, Zustände, RK, and a monster quick reference with STÄ/GES/KON/INT/WEI/CHA](docs/images/combat-de.png)
+
+<i>The same combat screen in German. Conditions, abilities and the round badge all follow
+the German SRD; the language selector sits under Settings → Darstellung.</i>
+
+</div>
+
+Game terminology is lifted from the **German SRD 5.2.1** rather than translated loosely,
+so the app agrees with what a German-speaking table reads in the rules:
+
+| | English | Deutsch |
+| --- | --- | --- |
+| Conditions | Poisoned, Incapacitated, Prone | **Vergiftet**, **Kampfunfähig**, **Liegend** |
+| Abilities | STR / DEX / CON / INT / WIS / CHA | **STÄ / GES / KON / INT / WEI / CHA** |
+| Armour Class | AC | **RK** |
+| Monsters | Owlbear, Ettercap, Bulette | **Eulenbär**, **Atterkopp**, **Landhai** |
+
+<details>
+<summary><b>The settings screen in German</b></summary>
+
+![Settings in German showing the Sprache selector set to Deutsch, plus theme, player view, bridge and credits sections](docs/images/settings-de.png)
+
+</details>
+
+Condition keys on the deck show the German label but still send the canonical English
+value back to the app, so your saved data never depends on which language you were using.
+
+> [!NOTE]
+> **What stays in English.** Monster *names* are translated for the 199 of 331 creatures
+> whose German names could be matched with confidence; the rest keep their English names
+> rather than being guessed at (`Goblin Warrior` in the screenshot above is one of them).
+> Monster **action names and their SRD prose** — *Multiattack*, *"The owlbear makes two
+> Rend attacks."* — also stay English: that is dataset content, not interface text, and
+> translating it needs the German stat blocks parsed rather than a dictionary.
+
+Every user-visible string in the interface goes through the lookup in
+`app/src/shared/i18n.ts`. That is enforced empirically rather than by eye — see
+[Checking localization coverage](#checking-localization-coverage).
 
 **Themes** live under Settings → Appearance: **PHB Style (Default)** (parchment and
 dark-red headings, styled after official 5e books / Homebrewery), **Default Electron**
@@ -471,6 +511,25 @@ npx streamdeck restart com.dmtools.dnd-combat-tracker        # reload after chan
 
 **Tests:** `node scripts/test-picker.mjs` in `plugin/` runs the picker state-machine
 harness (~245 assertions covering every screen, grid size and flow).
+`node scripts/test-i18n.mjs` covers the German key labels and checks that a translated
+condition key still reports the canonical English value.
+
+### Checking localization coverage
+
+A regex sweep for untranslated strings misses too much — bare JSX text nodes, labels split
+over lines, emoji-prefixed buttons. So coverage is measured against the running app
+instead: `app/scripts/check-i18n.mjs` walks all 13 screens and modals in English, then in
+German, and prints every visible line that **did not change**.
+
+```bash
+cd app
+npx electron . --remote-debugging-port=9222 --user-data-dir=/tmp/i18n-check
+node scripts/check-i18n.mjs
+```
+
+Anything it reports is either a proper noun, a number, or an untranslated string. It
+currently reports only monster names outside the map and SRD action content — no
+interface text.
 
 <details>
 <summary><b>Regenerating the deck previews in this README</b></summary>

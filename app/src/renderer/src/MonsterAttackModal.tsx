@@ -89,6 +89,14 @@ export function MonsterAttackModal({
     const verdict =
       die === 20 ? 'hit' : die === 1 ? 'miss' : ac !== null ? (total >= ac ? 'hit' : 'miss') : null;
     setAtkRoll({ die, total, verdict, crit: die === 20, nat1: die === 1 });
+    if (attacker) {
+      void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'attackRoll' });
+      const phase =
+        die === 20 ? 'attackCrit' : verdict === 'hit' ? 'attackHit' : verdict === 'miss' ? 'attackMiss' : null;
+      if (phase) {
+        void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase });
+      }
+    }
   };
 
   const rollDamage = () => {
@@ -110,6 +118,9 @@ export function MonsterAttackModal({
     }
     setDmgRoll({ total, parts, conditional });
     setSaved(new Set());
+    if (attacker) {
+      void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'damageRoll' });
+    }
   };
 
   const apply = async () => {
@@ -117,6 +128,9 @@ export function MonsterAttackModal({
     const half = Math.floor(dmgRoll.total / 2);
     for (const id of targets) {
       await api.applyDamage(id, saved.has(id) ? half : dmgRoll.total);
+    }
+    if (attacker && attack) {
+      void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'damageApplied' });
     }
     onClose();
   };

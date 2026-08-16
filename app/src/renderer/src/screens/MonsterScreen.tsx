@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type {
+  KenkuAttackTrigger,
   ActionKind,
   ActionSection,
   AppState,
@@ -16,6 +17,8 @@ import { useConfirm } from '../Confirm';
 import { AttackText } from '../AttackText';
 import { AbilityTable } from '../AbilityTable';
 import { useI18n } from '../i18n';
+import { useKenkuLibrary } from '../useKenkuLibrary';
+import { isDemo } from '../api';
 
 // ---- editable action form model (strings while typing) ----
 
@@ -29,6 +32,8 @@ interface DamageForm {
 interface ActionForm {
   id: string;
   name: string;
+  /** Carried opaquely; edited by the Kenku block in the action row. */
+  kenkuSound?: MonsterAction['kenkuSound'];
   section: ActionSection;
   type: ActionKind;
   kind: AttackKind;
@@ -109,6 +114,7 @@ function actionToForm(a: MonsterAction): ActionForm {
   return {
     id: a.id,
     name: a.name,
+    kenkuSound: a.kenkuSound ?? null,
     section: a.section,
     type: a.type,
     kind: a.attack?.kind ?? 'melee',
@@ -189,6 +195,7 @@ function formToAction(f: ActionForm, order: number, existing?: MonsterAction): M
       effects: existing?.onHit.effects ?? [],
     },
     onHitOrMiss: existing?.onHitOrMiss ?? null,
+    kenkuSound: f.kenkuSound ?? null,
     display: {
       toHit: isAttack ? (toHit >= 0 ? `+${toHit}` : `${toHit}`) : null,
       range: rangeParts.join(' or ') || null,
@@ -205,6 +212,8 @@ function formToAction(f: ActionForm, order: number, existing?: MonsterAction): M
 export function MonsterScreen({ state }: { state: AppState }) {
   const { t, mon, abilityCode, locAction, fmtRange } = useI18n();
   const [form, setForm] = useState<MonsterFormData | null>(null);
+  const kenkuOn = !isDemo && state.settings.kenku.enabled;
+  const { library: kenkuLibrary } = useKenkuLibrary(form !== null && kenkuOn);
   const confirm = useConfirm();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
@@ -636,6 +645,87 @@ export function MonsterScreen({ state }: { state: AppState }) {
                     >
                       {t('monsters.f.addDamage')}
                     </button>
+
+                    {kenkuOn && (
+                      <div className="kenku-action-sound">
+                        <label>
+                          {t('kenku.sound')}
+                          {kenkuLibrary ? (
+                            <select
+                              value={a.kenkuSound?.soundId ?? ''}
+                              onChange={(e) => {
+                                const soundId = e.target.value;
+                                if (!soundId) {
+                                  patchAction(i, { kenkuSound: null });
+                                  return;
+                                }
+                                const snd = kenkuLibrary.sounds.find((x) => x.id === soundId);
+                                patchAction(i, {
+                                  kenkuSound: {
+                                    soundId,
+                                    title: snd?.title ?? soundId,
+                                    trigger: a.kenkuSound?.trigger ?? 'attackHit',
+                                    delayMs: a.kenkuSound?.delayMs,
+                                  },
+                                });
+                              }}
+                            >
+                              <option value="">{t('kenku.noSound')}</option>
+                              {kenkuLibrary.sounds.map((snd) => (
+                                <option key={snd.id} value={snd.id}>
+                                  {snd.title}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="muted">
+                              {a.kenkuSound?.title ?? t('kenku.offline')}
+                            </span>
+                          )}
+                        </label>
+                        {a.kenkuSound && (
+                          <>
+                            <label>
+                              {t('kenku.trigger')}
+                              <select
+                                value={a.kenkuSound.trigger}
+                                onChange={(e) =>
+                                  patchAction(i, {
+                                    kenkuSound: {
+                                      ...a.kenkuSound!,
+                                      trigger: e.target.value as KenkuAttackTrigger,
+                                    },
+                                  })
+                                }
+                              >
+                                <option value="attackRoll">{t('kenku.trg.attackRoll')}</option>
+                                <option value="attackHit">{t('kenku.trg.attackHit')}</option>
+                                <option value="damageRoll">{t('kenku.trg.damageRoll')}</option>
+                                <option value="damageApplied">{t('kenku.trg.damageApplied')}</option>
+                              </select>
+                            </label>
+                            <label>
+                              {t('kenku.delay')}
+                              <input
+                                type="number"
+                                min={0}
+                                defaultValue={a.kenkuSound.delayMs ?? ''}
+                                onBlur={(e) => {
+                                  const delayMs = parseInt(e.target.value, 10);
+                                  patchAction(i, {
+                                    kenkuSound: {
+                                      ...a.kenkuSound!,
+                                      delayMs:
+                                        Number.isFinite(delayMs) && delayMs > 0 ? delayMs : undefined,
+                                    },
+                                  });
+                                }}
+                              />
+                            </label>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
 

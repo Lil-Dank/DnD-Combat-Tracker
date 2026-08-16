@@ -614,6 +614,24 @@ export function createDemoApi(): Api {
       data.pcs = data.pcs.filter((p) => p.id !== id);
       save();
     },
+    savePcAttack: async (pcId, action) => {
+      const pc = data.pcs.find((p) => p.id === pcId);
+      if (!pc) return;
+      const idx = pc.attacks.findIndex((a) => a.id === action.id);
+      if (idx === -1) pc.attacks.push(action);
+      else pc.attacks[idx] = action;
+      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
+      save();
+    },
+    deletePcAttack: async (pcId, actionId) => {
+      const pc = data.pcs.find((p) => p.id === pcId);
+      if (!pc) return;
+      pc.attacks = pc.attacks.filter((a) => a.id !== actionId);
+      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
+      save();
+    },
 
     saveMonster: async (m) => {
       const id = m.id ?? uuid();
@@ -823,5 +841,14 @@ export function createDemoApi(): Api {
     togglePlayerFullscreen: async () => {
       channel.postMessage('pv-fullscreen');
     },
+
+    // Player web + archive: inert in the browser demo (no LAN server here).
+    getPlayerWebQr: async () => ({ urls: [], port: 0, error: null, dataUrls: [] }),
+    kickPlayer: async () => {},
+    resolvePlayerSave: async () => {},
+    dismissPlayerSave: async () => {},
+    onPlayerSavePending: () => () => {},
+    listArchive: async () => [],
+    deleteArchivedCombat: async () => {},
   } as Api;
 }

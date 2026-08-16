@@ -1,7 +1,15 @@
 import { ipcMain } from 'electron';
+import * as QRCode from 'qrcode';
 import { store } from './state';
 import * as kenku from './kenku';
 import { logAttackEvent, type AttackRollDetails } from './combatLog';
+import {
+  dismissPendingSave,
+  getPlayerWebUrls,
+  kickPlayer,
+  onPlayerSavePending,
+  resolvePendingSave,
+} from './playerServer';
 import { importSrdMonsters } from './srd';
 import { onBridgeCommand } from './bridge';
 import {
@@ -17,6 +25,10 @@ export function registerIpc(): void {
 
   ipcMain.handle('pc:save', (_e, pc) => store.savePc(pc));
   ipcMain.handle('pc:delete', (_e, id) => store.deletePc(id));
+  ipcMain.handle('pc:saveAttack', (_e, { pcId, action }) => store.savePcAttack(pcId, action));
+  ipcMain.handle('pc:deleteAttack', (_e, { pcId, actionId }) =>
+    store.deletePcAttack(pcId, actionId),
+  );
 
   ipcMain.handle('monster:save', (_e, m) => store.saveMonster(m));
   ipcMain.handle('monster:delete', (_e, id) => store.deleteMonster(id));
@@ -56,6 +68,22 @@ export function registerIpc(): void {
 
   ipcMain.handle('settings:update', (_e, patch) => store.updateSettings(patch));
 
+  // ---- Player web ----
+  ipcMain.handle('playerWeb:getQr', async () => {
+    const { urls, port, error } = getPlayerWebUrls();
+    const dataUrls = await Promise.all(
+      urls.map((u) => QRCode.toDataURL(u, { margin: 1, width: 320 })),
+    );
+    return { urls, port, error, dataUrls };
+  });
+  ipcMain.handle('playerWeb:kick', (_e, pcId: string) => kickPlayer(pcId));
+  ipcMain.handle('playerWeb:resolveSave', (_e, { id, results }) => resolvePendingSave(id, results));
+  ipcMain.handle('playerWeb:dismissSave', (_e, id: string) => dismissPendingSave(id));
+
+  // ---- Combat archive ----
+  ipcMain.handle('archive:list', () => store.listArchive());
+  ipcMain.handle('archive:delete', (_e, id: string) => store.deleteArchivedCombat(id));
+
   ipcMain.handle('playerView:toggle', () => togglePlayerView());
   ipcMain.handle('playerView:fullscreen', () => togglePlayerFullscreen());
 
@@ -90,6 +118,14 @@ export function registerIpc(): void {
   onBridgeCommand(() => {
     for (const win of getAllWindows()) {
       win.webContents.send('focusCombat');
+    }
+  });
+
+  // A phone launched a save-based action: the DM window opens the
+  // adjudication modal (rolled or manually entered saves per target).
+  onPlayerSavePending((pending) => {
+    for (const win of getAllWindows()) {
+      win.webContents.send('playerSavePending', pending);
     }
   });
 }

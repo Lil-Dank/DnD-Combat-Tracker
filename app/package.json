@@ -14,6 +14,8 @@
     "dist": "electron-vite build && electron-builder --win"
   },
   "dependencies": {
+    "@types/qrcode": "^1.5.6",
+    "qrcode": "^1.5.4",
     "ws": "^8.18.0"
   },
   "devDependencies": {

@@ -1,5 +1,25 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppState, Condition, EncounterTemplate, MonsterTemplate, PC, Settings } from '../shared/types';
+import type {
+  AppState,
+  ArchivedCombat,
+  Condition,
+  EncounterTemplate,
+  MonsterAction,
+  MonsterTemplate,
+  PC,
+  Settings,
+} from '../shared/types';
+
+/** A phone-initiated save-based attack awaiting DM adjudication. */
+export interface PlayerSavePendingInfo {
+  id: string;
+  actorName: string;
+  attackName: string;
+  ability: string;
+  dc: number;
+  damage: number;
+  targetIds: string[];
+}
 
 const api = {
   getState: (): Promise<AppState> => ipcRenderer.invoke('getState'),
@@ -23,6 +43,10 @@ const api = {
 
   savePc: (pc: Omit<PC, 'id'> & { id?: string }) => ipcRenderer.invoke('pc:save', pc),
   deletePc: (id: string) => ipcRenderer.invoke('pc:delete', id),
+  savePcAttack: (pcId: string, action: MonsterAction) =>
+    ipcRenderer.invoke('pc:saveAttack', { pcId, action }),
+  deletePcAttack: (pcId: string, actionId: string) =>
+    ipcRenderer.invoke('pc:deleteAttack', { pcId, actionId }),
 
   saveMonster: (m: Omit<MonsterTemplate, 'id'> & { id?: string }) =>
     ipcRenderer.invoke('monster:save', m),
@@ -74,6 +98,29 @@ const api = {
   ): Promise<void> => ipcRenderer.invoke('kenku:attackEvent', payload),
   togglePlayerView: () => ipcRenderer.invoke('playerView:toggle'),
   togglePlayerFullscreen: () => ipcRenderer.invoke('playerView:fullscreen'),
+
+  // ---- Player web companion ----
+  getPlayerWebQr: (): Promise<{
+    urls: string[];
+    port: number;
+    error: string | null;
+    dataUrls: string[];
+  }> => ipcRenderer.invoke('playerWeb:getQr'),
+  kickPlayer: (pcId: string): Promise<void> => ipcRenderer.invoke('playerWeb:kick', pcId),
+  resolvePlayerSave: (
+    id: string,
+    results: Array<{ targetId: string; saved: boolean; total?: number }>,
+  ): Promise<void> => ipcRenderer.invoke('playerWeb:resolveSave', { id, results }),
+  dismissPlayerSave: (id: string): Promise<void> => ipcRenderer.invoke('playerWeb:dismissSave', id),
+  onPlayerSavePending: (cb: (pending: PlayerSavePendingInfo) => void): (() => void) => {
+    const handler = (_e: unknown, pending: PlayerSavePendingInfo) => cb(pending);
+    ipcRenderer.on('playerSavePending', handler);
+    return () => ipcRenderer.removeListener('playerSavePending', handler);
+  },
+
+  // ---- Combat archive ----
+  listArchive: (): Promise<ArchivedCombat[]> => ipcRenderer.invoke('archive:list'),
+  deleteArchivedCombat: (id: string): Promise<void> => ipcRenderer.invoke('archive:delete', id),
 };
 
 export type Api = typeof api;

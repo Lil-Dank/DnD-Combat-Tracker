@@ -161,6 +161,8 @@ class Picker {
   private actorName = '';
   private digits = '';
   private attackList: BridgeAttack[] = [];
+  /** Template id of the attacking monster, for per-attack Kenku sounds. */
+  private attackerSourceId = '';
   private selectedAttack: BridgeAttack | null = null;
   private lastRoll = '';
   /** Selected target ids (one for attack rolls, several for AoE saves). */
@@ -248,6 +250,19 @@ class Picker {
    * Entry point from the Attack action: pick one of the current-turn
    * monster's attacks, then roll attack/damage from the deck.
    */
+  /** Reports attack-flow progress; the app uses it only for Kenku sounds. */
+  private sendAttackEvent(
+    phase: 'attackRoll' | 'attackHit' | 'attackCrit' | 'attackMiss' | 'damageRoll' | 'damageApplied',
+  ): void {
+    if (!this.selectedAttack) return;
+    bridge.send({
+      type: 'attackEvent',
+      sourceId: this.attackerSourceId,
+      attackId: this.selectedAttack.id,
+      phase,
+    });
+  }
+
   async beginAttack(device: Device): Promise<boolean> {
     const current = bridge.state.combatants.find((c) => c.isCurrentTurn);
     const attacks = current?.attacks ?? [];
@@ -256,6 +271,7 @@ class Picker {
     if (ok) {
       this.actorId = current.id;
       this.actorName = current.displayName;
+      this.attackerSourceId = current.sourceId;
       this.attackList = attacks;
       await this.render();
     }
@@ -971,8 +987,12 @@ class Picker {
       // Nat 20 always hits, nat 1 always misses; otherwise meet-or-beat AC.
       const hit = die === 20 ? true : die === 1 ? false : ac !== null ? total >= ac : null;
       const note = die === 20 ? L('crit') : die === 1 ? L('nat1') : `d20: ${die}`;
-      const verdict = hit === null ? '' : hit ? `\n✔ HIT` : `\n✘ MISS`;
-      this.lastRoll = `ATK ${total}\n${note}${verdict}`;
+      const verdict = hit === null ? '' : `\n${L(hit ? 'hit' : 'miss')}`;
+      this.lastRoll = `${L('atk')} ${total}\n${note}${verdict}`;
+      this.sendAttackEvent('attackRoll');
+      if (die === 20) this.sendAttackEvent('attackCrit');
+      else if (hit === true) this.sendAttackEvent('attackHit');
+      else if (hit === false) this.sendAttackEvent('attackMiss');
       await action.showOk();
       return this.render();
     }
@@ -994,6 +1014,7 @@ class Picker {
           }
         }
       }
+      this.sendAttackEvent('damageRoll');
       const summary = [`DMG ${total}`, ...lines.slice(0, 1)];
       if (atk.save) {
         // Saving-throw action: ask which targets succeeded (they take half)
@@ -1037,6 +1058,7 @@ class Picker {
       for (const { id, amount } of amounts()) {
         bridge.send({ type: 'applyDamage', actorId: id, amount });
       }
+      this.sendAttackEvent('damageApplied');
       await this.exit();
     }, this.applyDelayMs);
   }

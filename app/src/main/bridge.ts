@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { store } from './state';
 import type { AppState } from '../shared/types';
 import { abilityCodeLabel, monsterName } from '../shared/i18n';
+import { handleAttackEvent, type AttackEventPayload } from './kenku';
 
 /**
  * Local WebSocket bridge for the Stream Deck plugin. The app is the server;
@@ -23,6 +24,9 @@ interface BridgeCommand {
   actorId?: string;
   amount?: number;
   condition?: string;
+  sourceId?: string;
+  attackId?: string;
+  phase?: string;
 }
 
 function stateMessage(state: AppState): string {
@@ -39,6 +43,7 @@ function stateMessage(state: AppState): string {
     combatants: active
       ? combat!.combatants.map((c, i) => ({
           id: c.id,
+          sourceId: c.sourceId,
           displayName: monsterName(lang, c.displayName),
           currentHp: c.currentHp,
           maxHp: c.maxHp,
@@ -110,6 +115,15 @@ async function handleCommand(cmd: BridgeCommand): Promise<void> {
         return store.toggleCondition(cmd.actorId, cmd.condition as never);
       }
       return;
+    case 'attackEvent': {
+      // Deliberately absent from KNOWN_COMMANDS: a sound trigger should not
+      // yank the DM window to the Combat screen.
+      const c = cmd as unknown as AttackEventPayload & { type: string };
+      if (typeof c.sourceId === 'string' && typeof c.attackId === 'string' && c.phase) {
+        handleAttackEvent({ sourceId: c.sourceId, attackId: c.attackId, phase: c.phase });
+      }
+      return;
+    }
     default:
       return;
   }

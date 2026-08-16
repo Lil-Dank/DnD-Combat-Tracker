@@ -18,8 +18,18 @@ export interface BridgeAttack {
   damage: BridgeAttackDamage[];
 }
 
+export type AttackEventPhase =
+  | 'attackRoll'
+  | 'attackHit'
+  | 'attackCrit'
+  | 'attackMiss'
+  | 'damageRoll'
+  | 'damageApplied';
+
 export interface BridgeCombatant {
   id: string;
+  /** Monster template id in the app; used for per-attack sound lookups. */
+  sourceId: string;
   displayName: string;
   currentHp: number;
   maxHp: number;
@@ -45,7 +55,14 @@ export type BridgeCommand =
   | { type: 'endCombat' }
   | { type: 'applyDamage'; actorId: string; amount: number }
   | { type: 'applyHeal'; actorId: string; amount: number }
-  | { type: 'toggleCondition'; actorId: string; condition: string };
+  | { type: 'toggleCondition'; actorId: string; condition: string }
+  | {
+      /** Attack-flow progress report; app-side it only triggers Kenku sounds. */
+      type: 'attackEvent';
+      sourceId: string;
+      attackId: string;
+      phase: AttackEventPhase;
+    };
 
 const DEFAULT_PORT = 57321;
 const RETRY_MS = 3000;

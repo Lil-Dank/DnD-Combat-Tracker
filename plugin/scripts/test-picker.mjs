@@ -426,7 +426,7 @@ assert(calls.switchToProfile.at(-1).length === 1, 'confirm screen auto-exits whe
 picker.applyDelayMs = 80; // shrink the 5 s apply delay for the test
 const attackers = [
   {
-    id: 'm1', displayName: 'Goblin Warrior 1', currentHp: 10, maxHp: 10, ac: 15, isCurrentTurn: true, conditions: [],
+    id: 'm1', sourceId: 'm1-src', displayName: 'Goblin Warrior 1', currentHp: 10, maxHp: 10, ac: 15, isCurrentTurn: true, conditions: [],
     attacks: [
       { id: 'a.scim', name: 'Scimitar', toHit: 4, save: null, damage: [
         { dice: '1d6+2', average: 5, type: 'slashing', condition: null },
@@ -495,10 +495,19 @@ const rolled = dm ? parseInt(dm[1], 10) : NaN;
 assert(rolled >= 3 && rolled <= 8, 'damage in range 3..8 (1d6+2): ' + JSON.stringify(dmgDisp));
 assert(dmgDisp.includes('if…'), 'conditional damage shown separately: ' + JSON.stringify(dmgDisp));
 assert(dmgDisp.includes('→ in'), 'apply countdown shown: ' + JSON.stringify(dmgDisp));
-assert(sock.sent.length === 0, 'nothing applied before the delay');
+assert(sock.sent.filter((c) => c.type === 'applyDamage').length === 0, 'nothing applied before the delay');
+// The damage roll itself reports its phase for Kenku sounds - that is allowed.
+assert(sock.sent.filter((c) => c.type === 'attackEvent' && c.phase === 'damageRoll').length === 1, 'damageRoll attackEvent emitted with the roll');
 await new Promise((r) => setTimeout(r, 200));
 const applied = sock.sent.filter((c) => c.type === 'applyDamage');
 assert(applied.length === 1 && applied[0].actorId === 'p1' && applied[0].amount === rolled, 'damage applied to target after delay: ' + JSON.stringify(applied));
+const atkEvents = sock.sent.filter((c) => c.type === 'attackEvent');
+assert(
+  atkEvents.some((c) => c.phase === 'damageApplied') &&
+    atkEvents.every((c) => c.sourceId === 'm1-src') &&
+    atkEvents.every((c) => c.attackId === 'a.scim'),
+  'attackEvents carry sourceId/attackId and include damageApplied: ' + JSON.stringify(atkEvents),
+);
 assert(calls.switchToProfile.at(-1).length === 1, 'returns to original profile after apply');
 
 // AoE: Fire Breath → multi-target with Done key; applies to all picked targets
@@ -531,7 +540,7 @@ assert(titles.get(1)?.startsWith('✓½\n'), 'saved target marked ½: ' + JSON.s
 const halfExpected = Math.floor(aoeRolled / 2);
 assert(titles.get(31)?.includes(`1×½(${halfExpected})`), 'apply key shows half count: ' + JSON.stringify(titles.get(31)));
 await picker.slotPressed(31, fakeAction(31)); // Apply → countdown
-assert(sock.sent.length === 0, 'nothing applied before the save-result delay');
+assert(sock.sent.filter((c) => c.type === 'applyDamage').length === 0, 'nothing applied before the save-result delay');
 await new Promise((r) => setTimeout(r, 200));
 const aoeApplied = sock.sent.filter((c) => c.type === 'applyDamage');
 const heroDmg = aoeApplied.find((c) => c.actorId === 'p1');

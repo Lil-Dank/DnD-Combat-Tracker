@@ -1449,3 +1449,30 @@ input, button, select, textarea {
 .pw-save-input {
   width: 70px;
 }
+
+.pc-attacks {
+  margin-top: 14px;
+  border-top: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+  padding-top: 10px;
+}
+
+.pc-attack-list {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+}
+
+.pc-attack-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.2));
+}
+
+.pc-attack-buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}

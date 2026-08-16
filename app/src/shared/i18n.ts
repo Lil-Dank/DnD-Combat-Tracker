@@ -197,6 +197,13 @@ const en: Dict = {
   'pw.saveApply': 'Apply',
   'pw.saveDismiss': 'Dismiss',
 
+  'pcs.attacks': 'Attacks',
+  'pcs.attacksNote': '(rollable from the phone, the DM attack modal and the Stream Deck)',
+  'pcs.noAttacks': 'No attacks yet — players can also add their own from their phone.',
+  'pcs.addAttack': 'Add attack',
+  'pcs.reach': 'Reach (ft)',
+  'pcs.range': 'Range (ft)',
+
   'common.back': '← Back',
   'common.close': 'Close',
   'common.confirm': 'Confirm',
@@ -508,6 +515,13 @@ const de: Dict = {
   'pw.saveFailed': 'verpatzt',
   'pw.saveApply': 'Anwenden',
   'pw.saveDismiss': 'Verwerfen',
+
+  'pcs.attacks': 'Angriffe',
+  'pcs.attacksNote': '(würfelbar vom Handy, im Angriffsfenster und am Stream Deck)',
+  'pcs.noAttacks': 'Noch keine Angriffe — Spieler können eigene auch am Handy anlegen.',
+  'pcs.addAttack': 'Angriff hinzufügen',
+  'pcs.reach': 'Reichweite (ft)',
+  'pcs.range': 'Distanz (ft)',
   'settings.about': 'Über / Danksagungen',
   'settings.credits': 'Monsterdaten: SRD 5.2.1 von Wizards of the Coast, lizenziert unter',
   'settings.creditsDataset': '. Datensatz: Open5e (srd-2024).',

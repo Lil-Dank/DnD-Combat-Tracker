@@ -3,6 +3,7 @@ import type { AppState, PC } from '../../../shared/types';
 import { api } from '../api';
 import { useConfirm } from '../Confirm';
 import { useI18n } from '../i18n';
+import { PcAttackEditor } from '../PcAttackEditor';
 
 interface PcFormData {
   id?: string;
@@ -130,6 +131,12 @@ export function PcScreen({ state }: { state: AppState }) {
                 />
               </label>
             </div>
+            {(() => {
+              const savedPc = form.id ? state.pcs.find((p) => p.id === form.id) : undefined;
+              return savedPc ? (
+                <PcAttackEditor pc={savedPc} kenkuOn={state.settings.kenku.enabled} />
+              ) : null;
+            })()}
             <div className="modal-actions">
               <button className="btn" onClick={() => setForm(null)}>{t('common.cancel')}</button>
               <button className="btn primary" disabled={!form.name.trim()} onClick={() => void submit()}>

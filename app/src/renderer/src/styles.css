@@ -1434,3 +1434,18 @@ input, button, select, textarea {
 .pw-offline {
   opacity: 0.6;
 }
+
+.pw-save-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+}
+
+.pw-save-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+}
+
+.pw-save-input {
+  width: 70px;
+}

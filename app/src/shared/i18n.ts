@@ -189,6 +189,13 @@ const en: Dict = {
   'pw.urlNote': 'Phones must be on the same Wi-Fi/network as this PC.',
   'pw.noNetwork': 'No network interface found — is this PC connected to a network?',
   'pw.error': 'Server error: {code} — try another port.',
+  'pw.saveTitle': 'Saving throw — {attack}',
+  'pw.saveInfo':
+    '{actor} forces a {ability} saving throw (DC {dc}). Damage: {damage} (half on a success).',
+  'pw.saveSaved': 'saved',
+  'pw.saveFailed': 'failed',
+  'pw.saveApply': 'Apply',
+  'pw.saveDismiss': 'Dismiss',
 
   'common.back': '← Back',
   'common.close': 'Close',
@@ -494,6 +501,13 @@ const de: Dict = {
   'pw.urlNote': 'Handys müssen im selben WLAN/Netzwerk sein wie dieser PC.',
   'pw.noNetwork': 'Keine Netzwerkschnittstelle gefunden — ist dieser PC mit einem Netzwerk verbunden?',
   'pw.error': 'Serverfehler: {code} — anderen Port versuchen.',
+  'pw.saveTitle': 'Rettungswurf — {attack}',
+  'pw.saveInfo':
+    '{actor} erzwingt einen {ability}-Rettungswurf (SG {dc}). Schaden: {damage} (halber bei Erfolg).',
+  'pw.saveSaved': 'geschafft',
+  'pw.saveFailed': 'verpatzt',
+  'pw.saveApply': 'Anwenden',
+  'pw.saveDismiss': 'Verwerfen',
   'settings.about': 'Über / Danksagungen',
   'settings.credits': 'Monsterdaten: SRD 5.2.1 von Wizards of the Coast, lizenziert unter',
   'settings.creditsDataset': '. Datensatz: Open5e (srd-2024).',

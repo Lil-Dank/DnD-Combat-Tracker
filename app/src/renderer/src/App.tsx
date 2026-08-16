@@ -11,6 +11,8 @@ import { ConfirmProvider } from './Confirm';
 import { I18nProvider } from './i18n';
 import { KenkuSoundboardModal } from './KenkuSoundboardModal';
 import { PlayerWebQrModal } from './PlayerWebQrModal';
+import { PlayerSaveModal } from './PlayerSaveModal';
+import type { PlayerSavePendingInfo } from '../../preload/index';
 import { translate } from '../../shared/i18n';
 
 type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'settings';
@@ -30,6 +32,7 @@ export function App() {
   const [combatTemplateId, setCombatTemplateId] = useState<string | null>(null);
   const [showSoundboard, setShowSoundboard] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [pendingSave, setPendingSave] = useState<PlayerSavePendingInfo | null>(null);
   const isPlayerView = window.location.hash.replace('#', '') === 'player';
   const lang = state?.settings.language ?? 'en';
 
@@ -59,11 +62,19 @@ export function App() {
     const offFocus = api.onFocusCombat(() => {
       if (!isPlayerView) setTab('combat');
     });
+    // A phone launched a save-based attack: the DM adjudicates in a modal.
+    const offSave = api.onPlayerSavePending((pending) => {
+      if (!isPlayerView) {
+        setPendingSave(pending);
+        setTab('combat');
+      }
+    });
     return () => {
       mounted = false;
       off();
       offPv();
       offFocus();
+      offSave();
     };
   }, []);
 
@@ -140,6 +151,13 @@ export function App() {
         {tab === 'settings' && <SettingsScreen state={state} />}
         {showSoundboard && <KenkuSoundboardModal onClose={() => setShowSoundboard(false)} />}
         {showQr && <PlayerWebQrModal onClose={() => setShowQr(false)} />}
+        {pendingSave && (
+          <PlayerSaveModal
+            state={state}
+            pending={pendingSave}
+            onClose={() => setPendingSave(null)}
+          />
+        )}
       </main>
     </div>
     </ConfirmProvider>

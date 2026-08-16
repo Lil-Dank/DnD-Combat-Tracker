@@ -119,8 +119,10 @@ async function handleCommand(cmd: BridgeCommand): Promise<void> {
       // Deliberately absent from KNOWN_COMMANDS: a sound trigger should not
       // yank the DM window to the Combat screen.
       const c = cmd as unknown as AttackEventPayload & { type: string };
-      if (typeof c.sourceId === 'string' && typeof c.attackId === 'string' && c.phase) {
-        handleAttackEvent({ sourceId: c.sourceId, attackId: c.attackId, phase: c.phase });
+      // sourceId is recommended but optional - the handler can resolve the
+      // per-attack sound from the attack id alone (older clients).
+      if (typeof c.attackId === 'string' && c.phase) {
+        handleAttackEvent({ sourceId: c.sourceId ?? '', attackId: c.attackId, phase: c.phase });
       }
       return;
     }

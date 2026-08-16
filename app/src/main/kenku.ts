@@ -249,7 +249,13 @@ export function handleAttackEvent(payload: AttackEventPayload): void {
 
   const trigger = PHASE_TRIGGER[payload.phase];
   if (trigger) {
-    const monster = store.getState().monsters.find((m) => m.id === payload.sourceId);
+    const monsters = store.getState().monsters;
+    // Resolve via the attacker's template; fall back to searching all
+    // templates by attack id (action ids are unique), so an older client
+    // that does not send sourceId still triggers per-attack sounds.
+    const monster =
+      monsters.find((m) => m.id === payload.sourceId) ??
+      monsters.find((m) => m.attacks.some((a) => a.id === payload.attackId));
     const action = monster?.attacks.find((a) => a.id === payload.attackId);
     if (action?.kenkuSound && action.kenkuSound.trigger === trigger) {
       fire(action.kenkuSound);

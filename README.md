@@ -49,6 +49,8 @@ in your browser, with a simulated Stream Deck and a combat already in progress.
 - [Using the app](#using-the-app)
   - [Language](#language)
   - [Kenku FM audio](#kenku-fm-audio)
+  - [Player web companion](#player-web-companion)
+  - [Combat log & archive](#combat-log--archive)
 - [Stream Deck plugin](#stream-deck-plugin)
 - [Build from source](#build-from-source)
 - [Releasing](#releasing)
@@ -68,6 +70,8 @@ in your browser, with a simulated Stream Deck and a combat already in progress.
 | 🎛️ **Stream Deck plugin** | Turn control, damage/heal numpad, multi-actor conditions, monster attack rolls, and a dice roller — all on hardware keys that render their own labels. |
 | 🎨 **Themes** | PHB Style (default), Default Electron, Dark, Light. |
 | 🔊 **Kenku FM audio** | [Sound effects and battle playlists](#kenku-fm-audio) via Kenku FM's remote API: event sounds, per-attack sounds with trigger points, encounter playlists, a soundboard panel. |
+| 📱 **Player web companion** | [Opt-in LAN webpage](#player-web-companion) for players' phones: claim your character via QR code, follow initiative, deal damage/heal, roll your attacks — gated to your turn. No app installs. |
+| 📜 **Combat log & archive** | [Every action logged](#combat-log--archive) with who-did-what-to-whom from every surface (DM window, deck, phones); ended combats archive with their full log. |
 | 🗣 **English & German** | [Full UI localization](#language) across both windows *and* the deck. Game terms follow the SRD 5.2.1 in each language. |
 | 💾 **Local-only storage** | Plain JSON in `%APPDATA%`, written atomically. Your data never leaves the machine. |
 
@@ -159,6 +163,7 @@ as it happens.
 | Path | What it is |
 | --- | --- |
 | `app/` | Electron + TypeScript + React app (DM Window + Player View) |
+| `app/src/mobile/` | The player web companion (own Vite bundle, served from the app over the LAN) |
 | `plugin/` | Stream Deck plugin (Elgato SDK v2, TypeScript) |
 | `app/srd-source/` | Open5e dataset fixtures the monster importer compiles from |
 | `app/resources/srd/` | Generated `monsters.json` + `monsters.de.json`, bundled into the installer |
@@ -260,6 +265,53 @@ combat flow — the tracker simply stays quiet. Pickers show your live Kenku lib
 while Kenku is offline they keep the configured titles read-only. The
 [browser demo](#live-demo) ships the whole feature with a built-in sample soundboard,
 so you can hear it without installing anything.
+
+### Player web companion
+
+Everything is optional here too — the app is fully functional without it. Flip on
+**Settings → Player Web (phones)** and the tracker hosts a **mobile webpage on your
+Wi-Fi** (default port 57322, all bound interfaces). A QR code — inline in Settings and
+behind the sidebar **📱 Player Access** button — gets players in with one scan; no
+Android/iOS apps, no accounts.
+
+- **Claim once** — a player taps their character (optionally typing their name) and
+  the phone remembers it across sessions; a claimed PC shows as taken to others. The
+  DM sees who claimed what, with online status, and can kick a claim free.
+- **Initiative view** — turn order with conditions, a turn banner, and PC HP.
+  Disclosure matches the Player View: **monster HP and AC never leave the machine** —
+  phones only see names, conditions and the bloodied state (attack rolls still resolve
+  against AC internally).
+- **Damage & heal** — the Stream Deck picker's flow on glass: pick target(s), enter an
+  amount, apply.
+- **Attacks** — each PC carries attack/save actions (same schema as monsters, so the
+  DM's attack modal and the Stream Deck roll them too). Players roll from the phone in
+  either mode: **App rolls** (digital d20 + damage dice) or **I roll my dice** (type
+  the total; nat-20/nat-1 buttons; the app compares against AC without revealing it).
+  Save-based actions pop an adjudication modal on the DM window — roll each target's
+  save digitally or type table rolls; targets that save take half.
+- **Players build their own attacks** on the phone; they save straight onto the PC
+  record, and the DM can edit everything in the Party screen.
+- **Turn gating, enforced server-side** — by default players can only act on their
+  own turn (viewing is always live). A Settings toggle relaxes it so self-targeted
+  damage/heal works anytime; everything else stays turn-locked. No chaos.
+
+Windows asks for a firewall permission the first time the server starts. Phones must
+be on the same network — guest Wi-Fi networks with client isolation will block them.
+
+### Combat log & archive
+
+Every action lands in a **combat log** — damage, healing, attack rolls with their d20
+results, saving throws, conditions, downs, kills, turn and round changes — tagged with
+where it came from (DM window, Stream Deck, or a player's phone). The Combat screen
+shows it in a collapsible right-hand sidebar; phones get a one-line ticker that pulls
+up into the full log. The player-facing log hides monster attack-roll numbers (players
+see *"Goblin 2: Scimitar vs Aria — hit"*, not the to-hit math). Log lines are stored
+structurally and rendered through the localization layer, so switching language
+re-renders history too.
+
+When a combat ends, its log moves to the **Combat Archive** (📜 in the sidebar):
+every past fight with template name, date, rounds and the full log, kept until you
+delete it. Players can browse the archive from their phones as well.
 
 **Themes** live under Settings → Appearance: **PHB Style (Default)** (parchment and
 dark-red headings, styled after official 5e books / Homebrewery), **Default Electron**
@@ -567,9 +619,13 @@ Stream Deck app for profile keys — but never needs to be placed manually.
 cd app
 npm install
 npm run dev        # live-reload dev session
-npm run build      # compile main/preload/renderer to out/
+npm run dev:mobile # (second terminal) rebuild the player web bundle on change
+npm run build      # compile main/preload/renderer + player web bundle to out/
 npm run dist       # → release/DnD Combat Tracker Setup 1.3.0.exe (NSIS)
 ```
+
+The player web page is served as plain static files from `out/mobile` in dev and
+production alike, so `dev:mobile` is just a watch build — no proxy, no divergence.
 
 ```bash
 # Stream Deck plugin

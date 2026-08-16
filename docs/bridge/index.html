@@ -149,6 +149,7 @@
     {
       "id": "6f0c…",             // stable per combat; use for commands
       "sourceId": "a1b2…",       // monster template id (PCs: library PC id)
+      "type": "monster",         // "pc" | "monster"
       "displayName": "Goblinkrieger 2",  // localized to `language`
       "currentHp": 4,
       "maxHp": 10,
@@ -175,6 +176,8 @@
       entirely. Player characters stay, with <code>isDowned: true</code>.
       Names, attack names and save abilities arrive already localized;
       <code>conditions</code> values are always the canonical English strings.
+      Player characters can carry <code>attacks</code> too (same shape) when
+      the DM or a player has defined them.
     </div>
 
     <h2 id="commands">Commands (client &rarr; app)</h2>
@@ -227,13 +230,23 @@
         <td><code>{"type":"attackEvent",
  "sourceId":"a1b2…",
  "attackId":"srd-2024_goblin.scimitar",
- "phase":"attackHit"}</code></td>
+ "phase":"attackHit",
+ "roll":{"actorName":"Goblin 2",
+  "actorType":"monster",
+  "targetName":"Aria",
+  "attackName":"Scimitar",
+  "die":14,"total":18}}</code></td>
         <td>
-          Attack-flow progress report. <strong>No state change</strong> &mdash;
-          it only triggers Kenku&nbsp;FM sounds the DM has configured for that
-          attack or for the global crit/hit/miss events.
-          <code>sourceId</code> is recommended but optional: the app can resolve
-          the attack from <code>attackId</code> alone (action ids are unique).
+          Attack-flow progress report. <strong>No HP/turn change</strong> &mdash;
+          it triggers Kenku&nbsp;FM sounds the DM has configured for that
+          attack or for the global crit/hit/miss events, and (on the verdict
+          phases <code>attackCrit</code>/<code>attackHit</code>/<code>attackMiss</code>)
+          writes one combat-log line when the optional <code>roll</code> block
+          is present. <code>sourceId</code> is recommended but optional: the
+          app can resolve the attack from <code>attackId</code> alone (action
+          ids are unique). <code>roll</code> is optional and ignored on
+          non-verdict phases; older clients that omit it simply produce no log
+          line.
         </td>
       </tr>
     </table>

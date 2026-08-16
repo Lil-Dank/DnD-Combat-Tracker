@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { store } from './state';
 import * as kenku from './kenku';
+import { logAttackEvent, type AttackRollDetails } from './combatLog';
 import { importSrdMonsters } from './srd';
 import { onBridgeCommand } from './bridge';
 import {
@@ -69,8 +70,12 @@ export function registerIpc(): void {
     store.setKenkuConnected(store.getState().settings.kenku.enabled && ok);
     return ok;
   });
-  ipcMain.handle('kenku:attackEvent', (_e, payload: kenku.AttackEventPayload) =>
-    kenku.handleAttackEvent(payload),
+  ipcMain.handle(
+    'kenku:attackEvent',
+    (_e, payload: kenku.AttackEventPayload & { roll?: AttackRollDetails }) => {
+      kenku.handleAttackEvent(payload);
+      logAttackEvent(payload.phase, payload.roll, 'dm');
+    },
   );
 
   // Push every state change to all open windows.

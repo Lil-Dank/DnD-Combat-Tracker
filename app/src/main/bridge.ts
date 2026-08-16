@@ -3,6 +3,7 @@ import { store } from './state';
 import type { AppState } from '../shared/types';
 import { abilityCodeLabel, monsterName } from '../shared/i18n';
 import { handleAttackEvent, type AttackEventPayload } from './kenku';
+import { logAttackEvent, type AttackRollDetails } from './combatLog';
 
 /**
  * Local WebSocket bridge for the Stream Deck plugin. The app is the server;
@@ -27,6 +28,8 @@ interface BridgeCommand {
   sourceId?: string;
   attackId?: string;
   phase?: string;
+  /** Optional attackEvent roll details for the combat log (v1.4+ plugins). */
+  roll?: AttackRollDetails;
 }
 
 function stateMessage(state: AppState): string {
@@ -44,6 +47,7 @@ function stateMessage(state: AppState): string {
       ? combat!.combatants.map((c, i) => ({
           id: c.id,
           sourceId: c.sourceId,
+          type: c.type,
           displayName: monsterName(lang, c.displayName),
           currentHp: c.currentHp,
           maxHp: c.maxHp,
@@ -93,26 +97,27 @@ const KNOWN_COMMANDS = new Set([
 async function handleCommand(cmd: BridgeCommand): Promise<void> {
   // Any hardware action means the DM is running combat — surface that screen.
   if (KNOWN_COMMANDS.has(cmd.type)) commandListener?.();
+  const ctx = { source: 'deck' as const };
   switch (cmd.type) {
     case 'nextTurn':
-      return store.nextTurn();
+      return store.nextTurn(ctx);
     case 'prevTurn':
-      return store.prevTurn();
+      return store.prevTurn(ctx);
     case 'endCombat':
-      return store.endCombat();
+      return store.endCombat(ctx);
     case 'applyDamage':
       if (cmd.actorId && typeof cmd.amount === 'number') {
-        return store.applyDamage(cmd.actorId, cmd.amount);
+        return store.applyDamage(cmd.actorId, cmd.amount, ctx);
       }
       return;
     case 'applyHeal':
       if (cmd.actorId && typeof cmd.amount === 'number') {
-        return store.applyHeal(cmd.actorId, cmd.amount);
+        return store.applyHeal(cmd.actorId, cmd.amount, ctx);
       }
       return;
     case 'toggleCondition':
       if (cmd.actorId && typeof cmd.condition === 'string') {
-        return store.toggleCondition(cmd.actorId, cmd.condition as never);
+        return store.toggleCondition(cmd.actorId, cmd.condition as never, ctx);
       }
       return;
     case 'attackEvent': {
@@ -123,6 +128,7 @@ async function handleCommand(cmd: BridgeCommand): Promise<void> {
       // per-attack sound from the attack id alone (older clients).
       if (typeof c.attackId === 'string' && c.phase) {
         handleAttackEvent({ sourceId: c.sourceId ?? '', attackId: c.attackId, phase: c.phase });
+        logAttackEvent(c.phase, cmd.roll, 'deck');
       }
       return;
     }

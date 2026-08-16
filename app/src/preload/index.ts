@@ -66,8 +66,12 @@ const api = {
   kenkuSoundPlayback: (): Promise<{ sounds: Array<{ id: string }> } | null> =>
     ipcRenderer.invoke('kenku:soundPlayback'),
   kenkuCheckConnection: (): Promise<boolean> => ipcRenderer.invoke('kenku:checkConnection'),
-  kenkuAttackEvent: (payload: import('../main/kenku').AttackEventPayload): Promise<void> =>
-    ipcRenderer.invoke('kenku:attackEvent', payload),
+  kenkuAttackEvent: (
+    payload: import('../main/kenku').AttackEventPayload & {
+      /** Optional attack-roll details for the combat log (verdict phases). */
+      roll?: import('../main/combatLog').AttackRollDetails;
+    },
+  ): Promise<void> => ipcRenderer.invoke('kenku:attackEvent', payload),
   togglePlayerView: () => ipcRenderer.invoke('playerView:toggle'),
   togglePlayerFullscreen: () => ipcRenderer.invoke('playerView:fullscreen'),
 };

@@ -985,6 +985,22 @@ input, button, select, textarea {
   width: 90px;
 }
 
+.kenku-soundboard {
+  max-width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.kenku-board h3 {
+  margin: 10px 0 6px;
+}
+
+.kenku-board-sounds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .kenku-marker {
   cursor: default;
 }

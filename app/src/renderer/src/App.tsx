@@ -9,6 +9,8 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { PlayerView } from './screens/PlayerView';
 import { ConfirmProvider } from './Confirm';
 import { I18nProvider } from './i18n';
+import { KenkuSoundboardModal } from './KenkuSoundboardModal';
+import { isDemo } from './api';
 import { translate } from '../../shared/i18n';
 
 type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'settings';
@@ -26,6 +28,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>('combat');
   const [playerViewOpen, setPlayerViewOpen] = useState(false);
   const [combatTemplateId, setCombatTemplateId] = useState<string | null>(null);
+  const [showSoundboard, setShowSoundboard] = useState(false);
   const isPlayerView = window.location.hash.replace('#', '') === 'player';
   const lang = state?.settings.language ?? 'en';
 
@@ -92,6 +95,12 @@ export function App() {
           </button>
         ))}
         <div className="sidebar-footer">
+          {!isDemo && state.settings.kenku.enabled && (
+            <button className="nav-btn" onClick={() => setShowSoundboard(true)}>
+              {'🎵 '}
+              {translate(lang, 'kenku.soundboard')}
+            </button>
+          )}
           <button
             className={`nav-btn pv-toggle ${playerViewOpen ? 'active' : ''}`}
             onClick={() => void api.togglePlayerView()}
@@ -122,6 +131,7 @@ export function App() {
         )}
         {tab === 'combat' && <CombatScreen state={state} preselectedTemplateId={combatTemplateId} />}
         {tab === 'settings' && <SettingsScreen state={state} />}
+        {showSoundboard && <KenkuSoundboardModal onClose={() => setShowSoundboard(false)} />}
       </main>
     </div>
     </ConfirmProvider>

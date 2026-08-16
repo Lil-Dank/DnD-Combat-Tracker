@@ -6,6 +6,7 @@ import type {
   MonsterAction,
 } from '../../shared/types';
 import { averageOf, parseDice } from '../../shared/dice';
+import { uuid } from '../../shared/uuid';
 
 /**
  * The editable form model for one action (strings while typing) and its
@@ -42,7 +43,7 @@ export interface ActionForm {
 export const ABILITIES = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
 export const emptyAction = (): ActionForm => ({
-  id: `manual.${crypto.randomUUID()}`,
+  id: `manual.${uuid()}`,
   name: '',
   section: 'action',
   type: 'attack',

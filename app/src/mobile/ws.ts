@@ -1,4 +1,5 @@
 import type { ServerMsg } from './protocol';
+import { uuid } from '../shared/uuid';
 
 const TOKEN_KEY = 'dct-player-token';
 
@@ -6,7 +7,7 @@ const TOKEN_KEY = 'dct-player-token';
 export function deviceToken(): string {
   let token = localStorage.getItem(TOKEN_KEY);
   if (!token) {
-    token = crypto.randomUUID();
+    token = uuid();
     localStorage.setItem(TOKEN_KEY, token);
   }
   return token;

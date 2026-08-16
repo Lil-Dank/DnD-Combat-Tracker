@@ -78,6 +78,19 @@ export function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    // Phones have no devtools: surface uncaught errors instead of dying
+    // silently. (translate() falls through to the raw text for non-keys.)
+    const onError = (e: ErrorEvent) => setToast(e.message || 'Error');
+    const onReject = (e: PromiseRejectionEvent) => setToast(String(e.reason));
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onReject);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onReject);
+    };
+  }, []);
+
   const send = (msg: Record<string, unknown>) =>
     socketRef.current?.send({ ...msg, token: deviceToken() });
 

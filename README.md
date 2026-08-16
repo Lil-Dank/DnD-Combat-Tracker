@@ -86,6 +86,14 @@ including the on-key rendering and the idle timeouts. **Open Player View** opens
 players' screen as a second tab, and the language selector switches everything to
 German just like the desktop app.
 
+The [Kenku FM audio](#kenku-fm-audio) features are live too, backed by a built-in
+**Fantasy Soundboard** of synthesized sample sounds (sword clash, dragon roar, battle
+horn…) and drum-loop battle playlists — the seeded config plays them on combat start,
+crits, kills, heals and specific monster attacks, from both the DM window and the
+simulated deck. If a future Kenku FM build allows cross-origin requests, the demo will
+use your real local Kenku library automatically; today its Remote API blocks browser
+pages, so the samples stand in.
+
 Demo data lives entirely in your browser (localStorage); the **Reset demo** button on
 the deck panel starts it over. The site also hosts the
 **[bridge protocol documentation](https://lil-dank.github.io/DnD-Combat-Tracker/bridge/)** —
@@ -249,8 +257,9 @@ Kenku FM itself — the audio output device is chosen there, not here.
 
 Everything is fail-soft: Kenku being closed or unreachable never blocks or delays the
 combat flow — the tracker simply stays quiet. Pickers show your live Kenku library;
-while Kenku is offline they keep the configured titles read-only. Not available in the
-browser demo (it needs the local Kenku app).
+while Kenku is offline they keep the configured titles read-only. The
+[browser demo](#live-demo) ships the whole feature with a built-in sample soundboard,
+so you can hear it without installing anything.
 
 **Themes** live under Settings → Appearance: **PHB Style (Default)** (parchment and
 dark-red headings, styled after official 5e books / Homebrewery), **Default Electron**

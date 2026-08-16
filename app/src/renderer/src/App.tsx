@@ -6,6 +6,7 @@ import { MonsterScreen } from './screens/MonsterScreen';
 import { TemplatesScreen } from './screens/TemplatesScreen';
 import { CombatScreen } from './screens/CombatScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { ArchiveScreen } from './screens/ArchiveScreen';
 import { PlayerView } from './screens/PlayerView';
 import { ConfirmProvider } from './Confirm';
 import { I18nProvider } from './i18n';
@@ -15,13 +16,14 @@ import { PlayerSaveModal } from './PlayerSaveModal';
 import type { PlayerSavePendingInfo } from '../../preload/index';
 import { translate } from '../../shared/i18n';
 
-type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'settings';
+type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'archive' | 'settings';
 
 const TABS: { id: Tab; key: string }[] = [
   { id: 'combat', key: 'nav.combat' },
   { id: 'pcs', key: 'nav.party' },
   { id: 'monsters', key: 'nav.monsters' },
   { id: 'templates', key: 'nav.encounters' },
+  { id: 'archive', key: 'nav.archive' },
   { id: 'settings', key: 'nav.settings' },
 ];
 
@@ -148,6 +150,7 @@ export function App() {
           />
         )}
         {tab === 'combat' && <CombatScreen state={state} preselectedTemplateId={combatTemplateId} />}
+        {tab === 'archive' && <ArchiveScreen />}
         {tab === 'settings' && <SettingsScreen state={state} />}
         {showSoundboard && <KenkuSoundboardModal onClose={() => setShowSoundboard(false)} />}
         {showQr && <PlayerWebQrModal onClose={() => setShowQr(false)} />}

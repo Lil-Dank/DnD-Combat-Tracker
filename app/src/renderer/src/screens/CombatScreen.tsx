@@ -8,6 +8,7 @@ import { AbilityTable } from '../AbilityTable';
 import { DiceRollerModal } from '../DiceRoller';
 import { MonsterAttackModal, hasRollableAttacks } from '../MonsterAttackModal';
 import { useI18n } from '../i18n';
+import { CombatLogPanel } from '../CombatLogPanel';
 
 export function CombatScreen({
   state,
@@ -329,6 +330,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
         </div>
       </header>
 
+      <div className="combat-with-log">
       <ul className="combat-list">
         {combat.combatants.map((c, i) => {
           const isCurrent = i === combat.currentIndex;
@@ -471,6 +473,8 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
           );
         })}
       </ul>
+      <CombatLogPanel log={combat.log} />
+      </div>
       {combat.combatants.length === 0 && (
         <p className="empty-note">{t('combat.noCombatants')}</p>
       )}

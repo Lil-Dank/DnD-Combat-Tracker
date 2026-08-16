@@ -51,49 +51,6 @@ function encodePng(width, height, pixelFn) {
   ]);
 }
 
-/** Rounded-square purple gradient with a white d20-style hexagon outline. */
-function pluginIconPng(size) {
-  const r = size * 0.18;
-  const cx = size / 2;
-  const cy = size / 2;
-  const hexR = size * 0.33;
-  const verts = Array.from({ length: 6 }, (_, i) => {
-    const a = (Math.PI / 3) * i - Math.PI / 2;
-    return [cx + hexR * Math.cos(a), cy + hexR * Math.sin(a)];
-  });
-  const distToSeg = (px, py, [x1, y1], [x2, y2]) => {
-    const dx = x2 - x1, dy = y2 - y1;
-    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
-    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
-  };
-  const stroke = size * 0.045;
-  return encodePng(size, size, (x, y) => {
-    // rounded-rect mask
-    const qx = Math.max(Math.abs(x - cx) - (cx - r), 0);
-    const qy = Math.max(Math.abs(y - cy) - (cy - r), 0);
-    if (Math.hypot(qx, qy) > r) return [0, 0, 0, 0];
-    // diagonal gradient #2a1745 → #7c3aed
-    const t = (x + y) / (2 * size);
-    let px = [42 + t * (124 - 42), 23 + t * (58 - 23), 69 + t * (237 - 69), 255];
-    // hexagon outline + spokes to center (d20 feel)
-    let d = Infinity;
-    for (let i = 0; i < 6; i++) {
-      d = Math.min(d, distToSeg(x, y, verts[i], verts[(i + 1) % 6]));
-      if (i % 2 === 0) d = Math.min(d, distToSeg(x, y, verts[i], [cx, cy]));
-    }
-    if (d < stroke) {
-      const edge = Math.min(1, (stroke - d) / (size * 0.01));
-      px = [
-        px[0] + (233 - px[0]) * edge,
-        px[1] + (213 - px[1]) * edge,
-        px[2] + (255 - px[2]) * edge,
-        255,
-      ];
-    }
-    return px.map(Math.round);
-  });
-}
-
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', 'com.dmtools.dnd-combat-tracker.sdPlugin');
 
 const svg = (size, bg, glyph) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}">
@@ -116,7 +73,7 @@ const icons = {
   'actions/roll': svg(72, ['#713f12', '#d97706'], `<g transform="translate(36,36)"><path d="M0 -24 L21 -12 L21 12 L0 24 L-21 12 L-21 -12 Z" fill="none" stroke="#fef3c7" stroke-width="5"/><text x="0" y="7" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="20" font-weight="bold" fill="#fef3c7">20</text></g>`),
   'actions/dice': svg(72, ['#0f3a4a', '#0e7490'], `<rect x="17" y="17" width="38" height="38" rx="8" fill="none" stroke="#cffafe" stroke-width="5"/><circle cx="28" cy="28" r="4" fill="#cffafe"/><circle cx="44" cy="28" r="4" fill="#cffafe"/><circle cx="36" cy="36" r="4" fill="#cffafe"/><circle cx="28" cy="44" r="4" fill="#cffafe"/><circle cx="44" cy="44" r="4" fill="#cffafe"/>`),
   'actions/blank': svg(72, ['#17121f', '#241b33'], ''),
-  'plugin/category': svg(28, ['#2a1745', '#7c3aed'], `<path d="M14 3 L23 8.5 L23 19.5 L14 25 L5 19.5 L5 8.5 Z" fill="none" stroke="#e9d5ff" stroke-width="2.4"/>`),
+  'plugin/category': svg(28, ['#2c2144', '#150f22'], `<polygon points="14,3.7 23.1,8.95 23.1,19.45 14,24.7 4.9,19.45 4.9,8.95" fill="#a32424" stroke="#f6d27a" stroke-width="1.8" stroke-linejoin="round"/><polygon points="14,8.3 8.9,17.15 19.1,17.15" fill="#d94040" stroke="#f6d27a" stroke-width="1.6" stroke-linejoin="round"/>`),
 };
 
 for (const [name, content] of Object.entries(icons)) {
@@ -125,7 +82,7 @@ for (const [name, content] of Object.entries(icons)) {
   writeFileSync(file, content);
 }
 
-// Marketplace/plugin icon must be a real PNG (validated by `streamdeck pack`).
-writeFileSync(join(root, 'imgs', 'plugin', 'icon.png'), pluginIconPng(288));
-writeFileSync(join(root, 'imgs', 'plugin', 'icon@2x.png'), pluginIconPng(576));
-console.log(`Wrote ${Object.keys(icons).length} SVG icons + plugin PNGs.`);
+// The marketplace/plugin PNGs (imgs/plugin/icon.png + @2x) are NOT generated
+// here: they come from the same d20 source as the app icon, rendered by
+// app/scripts/build-icon.cjs. This keeps app and plugin logos identical.
+console.log(`Wrote ${Object.keys(icons).length} SVG icons.`);

@@ -18,6 +18,8 @@
 //   ../docs/images/logo.png     - 512 px logo for the README header
 //   ../docs/images/social-preview.png - 1280x640 banner for GitHub's social
 //     preview (upload manually: repo Settings -> Social preview)
+//   ../plugin/.../imgs/plugin/icon.png + icon@2x.png - the Stream Deck
+//     plugin's marketplace/list icon, same d20 (288 / 576 px)
 const { app, BrowserWindow, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -174,6 +176,35 @@ app.whenReady().then(async () => {
   // Previews for eyeballing the small sizes at their real scale.
   for (const { size, buf } of pngs) {
     fs.writeFileSync(path.join(root, 'build', `icon-${size}.png`), buf);
+  }
+
+  // Stream Deck plugin icon: same d20, at the sizes the packer expects.
+  // Rendered natively at 576 (viewBox scaling) rather than upscaled.
+  const sdDir = path.join(root, '..', 'plugin', 'com.dmtools.dnd-combat-tracker.sdPlugin', 'imgs', 'plugin');
+  if (fs.existsSync(sdDir)) {
+    const win576 = new BrowserWindow({
+      width: 576,
+      height: 576,
+      show: false,
+      frame: false,
+      transparent: true,
+    });
+    const svg576 = d20Svg('full').replace(
+      `width="${CANVAS}" height="${CANVAS}"`,
+      `width="576" height="576" viewBox="0 0 ${CANVAS} ${CANVAS}"`,
+    );
+    const html576 = `<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent;overflow:hidden}svg{display:block}</style>${svg576}`;
+    await win576.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html576));
+    await new Promise((r) => setTimeout(r, 400));
+    const shot576 = await win576.webContents.capturePage({ x: 0, y: 0, width: 576, height: 576 });
+    const img576 = nativeImage.createFromBuffer(shot576.toPNG());
+    fs.writeFileSync(path.join(sdDir, 'icon@2x.png'), img576.toPNG());
+    fs.writeFileSync(
+      path.join(sdDir, 'icon.png'),
+      img576.resize({ width: 288, height: 288, quality: 'best' }).toPNG(),
+    );
+    win576.destroy();
   }
 
   // README logo (512, transparent corners) and the GitHub social banner.

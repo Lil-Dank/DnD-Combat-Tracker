@@ -184,7 +184,8 @@ export class AppStore {
   // ---- PCs ----
 
   async savePc(pc: Omit<PC, 'id'> & { id?: string }): Promise<void> {
-    await this.pcs.put({ ...pc, id: pc.id ?? randomUUID() });
+    // Defensive: IPC callers predating the attacks field may omit it.
+    await this.pcs.put({ ...pc, attacks: pc.attacks ?? [], id: pc.id ?? randomUUID() });
     this.notify();
   }
 

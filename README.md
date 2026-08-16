@@ -17,7 +17,7 @@ in your browser, with a simulated Stream Deck and a combat already in progress.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v1.2.0-success)
+![Release](https://img.shields.io/badge/release-v1.3.0-success)
 
 </div>
 
@@ -48,6 +48,7 @@ in your browser, with a simulated Stream Deck and a combat already in progress.
 - [How it fits together](#how-it-fits-together)
 - [Using the app](#using-the-app)
   - [Language](#language)
+  - [Kenku FM audio](#kenku-fm-audio)
 - [Stream Deck plugin](#stream-deck-plugin)
 - [Build from source](#build-from-source)
 - [Releasing](#releasing)
@@ -66,6 +67,7 @@ in your browser, with a simulated Stream Deck and a combat already in progress.
 | 📺 **Player View** | Display-only second-monitor window. Monsters show no numbers — just a progressive "bloodied" reddening. Auto-fits any actor count. **Styled for chroma keying.** |
 | 🎛️ **Stream Deck plugin** | Turn control, damage/heal numpad, multi-actor conditions, monster attack rolls, and a dice roller — all on hardware keys that render their own labels. |
 | 🎨 **Themes** | PHB Style (default), Default Electron, Dark, Light. |
+| 🔊 **Kenku FM audio** | [Sound effects and battle playlists](#kenku-fm-audio) via Kenku FM's remote API: event sounds, per-attack sounds with trigger points, encounter playlists, a soundboard panel. |
 | 🗣 **English & German** | [Full UI localization](#language) across both windows *and* the deck. Game terms follow the SRD 5.2.1 in each language. |
 | 💾 **Local-only storage** | Plain JSON in `%APPDATA%`, written atomically. Your data never leaves the machine. |
 
@@ -97,7 +99,7 @@ actual Stream Deck hardware, and the second-monitor/chroma workflow.
 
 Grab both files from the [**latest release**](../../releases/latest):
 
-1. **App** — run `DnD Combat Tracker Setup 1.2.0.exe` (NSIS installer, choose your own directory).
+1. **App** — run `DnD Combat Tracker Setup 1.3.0.exe` (NSIS installer, choose your own directory).
 2. **Stream Deck plugin** — double-click `com.dmtools.dnd-combat-tracker.streamDeckPlugin`;
    the Stream Deck app installs it and registers the bundled picker profiles.
 3. Start the app. The plugin connects within a few seconds — the DM window's sidebar
@@ -153,6 +155,7 @@ as it happens.
 | `app/srd-source/` | Open5e dataset fixtures the monster importer compiles from |
 | `app/resources/srd/` | Generated `monsters.json` + `monsters.de.json`, bundled into the installer |
 | `scripts/publish.mjs` | Tags and publishes a GitHub release with both artifacts |
+| `docs/bridge/` | The WebSocket bridge protocol documentation, served at `/bridge/` |
 
 Build outputs (`node_modules`, `app/out`, `app/release`, `plugin/dist`,
 `plugin/…sdPlugin/bin`) are gitignored. Shippable artifacts are published as
@@ -222,6 +225,32 @@ the UI around them, exactly as you'd expect for your own homebrew.
 Every user-visible string in the interface goes through the lookup in
 `app/src/shared/i18n.ts`. That is enforced empirically rather than by eye — see
 [Checking localization coverage](#checking-localization-coverage).
+
+### Kenku FM audio
+
+If you run [Kenku FM](https://www.kenku.fm/) for table audio, the tracker can drive it
+through **Kenku Remote** (enable it in Kenku FM's settings, default `127.0.0.1:3333`,
+then flip on **Settings → Kenku FM** in the tracker). Sounds always play through
+Kenku FM itself — the audio output device is chosen there, not here.
+
+- **Event sounds** — map any app event to a Kenku soundboard sound, each with an
+  optional delay: combat starts/ends, turn change, damage or healing applied, a PC
+  goes down, a monster dies, an attack crits/hits/misses. Delayed sounds are cancelled
+  if combat ends first, so a slow-fuse kill sting can't land in the post-combat quiet.
+- **Per-attack sounds** — in the monster editor, any action can carry its own sound
+  with a trigger point (**attack roll / hit / damage roll / damage applied**) and a
+  delay. Fires identically from the DM window's attack modal and the Stream Deck's
+  attack flow.
+- **Encounter playlists** — pick a Kenku playlist per encounter template (🎵 on the
+  card). It starts at **Begin Combat** and pauses at **End Combat** — only if that
+  combat started it, so your own Kenku playback is never touched.
+- **Soundboard panel** — a sidebar button opens every Kenku sound as click-to-play
+  buttons, with Stop All.
+
+Everything is fail-soft: Kenku being closed or unreachable never blocks or delays the
+combat flow — the tracker simply stays quiet. Pickers show your live Kenku library;
+while Kenku is offline they keep the configured titles read-only. Not available in the
+browser demo (it needs the local Kenku app).
 
 **Themes** live under Settings → Appearance: **PHB Style (Default)** (parchment and
 dark-red headings, styled after official 5e books / Homebrewery), **Default Electron**
@@ -530,7 +559,7 @@ cd app
 npm install
 npm run dev        # live-reload dev session
 npm run build      # compile main/preload/renderer to out/
-npm run dist       # → release/DnD Combat Tracker Setup 1.2.0.exe (NSIS)
+npm run dist       # → release/DnD Combat Tracker Setup 1.3.0.exe (NSIS)
 ```
 
 ```bash

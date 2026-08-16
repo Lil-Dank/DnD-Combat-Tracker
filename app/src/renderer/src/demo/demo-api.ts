@@ -86,6 +86,8 @@ export function createDemoApi(): Api {
       settings: data.settings,
       // The simulated deck on this page counts as a connected client.
       bridgeClientCount: 1,
+      // Kenku FM is a desktop-app integration; the browser demo hides it.
+      kenkuConnected: false,
     };
   }
 
@@ -631,6 +633,15 @@ export function createDemoApi(): Api {
       if (combat.phase === 'setup') sortCombatants(combat);
       save();
     },
+
+    // Kenku FM talks to a local desktop app; inert in the browser demo.
+    kenkuGetLibrary: async () => null,
+    kenkuPlaySound: async () => false,
+    kenkuStopSound: async () => false,
+    kenkuStopAll: async () => {},
+    kenkuSoundPlayback: async () => null,
+    kenkuCheckConnection: async () => false,
+    kenkuAttackEvent: async () => {},
 
     updateSettings: async (patch) => {
       data.settings = { ...data.settings, ...patch };

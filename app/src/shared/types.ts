@@ -78,6 +78,16 @@ export interface MonsterAction {
   };
   /** Free text; returning-thrown-weapon entries only. */
   onHitOrMiss: string | null;
+  /**
+   * Optional Kenku FM sound fired during this action's attack flow (DM window
+   * and Stream Deck both), at the configured trigger point.
+   */
+  kenkuSound?: {
+    soundId: string;
+    title: string;
+    trigger: KenkuAttackTrigger;
+    delayMs?: number;
+  } | null;
   /** Always-populated render layer; text is the raw SRD sentence (safety net). */
   display: {
     toHit: string | null;
@@ -138,6 +148,10 @@ export interface EncounterTemplate {
   id: string;
   name: string;
   entries: EncounterEntry[];
+  /** Kenku FM playlist started when combat begins from this template. */
+  kenkuPlaylistId?: string | null;
+  /** Cached for display while Kenku is offline. */
+  kenkuPlaylistTitle?: string | null;
 }
 
 export const CONDITIONS = [
@@ -200,6 +214,47 @@ export const THEMES: { id: ThemeId; label: string }[] = [
   { id: 'light', label: 'Light' },
 ];
 
+// ---- Kenku FM integration -------------------------------------------------
+
+/** App happenings that can trigger a configured Kenku FM sound. */
+export type KenkuEventId =
+  | 'combatStart'
+  | 'combatEnd'
+  | 'turnChange'
+  | 'damageApplied'
+  | 'healApplied'
+  | 'pcDowned'
+  | 'monsterKilled'
+  | 'attackCrit'
+  | 'attackHit'
+  | 'attackMiss';
+
+/** A configured Kenku sound: id + cached title (shown while Kenku is offline). */
+export interface KenkuSoundRef {
+  soundId: string;
+  title: string;
+  /** Wait this long after the event before playing. */
+  delayMs?: number;
+}
+
+/** When a per-attack sound fires during the attack flow. */
+export type KenkuAttackTrigger = 'attackRoll' | 'attackHit' | 'damageRoll' | 'damageApplied';
+
+export interface KenkuSettings {
+  enabled: boolean;
+  /** Kenku Remote address (enable it in Kenku FM's settings). */
+  host: string;
+  port: number;
+  eventSounds: Partial<Record<KenkuEventId, KenkuSoundRef>>;
+}
+
+export const DEFAULT_KENKU_SETTINGS: KenkuSettings = {
+  enabled: false,
+  host: '127.0.0.1',
+  port: 3333,
+  eventSounds: {},
+};
+
 export interface Settings {
   playerViewBgColor: string;
   bridgePort: number;
@@ -208,6 +263,8 @@ export interface Settings {
   autoOpenAttacks: boolean;
   /** UI language for both windows and the Stream Deck plugin. */
   language: Lang;
+  /** Kenku FM Remote integration (sounds play through Kenku, not this app). */
+  kenku: KenkuSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -216,6 +273,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'phb',
   autoOpenAttacks: true,
   language: DEFAULT_LANG,
+  kenku: DEFAULT_KENKU_SETTINGS,
 };
 
 /** Full snapshot pushed to every window on any change. */
@@ -226,4 +284,6 @@ export interface AppState {
   combat: Combat | null;
   settings: Settings;
   bridgeClientCount: number;
+  /** Whether Kenku Remote answered the most recent connection check. */
+  kenkuConnected: boolean;
 }

@@ -56,6 +56,18 @@ const api = {
     ipcRenderer.invoke('combat:addMonster', { monsterTemplateId, quantity }),
 
   updateSettings: (patch: Partial<Settings>) => ipcRenderer.invoke('settings:update', patch),
+
+  // ---- Kenku FM (audio plays through Kenku; these only talk to its remote) ----
+  kenkuGetLibrary: (): Promise<import('../main/kenku').KenkuLibrary | null> =>
+    ipcRenderer.invoke('kenku:getLibrary'),
+  kenkuPlaySound: (id: string): Promise<boolean> => ipcRenderer.invoke('kenku:playSound', id),
+  kenkuStopSound: (id: string): Promise<boolean> => ipcRenderer.invoke('kenku:stopSound', id),
+  kenkuStopAll: (): Promise<void> => ipcRenderer.invoke('kenku:stopAll'),
+  kenkuSoundPlayback: (): Promise<{ sounds: Array<{ id: string }> } | null> =>
+    ipcRenderer.invoke('kenku:soundPlayback'),
+  kenkuCheckConnection: (): Promise<boolean> => ipcRenderer.invoke('kenku:checkConnection'),
+  kenkuAttackEvent: (payload: import('../main/kenku').AttackEventPayload): Promise<void> =>
+    ipcRenderer.invoke('kenku:attackEvent', payload),
   togglePlayerView: () => ipcRenderer.invoke('playerView:toggle'),
   togglePlayerFullscreen: () => ipcRenderer.invoke('playerView:fullscreen'),
 };

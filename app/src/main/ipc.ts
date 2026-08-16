@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { store } from './state';
+import * as kenku from './kenku';
 import { importSrdMonsters } from './srd';
 import { onBridgeCommand } from './bridge';
 import {
@@ -56,6 +57,21 @@ export function registerIpc(): void {
 
   ipcMain.handle('playerView:toggle', () => togglePlayerView());
   ipcMain.handle('playerView:fullscreen', () => togglePlayerFullscreen());
+
+  // ---- Kenku FM ----
+  ipcMain.handle('kenku:getLibrary', () => kenku.getLibrary());
+  ipcMain.handle('kenku:playSound', (_e, id: string) => kenku.playSound(id));
+  ipcMain.handle('kenku:stopSound', (_e, id: string) => kenku.stopSound(id));
+  ipcMain.handle('kenku:stopAll', () => kenku.stopAllSounds());
+  ipcMain.handle('kenku:soundPlayback', () => kenku.getSoundboardPlayback());
+  ipcMain.handle('kenku:checkConnection', async () => {
+    const ok = await kenku.checkConnection();
+    store.setKenkuConnected(store.getState().settings.kenku.enabled && ok);
+    return ok;
+  });
+  ipcMain.handle('kenku:attackEvent', (_e, payload: kenku.AttackEventPayload) =>
+    kenku.handleAttackEvent(payload),
+  );
 
   // Push every state change to all open windows.
   store.onChange((state) => {

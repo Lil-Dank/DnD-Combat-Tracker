@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { AppState, KenkuEventId, KenkuSoundRef, ThemeId } from '../../../shared/types';
 import { THEMES } from '../../../shared/types';
 import { LANGUAGES, type Lang } from '../../../shared/i18n';
-import { api, isDemo } from '../api';
+import { api } from '../api';
 import { useI18n } from '../i18n';
 import { useKenkuLibrary } from '../useKenkuLibrary';
 
@@ -19,7 +19,7 @@ const KENKU_EVENTS: KenkuEventId[] = [
   'attackMiss',
 ];
 
-/** The Kenku FM settings section; desktop only (hidden in the browser demo). */
+/** The Kenku FM settings section. */
 function KenkuSection({ state }: { state: AppState }) {
   const { t } = useI18n();
   const kenku = state.settings.kenku;
@@ -257,7 +257,7 @@ export function SettingsScreen({ state }: { state: AppState }) {
         </p>
       </section>
 
-      {!isDemo && <KenkuSection state={state} />}
+      <KenkuSection state={state} />
 
       <section className="settings-section">
         <h2>{t('settings.about')}</h2>

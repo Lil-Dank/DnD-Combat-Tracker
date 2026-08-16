@@ -3,7 +3,6 @@ import type { AppState, EncounterEntry, EncounterTemplate } from '../../../share
 import { api } from '../api';
 import { useConfirm } from '../Confirm';
 import { useKenkuLibrary } from '../useKenkuLibrary';
-import { isDemo } from '../api';
 import { useI18n } from '../i18n';
 
 interface TemplateFormData {
@@ -31,7 +30,7 @@ export function TemplatesScreen({
     [state.monsters],
   );
 
-  const kenkuOn = !isDemo && state.settings.kenku.enabled;
+  const kenkuOn = state.settings.kenku.enabled;
   const { library } = useKenkuLibrary(form !== null && kenkuOn);
 
   const startEdit = (t: EncounterTemplate) =>

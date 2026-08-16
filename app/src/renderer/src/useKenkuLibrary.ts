@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { KenkuLibrary } from '../../main/kenku';
-import { api, isDemo } from './api';
+import { api } from './api';
 
 /**
  * The Kenku FM library (playlists + sounds), fetched once per mount.
  * `null` while loading or when Kenku is unreachable — callers show the
- * cached title / an offline note in that case. Inert in the browser demo.
+ * cached title / an offline note in that case. In the browser demo the shim
+ * answers with real Kenku when reachable, else the built-in sample board.
  */
 export function useKenkuLibrary(enabled: boolean): {
   library: KenkuLibrary | null;
@@ -17,7 +18,7 @@ export function useKenkuLibrary(enabled: boolean): {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    if (!enabled || isDemo) return;
+    if (!enabled) return;
     let mounted = true;
     setLoading(true);
     void api.kenkuGetLibrary().then((lib) => {

@@ -18,7 +18,6 @@ import { AttackText } from '../AttackText';
 import { AbilityTable } from '../AbilityTable';
 import { useI18n } from '../i18n';
 import { useKenkuLibrary } from '../useKenkuLibrary';
-import { isDemo } from '../api';
 
 // ---- editable action form model (strings while typing) ----
 
@@ -212,7 +211,7 @@ function formToAction(f: ActionForm, order: number, existing?: MonsterAction): M
 export function MonsterScreen({ state }: { state: AppState }) {
   const { t, mon, abilityCode, locAction, fmtRange } = useI18n();
   const [form, setForm] = useState<MonsterFormData | null>(null);
-  const kenkuOn = !isDemo && state.settings.kenku.enabled;
+  const kenkuOn = state.settings.kenku.enabled;
   const { library: kenkuLibrary } = useKenkuLibrary(form !== null && kenkuOn);
   const confirm = useConfirm();
   const [expanded, setExpanded] = useState<string | null>(null);

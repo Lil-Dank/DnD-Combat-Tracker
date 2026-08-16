@@ -10,7 +10,6 @@ import { PlayerView } from './screens/PlayerView';
 import { ConfirmProvider } from './Confirm';
 import { I18nProvider } from './i18n';
 import { KenkuSoundboardModal } from './KenkuSoundboardModal';
-import { isDemo } from './api';
 import { translate } from '../../shared/i18n';
 
 type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'settings';
@@ -95,7 +94,7 @@ export function App() {
           </button>
         ))}
         <div className="sidebar-footer">
-          {!isDemo && state.settings.kenku.enabled && (
+          {state.settings.kenku.enabled && (
             <button className="nav-btn" onClick={() => setShowSoundboard(true)}>
               {'🎵 '}
               {translate(lang, 'kenku.soundboard')}

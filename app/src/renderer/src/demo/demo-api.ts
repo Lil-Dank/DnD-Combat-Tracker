@@ -19,6 +19,7 @@ import type {
   Combatant,
   Condition,
   EncounterTemplate,
+  KenkuEventId,
   MonsterTemplate,
   PC,
   Settings,
@@ -31,8 +32,20 @@ import {
 } from '../../../shared/i18n';
 import type { Api } from '../../../preload/index';
 import monstersDe from '../../../../resources/srd/monsters.de.json';
+import {
+  demoKenkuLibrary,
+  demoKenkuPausePlayback,
+  demoKenkuPlayback,
+  demoKenkuPlayPlaylist,
+  demoKenkuPlaySound,
+  demoKenkuStopAll,
+  demoKenkuStopSound,
+  kenkuReachable,
+} from './demo-kenku';
 
-const LS_KEY = 'dnd-combat-tracker-demo-v1';
+// v2: reseeds visitors who stored a pre-Kenku demo state, so the sample
+// sound configuration shows up for everyone.
+const LS_KEY = 'dnd-combat-tracker-demo-v2';
 const uuid = () => crypto.randomUUID();
 const d20 = () => 1 + Math.floor(Math.random() * 20);
 
@@ -71,7 +84,15 @@ export function createDemoApi(): Api {
   function load(): DemoData | null {
     try {
       const raw = localStorage.getItem(LS_KEY);
-      return raw ? (JSON.parse(raw) as DemoData) : null;
+      if (!raw) return null;
+      const stored = JSON.parse(raw) as DemoData;
+      // Same deep-merge as main/state.ts: settings gain new sections over time.
+      stored.settings = {
+        ...DEFAULT_SETTINGS,
+        ...stored.settings,
+        kenku: { ...DEFAULT_SETTINGS.kenku, ...(stored.settings?.kenku ?? {}) },
+      };
+      return stored;
     } catch {
       return null;
     }
@@ -86,8 +107,7 @@ export function createDemoApi(): Api {
       settings: data.settings,
       // The simulated deck on this page counts as a connected client.
       bridgeClientCount: 1,
-      // Kenku FM is a desktop-app integration; the browser demo hides it.
-      kenkuConnected: false,
+      kenkuConnected,
     };
   }
 
@@ -119,6 +139,98 @@ export function createDemoApi(): Api {
       }
     }
   });
+
+  // ---- Kenku (demo): trigger engine mirroring main/kenku.ts -------------------
+  // Real Kenku is used when reachable (its remote has no CORS as of 1.x, so a
+  // hosted page usually cannot reach it); otherwise sounds synthesize locally.
+
+  let kenkuConnected = false;
+  const kenkuPending = new Set<ReturnType<typeof setTimeout>>();
+
+  const kenkuSettings = () => data.settings.kenku;
+
+  setInterval(() => {
+    const k = kenkuSettings();
+    if (!k.enabled) {
+      if (kenkuConnected) { kenkuConnected = false; notify(); }
+      return;
+    }
+    void kenkuReachable(k).then((r) => {
+      if (r !== kenkuConnected) { kenkuConnected = r; notify(); }
+    });
+  }, 5000);
+
+  function kenkuFire(ref: { soundId: string; delayMs?: number }): void {
+    const delay = ref.delayMs ?? 0;
+    if (delay <= 0) {
+      void demoKenkuPlaySound(kenkuSettings(), ref.soundId);
+      return;
+    }
+    const timer = setTimeout(() => {
+      kenkuPending.delete(timer);
+      void demoKenkuPlaySound(kenkuSettings(), ref.soundId);
+    }, delay);
+    kenkuPending.add(timer);
+  }
+
+  function kenkuEvent(event: KenkuEventId): void {
+    const k = kenkuSettings();
+    if (!k.enabled) return;
+    const ref = k.eventSounds[event];
+    if (ref) kenkuFire(ref);
+  }
+
+  function kenkuCombatEvent(event: KenkuEventId): void {
+    const k = kenkuSettings();
+    if (event === 'combatStart') {
+      kenkuEvent(event);
+      if (!k.enabled) return;
+      const tpl = data.templates.find((t) => t.id === data.combat?.sourceTemplateId);
+      if (tpl?.kenkuPlaylistId) void demoKenkuPlayPlaylist(k, tpl.kenkuPlaylistId);
+      return;
+    }
+    if (event === 'combatEnd') {
+      for (const t of kenkuPending) clearTimeout(t);
+      kenkuPending.clear();
+      kenkuEvent(event);
+      if (!k.enabled) return;
+      const tpl = data.templates.find((t) => t.id === data.combat?.sourceTemplateId);
+      if (tpl?.kenkuPlaylistId) void demoKenkuPausePlayback(k);
+      return;
+    }
+    kenkuEvent(event);
+  }
+
+  const KENKU_PHASE_TRIGGER: Record<string, string | null> = {
+    attackRoll: 'attackRoll',
+    attackHit: 'attackHit',
+    attackCrit: 'attackHit',
+    attackMiss: null,
+    damageRoll: 'damageRoll',
+    damageApplied: 'damageApplied',
+  };
+  const KENKU_PHASE_EVENT: Record<string, KenkuEventId | undefined> = {
+    attackHit: 'attackHit',
+    attackCrit: 'attackCrit',
+    attackMiss: 'attackMiss',
+  };
+
+  function kenkuAttackEvent(payload: { sourceId?: string; attackId: string; phase: string }): void {
+    const k = kenkuSettings();
+    if (!k.enabled) return;
+    const trigger = KENKU_PHASE_TRIGGER[payload.phase];
+    if (trigger) {
+      const monster =
+        data.monsters.find((m) => m.id === payload.sourceId) ??
+        data.monsters.find((m) => m.attacks.some((a) => a.id === payload.attackId));
+      const action = monster?.attacks.find((a) => a.id === payload.attackId);
+      if (action?.kenkuSound && action.kenkuSound.trigger === trigger) {
+        kenkuFire(action.kenkuSound);
+      }
+    }
+    const event = KENKU_PHASE_EVENT[payload.phase];
+    if (event) kenkuEvent(event);
+  }
 
   // ---- combat helpers, mirroring main/state.ts --------------------------------
 
@@ -157,7 +269,9 @@ export function createDemoApi(): Api {
     if (idx === -1) return;
     const c = combat.combatants[idx];
     c.currentHp = Math.max(0, c.currentHp - amount);
+    let downedOrKilled: KenkuEventId | null = null;
     if (c.currentHp === 0) {
+      downedOrKilled = c.type === 'monster' ? 'monsterKilled' : 'pcDowned';
       if (c.type === 'monster') {
         combat.combatants.splice(idx, 1);
         if (combat.combatants.length === 0) {
@@ -173,6 +287,8 @@ export function createDemoApi(): Api {
       }
     }
     save();
+    kenkuCombatEvent('damageApplied');
+    if (downedOrKilled) kenkuCombatEvent(downedOrKilled);
   }
 
   function applyHeal(combatantId: string, amount: number): void {
@@ -183,6 +299,7 @@ export function createDemoApi(): Api {
     c.currentHp = Math.min(c.maxHp, c.currentHp + amount);
     if (c.currentHp > 0) c.isDowned = false;
     save();
+    kenkuCombatEvent('healApplied');
   }
 
   function toggleCondition(combatantId: string, condition: Condition): void {
@@ -205,6 +322,7 @@ export function createDemoApi(): Api {
       combat.round += 1;
     }
     save();
+    kenkuCombatEvent('turnChange');
   }
 
   function prevTurn(): void {
@@ -218,6 +336,7 @@ export function createDemoApi(): Api {
       combat.currentIndex -= 1;
     }
     save();
+    kenkuCombatEvent('turnChange');
   }
 
   // ---- SRD import -------------------------------------------------------------
@@ -275,6 +394,36 @@ export function createDemoApi(): Api {
       ['Kobold Warrior', 4],
     ]);
     tpl('Owlbear Den', [['Owlbear', 2]]);
+
+    // Kenku demo config: enabled, with sample event sounds, per-attack sounds
+    // and a battle playlist on the first template - all synthesized locally.
+    data.settings.kenku = {
+      enabled: true,
+      host: '127.0.0.1',
+      port: 3333,
+      eventSounds: {
+        combatStart: { soundId: 'demo-horn', title: 'Battle Horn' },
+        monsterKilled: { soundId: 'demo-screech', title: 'Goblin Screech' },
+        attackCrit: { soundId: 'demo-thunder', title: 'Thunder Crack' },
+        healApplied: { soundId: 'demo-chime', title: 'Healing Chime' },
+      },
+    };
+    data.templates[0].kenkuPlaylistId = 'demo-pl-battle';
+    data.templates[0].kenkuPlaylistTitle = 'Battle Drums';
+    const attachSound = (
+      monsterName: string,
+      attackName: string,
+      soundId: string,
+      title: string,
+      trigger: 'attackRoll' | 'attackHit' | 'damageRoll' | 'damageApplied',
+    ) => {
+      const m = byName(monsterName);
+      const a = m?.attacks.find((x) => x.name === attackName);
+      if (a) a.kenkuSound = { soundId, title, trigger };
+    };
+    attachSound('Goblin Warrior', 'Scimitar', 'demo-sword', 'Sword Clash', 'attackHit');
+    attachSound('Owlbear', 'Rend', 'demo-roar', 'Dragon Roar', 'attackHit');
+    attachSound('Adult Black Dragon', 'Acid Breath', 'demo-fire', 'Fire Whoosh', 'damageRoll');
 
     // A combat already in progress, so the first thing a visitor sees is the
     // tracker doing its job rather than an empty screen.
@@ -401,8 +550,12 @@ export function createDemoApi(): Api {
         prevTurn();
         break;
       case 'endCombat':
+        if (data.combat) kenkuCombatEvent('combatEnd');
         data.combat = null;
         save();
+        break;
+      case 'attackEvent':
+        kenkuAttackEvent(cmd as unknown as { sourceId?: string; attackId: string; phase: string });
         break;
       case 'applyDamage':
         if (cmd.actorId && typeof cmd.amount === 'number') applyDamage(cmd.actorId, cmd.amount);
@@ -576,8 +729,10 @@ export function createDemoApi(): Api {
       combat.currentIndex = 0;
       combat.round = 1;
       save();
+      kenkuCombatEvent('combatStart');
     },
     endCombat: async () => {
+      if (data.combat) kenkuCombatEvent('combatEnd');
       data.combat = null;
       save();
     },
@@ -634,14 +789,19 @@ export function createDemoApi(): Api {
       save();
     },
 
-    // Kenku FM talks to a local desktop app; inert in the browser demo.
-    kenkuGetLibrary: async () => null,
-    kenkuPlaySound: async () => false,
-    kenkuStopSound: async () => false,
-    kenkuStopAll: async () => {},
-    kenkuSoundPlayback: async () => null,
-    kenkuCheckConnection: async () => false,
-    kenkuAttackEvent: async () => {},
+    // Kenku in the demo: real Kenku Remote when reachable (its remote has no
+    // CORS today, so usually not), otherwise the built-in synthesized board.
+    kenkuGetLibrary: async () => demoKenkuLibrary(kenkuSettings()),
+    kenkuPlaySound: async (id) => demoKenkuPlaySound(kenkuSettings(), id),
+    kenkuStopSound: async (id) => demoKenkuStopSound(kenkuSettings(), id),
+    kenkuStopAll: async () => demoKenkuStopAll(kenkuSettings()),
+    kenkuSoundPlayback: async () => demoKenkuPlayback(kenkuSettings()),
+    kenkuCheckConnection: async () => {
+      const r = await kenkuReachable(kenkuSettings());
+      if (r !== kenkuConnected) { kenkuConnected = r; notify(); }
+      return r;
+    },
+    kenkuAttackEvent: async (payload) => kenkuAttackEvent(payload),
 
     updateSettings: async (patch) => {
       data.settings = { ...data.settings, ...patch };

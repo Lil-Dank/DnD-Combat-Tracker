@@ -1371,3 +1371,66 @@ input, button, select, textarea {
 .combat-row-main.clickable {
   cursor: pointer;
 }
+
+/* ---- Player web (phones) ---- */
+
+.pw-qr-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0;
+}
+
+.pw-qr {
+  margin: 0;
+  text-align: center;
+}
+
+.pw-qr img {
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px;
+  display: block;
+  margin: 0 auto 6px;
+}
+
+.pw-qr figcaption code {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.pw-qr-modal {
+  max-width: 680px;
+}
+
+.pw-qr-row.large .pw-qr img {
+  padding: 10px;
+}
+
+.pw-error {
+  color: var(--danger, #e05555);
+  font-weight: 600;
+}
+
+.pw-claims {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.pw-claims li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+}
+
+.pw-online {
+  color: var(--success, #4caf7d);
+}
+
+.pw-offline {
+  opacity: 0.6;
+}

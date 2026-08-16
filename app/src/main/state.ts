@@ -2,6 +2,7 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { JsonCollection, JsonValue } from './storage';
 import type {
+  KenkuEventId,
   AppState,
   Combat,
   Combatant,
@@ -31,6 +32,9 @@ export class AppStore {
   private combat!: JsonValue<Combat | null>;
   private listeners = new Set<ChangeListener>();
   bridgeClientCount = 0;
+  kenkuConnected = false;
+  /** Combat happenings for side-effect listeners (Kenku sounds); see index.ts. */
+  private combatEventListener: ((event: KenkuEventId) => void) | null = null;
 
   async init(userDataDir: string): Promise<void> {
     const dataDir = path.join(userDataDir, 'data');
@@ -47,7 +51,14 @@ export class AppStore {
       this.combat.load(),
     ]);
     // Fill in any settings keys added after the file was first written.
-    await this.settings.set({ ...DEFAULT_SETTINGS, ...this.settings.get() });
+    // kenku is nested, so merge its sub-keys explicitly - a stored file from
+    // before a new sub-key was added must still pick up that default.
+    const stored = this.settings.get();
+    await this.settings.set({
+      ...DEFAULT_SETTINGS,
+      ...stored,
+      kenku: { ...DEFAULT_SETTINGS.kenku, ...(stored.kenku ?? {}) },
+    });
     await this.migrateLegacyAttacks();
   }
 
@@ -79,7 +90,22 @@ export class AppStore {
       combat: this.combat.get(),
       settings: this.settings.get(),
       bridgeClientCount: this.bridgeClientCount,
+      kenkuConnected: this.kenkuConnected,
     };
+  }
+
+  setKenkuConnected(connected: boolean): void {
+    if (this.kenkuConnected === connected) return;
+    this.kenkuConnected = connected;
+    this.notify();
+  }
+
+  onCombatEvent(listener: (event: KenkuEventId) => void): void {
+    this.combatEventListener = listener;
+  }
+
+  private emitCombatEvent(event: KenkuEventId): void {
+    this.combatEventListener?.(event);
   }
 
   onChange(listener: ChangeListener): () => void {
@@ -314,9 +340,13 @@ export class AppStore {
     combat.currentIndex = 0;
     combat.round = 1;
     await this.setCombat(combat);
+    this.emitCombatEvent('combatStart');
   }
 
   async endCombat(): Promise<void> {
+    // Emit while the combat still exists, so the listener can read its
+    // template (the Kenku handler pauses the playlist it started).
+    if (this.combat.get()) this.emitCombatEvent('combatEnd');
     await this.setCombat(null);
   }
 
@@ -331,6 +361,7 @@ export class AppStore {
       combat.round += 1;
     }
     await this.setCombat(combat);
+    this.emitCombatEvent('turnChange');
   }
 
   async prevTurn(): Promise<void> {
@@ -344,6 +375,7 @@ export class AppStore {
       combat.currentIndex -= 1;
     }
     await this.setCombat(combat);
+    this.emitCombatEvent('turnChange');
   }
 
   async applyDamage(combatantId: string, amount: number): Promise<void> {
@@ -353,7 +385,9 @@ export class AppStore {
     if (idx === -1) return;
     const c = combat.combatants[idx];
     c.currentHp = Math.max(0, c.currentHp - amount);
+    let killedOrDowned: KenkuEventId | null = null;
     if (c.currentHp === 0) {
+      killedOrDowned = c.type === 'monster' ? 'monsterKilled' : 'pcDowned';
       if (c.type === 'monster') {
         // Remove dead monsters from the order entirely.
         combat.combatants.splice(idx, 1);
@@ -371,6 +405,8 @@ export class AppStore {
       }
     }
     await this.setCombat(combat);
+    this.emitCombatEvent('damageApplied');
+    if (killedOrDowned) this.emitCombatEvent(killedOrDowned);
   }
 
   async applyHeal(combatantId: string, amount: number): Promise<void> {
@@ -381,6 +417,7 @@ export class AppStore {
     c.currentHp = Math.min(c.maxHp, c.currentHp + amount);
     if (c.currentHp > 0) c.isDowned = false;
     await this.setCombat(combat);
+    this.emitCombatEvent('healApplied');
   }
 
   async toggleCondition(combatantId: string, condition: Condition): Promise<void> {

@@ -85,7 +85,10 @@ players' screen as a second tab, and the language selector switches everything t
 German just like the desktop app.
 
 Demo data lives entirely in your browser (localStorage); the **Reset demo** button on
-the deck panel starts it over. What the demo cannot show: the real installer, the
+the deck panel starts it over. The site also hosts the
+**[bridge protocol documentation](https://lil-dank.github.io/DnD-Combat-Tracker/bridge/)** —
+the WebSocket API the Stream Deck plugin uses, documented for anyone who wants to
+integrate their own hardware or overlays. What the demo cannot show: the real installer, the
 actual Stream Deck hardware, and the second-monitor/chroma workflow.
 
 ---

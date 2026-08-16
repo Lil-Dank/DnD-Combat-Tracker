@@ -40,6 +40,9 @@ await esbuild.build({
 mkdirSync(join(dist, 'srd'), { recursive: true });
 cpSync(join(app, 'resources', 'srd', 'monsters.json'), join(dist, 'srd', 'monsters.json'));
 
+// Bridge protocol docs ride along at /bridge/ on the same Pages site.
+cpSync(join(app, '..', 'docs', 'bridge'), join(dist, 'bridge'), { recursive: true });
+
 const indexPath = join(dist, 'index.html');
 let html = readFileSync(indexPath, 'utf8');
 // The deck panel only belongs on the DM view; the script exits early on

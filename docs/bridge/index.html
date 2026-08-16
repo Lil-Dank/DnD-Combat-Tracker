@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Combat Tracker Bridge Protocol</title>
+<style>
+  :root {
+    --bg: #17121f; --panel: #1f1930; --border: #37304a; --text: #e8e3f2;
+    --muted: #a79fc0; --accent: #b45309; --gold: #f2c14e; --code-bg: #120d1c;
+    --good: #4ade80; --cmd: #7c3aed;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.65 'Segoe UI', system-ui, sans-serif;
+    padding: 40px 20px 80px;
+  }
+  main { max-width: 860px; margin: 0 auto; }
+  h1 { font-family: Georgia, serif; font-size: 30px; color: var(--gold); margin-bottom: 4px; }
+  .sub { color: var(--muted); margin-bottom: 28px; }
+  h2 {
+    font-family: Georgia, serif; font-size: 21px; color: var(--gold);
+    margin: 36px 0 10px; padding-top: 18px; border-top: 1px solid var(--border);
+  }
+  h3 { font-size: 16px; margin: 20px 0 6px; }
+  p { margin-bottom: 10px; }
+  code {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 5px; font: 13px/1.5 Consolas, 'Cascadia Code', monospace;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; margin: 10px 0 16px;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 16px; font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--panel); color: var(--gold); }
+  td code { white-space: nowrap; }
+  .note {
+    background: var(--panel); border-left: 4px solid var(--accent); border-radius: 6px;
+    padding: 10px 14px; margin: 12px 0; color: var(--muted);
+  }
+  .pill {
+    display: inline-block; background: var(--cmd); color: #fff; border-radius: 999px;
+    font-size: 12px; padding: 1px 10px; margin-right: 6px;
+  }
+  a { color: var(--gold); }
+  ul { margin: 0 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  .backlink { margin-bottom: 24px; display: inline-block; }
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../">&larr; back to the demo</a>
+  <h1>&#9876; Combat Tracker Bridge Protocol</h1>
+  <p class="sub">
+    The WebSocket protocol between the
+    <a href="https://github.com/Lil-Dank/DnD-Combat-Tracker">D&amp;D Combat Tracker</a>
+    desktop app and its Stream Deck plugin &mdash; documented so anything else
+    can integrate the same way: stream overlays, macro pads, home-automation
+    buttons, other tools.
+  </p>
+
+  <h2>Connection</h2>
+  <p>
+    The desktop app hosts a plain WebSocket server on
+    <code>ws://127.0.0.1:57321</code> (port configurable in the app under
+    <em>Settings &rarr; Stream Deck bridge</em>). No authentication, no
+    handshake beyond the WebSocket upgrade &mdash; the server only listens on
+    the loopback interface. Any number of clients may connect; the Stream Deck
+    plugin is simply one of them, and the connection count shows in the app's
+    sidebar.
+  </p>
+  <ul>
+    <li>On connect, the app immediately pushes a full <code>state</code> message.</li>
+    <li>Every state change pushes a fresh, complete <code>state</code> message to all clients &mdash; there are no deltas.</li>
+    <li>Clients send single JSON command objects; the app never replies to commands directly (the resulting state broadcast is the acknowledgement).</li>
+    <li>If the app is closed, reconnect with your own retry loop &mdash; the plugin retries every 3&nbsp;s forever.</li>
+  </ul>
+
+  <h2>State message (app &rarr; client)</h2>
+  <p>
+    Sent on connect and on every change. Outside an active combat,
+    <code>combatants</code> is empty and <code>round</code> is <code>0</code>.
+  </p>
+<pre><code>{
+  "type": "state",
+  "language": "en",              // "en" | "de" - the app's UI language
+  "currentIndex": 2,             // index into combatants of the active turn
+  "round": 3,
+  "combatants": [
+    {
+      "id": "6f0c…",             // stable per combat; use for commands
+      "sourceId": "a1b2…",       // monster template id (PCs: library PC id)
+      "displayName": "Goblinkrieger 2",  // localized to `language`
+      "currentHp": 4,
+      "maxHp": 10,
+      "ac": 15,
+      "isCurrentTurn": true,
+      "isDowned": false,          // PCs at 0 HP stay listed, downed
+      "conditions": ["Poisoned"], // canonical English values (see below)
+      "attacks": [                // rollable actions only
+        {
+          "id": "srd-2024_goblin.scimitar",
+          "name": "Krummsäbel",   // localized to `language`
+          "toHit": 4,             // null for save-based actions
+          "save": null,           // e.g. "GES 13" (localized ability + DC)
+          "damage": [
+            { "dice": "1d6+2", "average": 5, "type": "slashing", "condition": null }
+          ]
+        }
+      ]
+    }
+  ]
+}</code></pre>
+  <div class="note">
+    Monsters removed at 0&nbsp;HP disappear from <code>combatants</code>
+    entirely. Player characters stay, with <code>isDowned: true</code>.
+    Names, attack names and save abilities arrive already localized;
+    <code>conditions</code> values are always the canonical English strings.
+  </div>
+
+  <h2>Commands (client &rarr; app)</h2>
+  <p>One JSON object per WebSocket message.</p>
+  <table>
+    <tr><th>Command</th><th>Payload</th><th>Effect</th></tr>
+    <tr>
+      <td><code>nextTurn</code></td>
+      <td><code>{"type":"nextTurn"}</code></td>
+      <td>Advance the turn; wraps to the next round.</td>
+    </tr>
+    <tr>
+      <td><code>prevTurn</code></td>
+      <td><code>{"type":"prevTurn"}</code></td>
+      <td>Rewind the turn; refused at round 1, first actor.</td>
+    </tr>
+    <tr>
+      <td><code>endCombat</code></td>
+      <td><code>{"type":"endCombat"}</code></td>
+      <td>End the combat immediately (no confirmation on this side).</td>
+    </tr>
+    <tr>
+      <td><code>applyDamage</code></td>
+      <td><code>{"type":"applyDamage","actorId":"6f0c…","amount":7}</code></td>
+      <td>Damage floors at 0 HP; monsters die and leave the order, PCs go down.</td>
+    </tr>
+    <tr>
+      <td><code>applyHeal</code></td>
+      <td><code>{"type":"applyHeal","actorId":"6f0c…","amount":5}</code></td>
+      <td>Healing caps at max HP; revives downed PCs.</td>
+    </tr>
+    <tr>
+      <td><code>toggleCondition</code></td>
+      <td><code>{"type":"toggleCondition","actorId":"6f0c…","condition":"Poisoned"}</code></td>
+      <td>Adds or removes the condition (canonical English value).</td>
+    </tr>
+    <tr>
+      <td><code>attackEvent</code></td>
+      <td><code>{"type":"attackEvent","sourceId":"a1b2…","attackId":"srd-2024_goblin.scimitar","phase":"attackHit"}</code></td>
+      <td>
+        Attack-flow progress report. <strong>No state change</strong> &mdash;
+        it only triggers Kenku&nbsp;FM sounds the DM has configured for that
+        attack or for the global crit/hit/miss events.
+        <code>sourceId</code> is recommended but optional: the app can resolve
+        the attack from <code>attackId</code> alone (action ids are unique).
+      </td>
+    </tr>
+  </table>
+
+  <h3>attackEvent phases</h3>
+  <ul>
+    <li><code>attackRoll</code> &mdash; the d20 left the cup (fires regardless of outcome)</li>
+    <li><code>attackCrit</code> / <code>attackHit</code> / <code>attackMiss</code> &mdash; the verdict (send exactly one; a crit implies a hit)</li>
+    <li><code>damageRoll</code> &mdash; damage dice rolled</li>
+    <li><code>damageApplied</code> &mdash; the damage was committed (send alongside <code>applyDamage</code>)</li>
+  </ul>
+
+  <h3>Condition values</h3>
+  <p>
+    <code>Blinded</code>, <code>Charmed</code>, <code>Deafened</code>,
+    <code>Exhaustion</code>, <code>Frightened</code>, <code>Grappled</code>,
+    <code>Incapacitated</code>, <code>Invisible</code>, <code>Paralyzed</code>,
+    <code>Petrified</code>, <code>Poisoned</code>, <code>Prone</code>,
+    <code>Restrained</code>, <code>Stunned</code>, <code>Unconscious</code>
+  </p>
+
+  <h2>Example session</h2>
+<pre><code>&gt; (connect ws://127.0.0.1:57321)
+&lt; {"type":"state","language":"en","currentIndex":0,"round":1,"combatants":[…]}
+
+&gt; {"type":"applyDamage","actorId":"6f0c…","amount":7}
+&lt; {"type":"state", …updated combatants…}
+
+&gt; {"type":"nextTurn"}
+&lt; {"type":"state","currentIndex":1, …}
+
+&gt; {"type":"endCombat"}
+&lt; {"type":"state","combatants":[],"round":0, …}</code></pre>
+
+  <h2>Behaviour notes</h2>
+  <ul>
+    <li>Unknown command types are ignored silently &mdash; safe to feature-detect by trying.</li>
+    <li>Malformed JSON closes nothing; the message is dropped.</li>
+    <li>Pressing hardware keys pulls the app's DM window to its Combat screen; <code>attackEvent</code> deliberately does not.</li>
+    <li>The protocol is unversioned; fields are only ever added, never repurposed. Treat unknown fields as forwards-compatible.</li>
+  </ul>
+
+  <p class="sub" style="margin-top:32px">
+    Source of truth: <code>app/src/main/bridge.ts</code> (server) and
+    <code>plugin/src/bridge.ts</code> (reference client) in the
+    <a href="https://github.com/Lil-Dank/DnD-Combat-Tracker">repository</a>.
+  </p>
+</main>
+</body>
+</html>

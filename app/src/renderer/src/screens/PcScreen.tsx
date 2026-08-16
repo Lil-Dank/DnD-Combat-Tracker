@@ -30,12 +30,14 @@ export function PcScreen({ state }: { state: AppState }) {
 
   const submit = async () => {
     if (!form || !form.name.trim()) return;
+    const existing = form.id ? state.pcs.find((p) => p.id === form.id) : undefined;
     await api.savePc({
       id: form.id,
       name: form.name.trim(),
       maxHp: Math.max(1, parseInt(form.maxHp, 10) || 1),
       ac: parseInt(form.ac, 10) || 10,
       initMod: parseInt(form.initMod, 10) || 0,
+      attacks: existing?.attacks ?? [],
     });
     setForm(null);
   };

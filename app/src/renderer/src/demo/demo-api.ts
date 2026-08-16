@@ -108,6 +108,7 @@ export function createDemoApi(): Api {
       // The simulated deck on this page counts as a connected client.
       bridgeClientCount: 1,
       kenkuConnected,
+      playerClients: [],
     };
   }
 
@@ -374,7 +375,7 @@ export function createDemoApi(): Api {
       { name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2 },
       { name: 'Seraphina Dawnbringer', maxHp: 45, ac: 17, initMod: 1 },
     ]) {
-      data.pcs.push({ id: uuid(), ...p });
+      data.pcs.push({ id: uuid(), ...p, attacks: [] });
     }
 
     const byName = (n: string) => data.monsters.find((m) => m.name === n);
@@ -447,7 +448,7 @@ export function createDemoApi(): Api {
         ac: pc.ac,
         initMod: pc.initMod,
         abilities: null,
-        attacks: [],
+        attacks: pc.attacks.map((a) => ({ ...a })),
         conditions: [],
         initiative: d20() + pc.initMod,
         isDowned: false,
@@ -460,6 +461,7 @@ export function createDemoApi(): Api {
       combatants,
       currentIndex: 0,
       round: 0,
+      log: [],
     };
     sortCombatants(combat);
     combat.phase = 'active';
@@ -689,6 +691,7 @@ export function createDemoApi(): Api {
         combatants,
         currentIndex: 0,
         round: 0,
+        log: [],
       };
       sortCombatants(combat);
       data.combat = combat;

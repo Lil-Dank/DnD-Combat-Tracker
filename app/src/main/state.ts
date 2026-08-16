@@ -4,18 +4,33 @@ import { JsonCollection, JsonValue } from './storage';
 import type {
   KenkuEventId,
   AppState,
+  ArchivedCombat,
   Combat,
   Combatant,
   Condition,
   EncounterTemplate,
+  LogEntry,
+  LogSource,
+  MonsterAction,
   MonsterTemplate,
   PC,
+  PlayerClaimInfo,
   Settings,
 } from '../shared/types';
 import { DEFAULT_SETTINGS } from '../shared/types';
 import { migrateActions } from './migrate';
 
 export type ChangeListener = (state: AppState) => void;
+
+/** Who performed a mutation, for the combat log. Defaults to the DM window. */
+export interface ActionContext {
+  source: LogSource;
+  /** Acting combatant's display name (player web actions carry their PC). */
+  actorName?: string;
+  actorType?: 'pc' | 'monster';
+}
+
+const DM_CTX: ActionContext = { source: 'dm' };
 
 const d20 = () => Math.floor(Math.random() * 20) + 1;
 
@@ -30,9 +45,11 @@ export class AppStore {
   private templates!: JsonCollection<EncounterTemplate>;
   private settings!: JsonValue<Settings>;
   private combat!: JsonValue<Combat | null>;
+  private archive!: JsonCollection<ArchivedCombat>;
   private listeners = new Set<ChangeListener>();
   bridgeClientCount = 0;
   kenkuConnected = false;
+  playerClients: PlayerClaimInfo[] = [];
   /** Combat happenings for side-effect listeners (Kenku sounds); see index.ts. */
   private combatEventListener: ((event: KenkuEventId) => void) | null = null;
 
@@ -43,22 +60,34 @@ export class AppStore {
     this.templates = new JsonCollection<EncounterTemplate>(path.join(dataDir, 'encounter-templates.json'));
     this.settings = new JsonValue<Settings>(path.join(dataDir, 'settings.json'), DEFAULT_SETTINGS);
     this.combat = new JsonValue<Combat | null>(path.join(dataDir, 'combat.json'), null);
+    this.archive = new JsonCollection<ArchivedCombat>(path.join(dataDir, 'combat-archive.json'));
     await Promise.all([
       this.pcs.load(),
       this.monsters.load(),
       this.templates.load(),
       this.settings.load(),
       this.combat.load(),
+      this.archive.load(),
     ]);
     // Fill in any settings keys added after the file was first written.
-    // kenku is nested, so merge its sub-keys explicitly - a stored file from
-    // before a new sub-key was added must still pick up that default.
+    // Nested sections (kenku, playerWeb) merge sub-keys explicitly - a stored
+    // file from before a new sub-key was added must still pick up its default.
     const stored = this.settings.get();
     await this.settings.set({
       ...DEFAULT_SETTINGS,
       ...stored,
       kenku: { ...DEFAULT_SETTINGS.kenku, ...(stored.kenku ?? {}) },
+      playerWeb: { ...DEFAULT_SETTINGS.playerWeb, ...(stored.playerWeb ?? {}) },
     });
+    // PCs stored before the attacks field / combats before the log field.
+    for (const pc of this.pcs.list()) {
+      if (!Array.isArray(pc.attacks)) await this.pcs.put({ ...pc, attacks: [] });
+    }
+    const combat = this.combat.get();
+    if (combat && !Array.isArray(combat.log)) {
+      combat.log = [];
+      await this.combat.set(combat);
+    }
     await this.migrateLegacyAttacks();
   }
 
@@ -91,7 +120,41 @@ export class AppStore {
       settings: this.settings.get(),
       bridgeClientCount: this.bridgeClientCount,
       kenkuConnected: this.kenkuConnected,
+      playerClients: this.playerClients,
     };
+  }
+
+  setPlayerClients(list: PlayerClaimInfo[]): void {
+    this.playerClients = list;
+    this.notify();
+  }
+
+  // ---- Combat log ----
+
+  /**
+   * Append a structured entry to the running combat's log. id/ts/round are
+   * filled in here; rendering to text happens per-surface via i18n keys.
+   * No-op without a combat (log lines never outlive their fight).
+   */
+  async appendLog(entry: Omit<LogEntry, 'id' | 'ts' | 'round'>): Promise<void> {
+    const combat = this.combat.get();
+    if (!combat) return;
+    this.pushLog(combat, entry);
+    await this.setCombat(combat);
+  }
+
+  /** In-mutator variant: fills fields and pushes, without its own persist. */
+  private pushLog(combat: Combat, entry: Omit<LogEntry, 'id' | 'ts' | 'round'>): void {
+    combat.log.push({ ...entry, id: randomUUID(), ts: Date.now(), round: combat.round });
+  }
+
+  listArchive(): ArchivedCombat[] {
+    return this.archive.list().sort((a, b) => b.endedAt - a.endedAt);
+  }
+
+  async deleteArchivedCombat(id: string): Promise<void> {
+    await this.archive.delete(id);
+    this.notify();
   }
 
   setKenkuConnected(connected: boolean): void {
@@ -128,6 +191,41 @@ export class AppStore {
   async deletePc(id: string): Promise<void> {
     await this.pcs.delete(id);
     this.notify();
+  }
+
+  /**
+   * Create or update one attack on a PC. Also patches the PC's live combatant
+   * (matched by sourceId) so the deck and phones see the change immediately.
+   * Used by the Party screen editor and the player web app.
+   */
+  async savePcAttack(pcId: string, action: MonsterAction): Promise<void> {
+    const pc = this.pcs.get(pcId);
+    if (!pc) return;
+    const attacks = [...pc.attacks];
+    const idx = attacks.findIndex((a) => a.id === action.id);
+    if (idx === -1) attacks.push(action);
+    else attacks[idx] = action;
+    await this.pcs.put({ ...pc, attacks });
+    await this.syncPcCombatantAttacks(pcId, attacks);
+    this.notify();
+  }
+
+  async deletePcAttack(pcId: string, actionId: string): Promise<void> {
+    const pc = this.pcs.get(pcId);
+    if (!pc) return;
+    const attacks = pc.attacks.filter((a) => a.id !== actionId);
+    await this.pcs.put({ ...pc, attacks });
+    await this.syncPcCombatantAttacks(pcId, attacks);
+    this.notify();
+  }
+
+  private async syncPcCombatantAttacks(pcId: string, attacks: MonsterAction[]): Promise<void> {
+    const combat = this.combat.get();
+    if (!combat) return;
+    const c = combat.combatants.find((x) => x.type === 'pc' && x.sourceId === pcId);
+    if (!c) return;
+    c.attacks = attacks.map((a) => ({ ...a }));
+    await this.combat.set(combat);
   }
 
   // ---- Monsters ----
@@ -266,7 +364,7 @@ export class AppStore {
         ac: pc.ac,
         initMod: pc.initMod,
         abilities: null,
-        attacks: [],
+        attacks: pc.attacks.map((a) => ({ ...a })),
         conditions: [],
         initiative: rollMode === 'all' ? d20() + pc.initMod : null,
         isDowned: false,
@@ -280,6 +378,7 @@ export class AppStore {
       combatants,
       currentIndex: 0,
       round: 0,
+      log: [],
     };
     this.sortCombatants(combat);
     await this.setCombat(combat);
@@ -339,20 +438,45 @@ export class AppStore {
     combat.phase = 'active';
     combat.currentIndex = 0;
     combat.round = 1;
+    this.pushLog(combat, { kind: 'combatStart', source: 'dm' });
+    const first = combat.combatants[0];
+    if (first) {
+      this.pushLog(combat, {
+        kind: 'turn',
+        actorName: first.displayName,
+        actorType: first.type,
+        source: 'dm',
+      });
+    }
     await this.setCombat(combat);
     this.emitCombatEvent('combatStart');
   }
 
-  async endCombat(): Promise<void> {
+  async endCombat(ctx: ActionContext = DM_CTX): Promise<void> {
     // Emit while the combat still exists, so the listener can read its
     // template (the Kenku handler pauses the playlist it started).
-    if (this.combat.get()) this.emitCombatEvent('combatEnd');
+    const combat = this.combat.get();
+    if (combat) {
+      this.emitCombatEvent('combatEnd');
+      // Archive the log (active combats only - an abandoned setup logs nothing).
+      if (combat.phase === 'active') {
+        this.pushLog(combat, { kind: 'combatEnd', source: ctx.source });
+        const template = this.templates.get(combat.sourceTemplateId);
+        await this.archive.put({
+          id: combat.id,
+          templateName: template?.name ?? '?',
+          endedAt: Date.now(),
+          rounds: combat.round,
+          log: combat.log,
+        });
+      }
+    }
     await this.setCombat(null);
   }
 
   // ---- Live combat control ----
 
-  async nextTurn(): Promise<void> {
+  async nextTurn(ctx: ActionContext = DM_CTX): Promise<void> {
     const combat = this.getActiveCombat();
     if (!combat || combat.phase !== 'active' || combat.combatants.length === 0) return;
     combat.currentIndex += 1;
@@ -360,11 +484,12 @@ export class AppStore {
       combat.currentIndex = 0;
       combat.round += 1;
     }
+    this.logTurn(combat, ctx);
     await this.setCombat(combat);
     this.emitCombatEvent('turnChange');
   }
 
-  async prevTurn(): Promise<void> {
+  async prevTurn(ctx: ActionContext = DM_CTX): Promise<void> {
     const combat = this.getActiveCombat();
     if (!combat || combat.phase !== 'active' || combat.combatants.length === 0) return;
     if (combat.currentIndex === 0) {
@@ -374,20 +499,45 @@ export class AppStore {
     } else {
       combat.currentIndex -= 1;
     }
+    this.logTurn(combat, ctx);
     await this.setCombat(combat);
     this.emitCombatEvent('turnChange');
   }
 
-  async applyDamage(combatantId: string, amount: number): Promise<void> {
+  private logTurn(combat: Combat, ctx: ActionContext): void {
+    const current = combat.combatants[combat.currentIndex];
+    if (!current) return;
+    this.pushLog(combat, {
+      kind: 'turn',
+      actorName: current.displayName,
+      actorType: current.type,
+      source: ctx.source,
+    });
+  }
+
+  async applyDamage(combatantId: string, amount: number, ctx: ActionContext = DM_CTX): Promise<void> {
     const combat = this.getActiveCombat();
     if (!combat || amount <= 0) return;
     const idx = combat.combatants.findIndex((c) => c.id === combatantId);
     if (idx === -1) return;
     const c = combat.combatants[idx];
     c.currentHp = Math.max(0, c.currentHp - amount);
+    this.pushLog(combat, {
+      kind: 'damage',
+      actorName: ctx.actorName,
+      actorType: ctx.actorType,
+      targetName: c.displayName,
+      amount,
+      source: ctx.source,
+    });
     let killedOrDowned: KenkuEventId | null = null;
     if (c.currentHp === 0) {
       killedOrDowned = c.type === 'monster' ? 'monsterKilled' : 'pcDowned';
+      this.pushLog(combat, {
+        kind: c.type === 'monster' ? 'kill' : 'down',
+        targetName: c.displayName,
+        source: ctx.source,
+      });
       if (c.type === 'monster') {
         // Remove dead monsters from the order entirely.
         combat.combatants.splice(idx, 1);
@@ -409,27 +559,46 @@ export class AppStore {
     if (killedOrDowned) this.emitCombatEvent(killedOrDowned);
   }
 
-  async applyHeal(combatantId: string, amount: number): Promise<void> {
+  async applyHeal(combatantId: string, amount: number, ctx: ActionContext = DM_CTX): Promise<void> {
     const combat = this.getActiveCombat();
     if (!combat || amount <= 0) return;
     const c = combat.combatants.find((x) => x.id === combatantId);
     if (!c) return;
     c.currentHp = Math.min(c.maxHp, c.currentHp + amount);
     if (c.currentHp > 0) c.isDowned = false;
+    this.pushLog(combat, {
+      kind: 'heal',
+      actorName: ctx.actorName,
+      actorType: ctx.actorType,
+      targetName: c.displayName,
+      amount,
+      source: ctx.source,
+    });
     await this.setCombat(combat);
     this.emitCombatEvent('healApplied');
   }
 
-  async toggleCondition(combatantId: string, condition: Condition): Promise<void> {
+  async toggleCondition(
+    combatantId: string,
+    condition: Condition,
+    ctx: ActionContext = DM_CTX,
+  ): Promise<void> {
     const combat = this.getActiveCombat();
     if (!combat) return;
     const c = combat.combatants.find((x) => x.id === combatantId);
     if (!c) return;
-    if (c.conditions.includes(condition)) {
+    const removing = c.conditions.includes(condition);
+    if (removing) {
       c.conditions = c.conditions.filter((x) => x !== condition);
     } else {
       c.conditions = [...c.conditions, condition];
     }
+    this.pushLog(combat, {
+      kind: removing ? 'conditionRemoved' : 'conditionAdded',
+      targetName: c.displayName,
+      condition,
+      source: ctx.source,
+    });
     await this.setCombat(combat);
   }
 

@@ -9,6 +9,9 @@ Player View and an Elgato Stream Deck plugin for hardware turn, HP and condition
 
 Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 
+**[▶ Try the live demo](https://lil-dank.github.io/DnD-Combat-Tracker/)** — the full app
+in your browser, with a simulated Stream Deck and a combat already in progress.
+
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Electron](https://img.shields.io/badge/Electron-37-47848F?logo=electron&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
@@ -40,6 +43,7 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 ## Contents
 
 - [What it does](#what-it-does)
+- [Live demo](#live-demo)
 - [Install](#install)
 - [How it fits together](#how-it-fits-together)
 - [Using the app](#using-the-app)
@@ -64,6 +68,25 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 | 🎨 **Themes** | PHB Style (default), Default Electron, Dark, Light. |
 | 🗣 **English & German** | [Full UI localization](#language) across both windows *and* the deck. Game terms follow the SRD 5.2.1 in each language. |
 | 💾 **Local-only storage** | Plain JSON in `%APPDATA%`, written atomically. Your data never leaves the machine. |
+
+---
+
+## Live demo
+
+**https://lil-dank.github.io/DnD-Combat-Tracker/** — the real renderer built for the
+browser, seeded with sample characters, encounter templates, the full SRD library and
+a round-2 combat mid-fight.
+
+The floating **Stream Deck panel** is not a mock-up: it runs the plugin's actual picker
+state machine, bridge protocol and key renderer, so damage, healing, conditions, the
+dice roller, monster attacks and end-combat behave exactly like the hardware —
+including the on-key rendering and the idle timeouts. **Open Player View** opens the
+players' screen as a second tab, and the language selector switches everything to
+German just like the desktop app.
+
+Demo data lives entirely in your browser (localStorage); the **Reset demo** button on
+the deck panel starts it over. What the demo cannot show: the real installer, the
+actual Stream Deck hardware, and the second-monitor/chroma workflow.
 
 ---
 

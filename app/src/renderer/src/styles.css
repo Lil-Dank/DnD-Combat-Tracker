@@ -934,6 +934,39 @@ input, button, select, textarea {
   color: #f59e0b;
 }
 
+/* ---- Kenku FM ---- */
+.kenku-events {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+}
+
+.kenku-event-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kenku-event-row .kenku-event-label {
+  flex: 0 0 170px;
+  font-size: 13px;
+}
+
+.kenku-event-row select {
+  flex: 1;
+  min-width: 160px;
+}
+
+.kenku-delay {
+  width: 90px;
+}
+
+.kenku-marker {
+  cursor: default;
+}
+
 .bloodied-tag {
   font-size: 10.5px;
   font-weight: 700;

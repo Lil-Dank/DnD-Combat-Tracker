@@ -2,12 +2,16 @@ import { useMemo, useState } from 'react';
 import type { AppState, EncounterEntry, EncounterTemplate } from '../../../shared/types';
 import { api } from '../api';
 import { useConfirm } from '../Confirm';
+import { useKenkuLibrary } from '../useKenkuLibrary';
+import { isDemo } from '../api';
 import { useI18n } from '../i18n';
 
 interface TemplateFormData {
   id?: string;
   name: string;
   entries: EncounterEntry[];
+  kenkuPlaylistId?: string | null;
+  kenkuPlaylistTitle?: string | null;
 }
 
 export function TemplatesScreen({
@@ -27,8 +31,17 @@ export function TemplatesScreen({
     [state.monsters],
   );
 
+  const kenkuOn = !isDemo && state.settings.kenku.enabled;
+  const { library } = useKenkuLibrary(form !== null && kenkuOn);
+
   const startEdit = (t: EncounterTemplate) =>
-    setForm({ id: t.id, name: t.name, entries: t.entries.map((e) => ({ ...e })) });
+    setForm({
+      id: t.id,
+      name: t.name,
+      entries: t.entries.map((e) => ({ ...e })),
+      kenkuPlaylistId: t.kenkuPlaylistId ?? null,
+      kenkuPlaylistTitle: t.kenkuPlaylistTitle ?? null,
+    });
 
   const submit = async () => {
     if (!form || !form.name.trim()) return;
@@ -36,6 +49,8 @@ export function TemplatesScreen({
       id: form.id,
       name: form.name.trim(),
       entries: form.entries.filter((e) => e.quantity > 0),
+      kenkuPlaylistId: form.kenkuPlaylistId ?? null,
+      kenkuPlaylistTitle: form.kenkuPlaylistTitle ?? null,
     });
     setForm(null);
   };
@@ -93,7 +108,12 @@ export function TemplatesScreen({
         {state.encounterTemplates.map((t) => (
           <div key={t.id} className="template-card">
             <div className="template-card-head">
-              <h3>{t.name}</h3>
+              <h3>
+                {t.name}
+                {t.kenkuPlaylistId && (
+                  <span className="kenku-marker" title={t.kenkuPlaylistTitle ?? ''}> 🎵</span>
+                )}
+              </h3>
               <span className="muted">{totalMonsters(t)} {tr('templates.monsters')}</span>
             </div>
             <ul className="template-entries">
@@ -149,6 +169,40 @@ export function TemplatesScreen({
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </label>
+
+            {kenkuOn && (
+              <label className="inline-label">
+                {tr('kenku.playlist')}
+                {library ? (
+                  <select
+                    className="theme-select"
+                    value={form.kenkuPlaylistId ?? ''}
+                    onChange={(e) => {
+                      const id = e.target.value || null;
+                      const pl = library.playlists.find((p) => p.id === id);
+                      setForm({
+                        ...form,
+                        kenkuPlaylistId: id,
+                        kenkuPlaylistTitle: pl?.title ?? null,
+                      });
+                    }}
+                  >
+                    <option value="">{tr('kenku.noPlaylist')}</option>
+                    {library.playlists.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="muted">
+                    {form.kenkuPlaylistTitle
+                      ? tr('kenku.offlineKeep', { title: form.kenkuPlaylistTitle })
+                      : tr('kenku.offline')}
+                  </span>
+                )}
+              </label>
+            )}
 
             {form.entries.length > 0 && (
               <>

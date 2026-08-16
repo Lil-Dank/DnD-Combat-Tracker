@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["app/scripts/serve-demo.mjs"],
+      "port": 8123
+    }
+  ]
+}

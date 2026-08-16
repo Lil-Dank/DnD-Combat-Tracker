@@ -4,6 +4,7 @@ node_modules/
 # Electron app build output
 app/out/
 app/release/
+app/demo-dist/
 
 # Stream Deck plugin build output
 # The bundled plugin.js is produced by scripts/build.mjs; the packed

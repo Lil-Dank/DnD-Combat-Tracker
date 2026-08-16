@@ -934,6 +934,18 @@ input, button, select, textarea {
   color: #f59e0b;
 }
 
+.bloodied-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c22f2f;
+  border: 1px solid rgba(194, 47, 47, 0.55);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
 .hp-controls {
   display: flex;
   align-items: center;

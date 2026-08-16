@@ -237,10 +237,30 @@ function ConditionBadges({ conditions }: { conditions: string[] }) {
   );
 }
 
+/**
+ * Fully opaque bloodied card colours (any alpha here would let the chroma-key
+ * colour show through). Colour and gradient set separately: the `background`
+ * shorthand would blank the colour, leaving only the gradient over the key.
+ */
+function bloodiedStyle(severity: number) {
+  return {
+    backgroundColor: 'rgb(44, 14, 18)',
+    backgroundImage: `linear-gradient(145deg, rgb(${Math.round(70 + severity * 120)}, ${Math.round(18 + severity * 12)}, ${Math.round(22 + severity * 14)}), rgb(44, 14, 18))`,
+    borderColor: `rgb(${Math.round(150 + severity * 70)}, ${Math.round(48 + severity * 22)}, 50)`,
+  };
+}
+
 function PlayerCard({ c, isCurrent }: { c: Combatant; isCurrent: boolean }) {
   const { t } = useI18n();
+  // PCs redden exactly like monsters below half HP; downed keeps its own
+  // muted look instead (the skull line already carries that state).
+  const bloodied = !c.isDowned && isBloodied(c);
+  const style = bloodied ? bloodiedStyle(severityOf(c)) : undefined;
   return (
-    <div className={`pv-card pc ${isCurrent ? 'current' : ''} ${c.isDowned ? 'downed' : ''}`}>
+    <div
+      className={`pv-card pc ${isCurrent ? 'current' : ''} ${c.isDowned ? 'downed' : ''}`}
+      style={style}
+    >
       <div className="pv-card-name"><span>{c.displayName}</span></div>
       {isCurrent && <span className="pv-turn-chip">{t('pv.turn')}</span>}
       <div
@@ -268,17 +288,7 @@ function MonsterGroupCard({
   const { t, mon } = useI18n();
   const bloodied = isBloodied(members[0]);
   const severity = members.reduce((sum, m) => sum + severityOf(m), 0) / members.length;
-  // Fully opaque reds — this replaces the card's own background, so any alpha
-  // here would let the chroma-key colour show through. Colour and gradient are
-  // set separately (the `background` shorthand would blank the colour, leaving
-  // the gradient as the only thing standing between the key and the card).
-  const style = bloodied
-    ? {
-        backgroundColor: 'rgb(44, 14, 18)',
-        backgroundImage: `linear-gradient(145deg, rgb(${Math.round(70 + severity * 120)}, ${Math.round(18 + severity * 12)}, ${Math.round(22 + severity * 14)}), rgb(44, 14, 18))`,
-        borderColor: `rgb(${Math.round(150 + severity * 70)}, ${Math.round(48 + severity * 22)}, 50)`,
-      }
-    : undefined;
+  const style = bloodied ? bloodiedStyle(severity) : undefined;
   const numbers = members
     .map(instanceNumber)
     .filter((n): n is number => n !== null);

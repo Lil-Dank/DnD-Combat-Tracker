@@ -332,11 +332,21 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
       <ul className="combat-list">
         {combat.combatants.map((c, i) => {
           const isCurrent = i === combat.currentIndex;
+          // Same bloodied cue as the Player View: below half HP the row tints
+          // progressively redder. Translucent, so it sits on every theme.
+          const bloodied = !c.isDowned && c.currentHp < c.maxHp / 2;
+          const severity = bloodied ? Math.min(1, (c.maxHp / 2 - c.currentHp) / (c.maxHp / 2)) : 0;
+          const bloodStyle = bloodied
+            ? {
+                background: `linear-gradient(90deg, rgba(190, 36, 36, ${(0.1 + severity * 0.16).toFixed(3)}), rgba(190, 36, 36, ${(0.03 + severity * 0.08).toFixed(3)}))`,
+              }
+            : undefined;
           return (
             <li
               key={c.id}
               data-cid={c.id}
               className={`combat-row ${c.type} ${isCurrent ? 'current' : ''} ${c.isDowned ? 'downed' : ''}`}
+              style={bloodStyle}
             >
               <div
                 className={`combat-row-main ${c.type === 'monster' && c.attacks.length > 0 ? 'clickable' : ''}`}
@@ -360,6 +370,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                 <span className={`hp ${c.currentHp <= c.maxHp / 2 ? 'low' : ''}`}>
                   {c.currentHp}/{c.maxHp}
                 </span>
+                {bloodied && <span className="bloodied-tag">{t('pv.bloodied')}</span>}
                 <span className="hp-controls">
                   <input
                     type="number"

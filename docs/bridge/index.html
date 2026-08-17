@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Combat Tracker Bridge Protocol</title>
+<title>Deck of Many Turns Bridge Protocol</title>
 <style>
   :root {
     --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #c9d1d9;
@@ -109,10 +109,10 @@
   </nav>
 
   <main>
-    <h1>&#9876; Combat Tracker Bridge Protocol</h1>
+    <h1>&#9876; Deck of Many Turns Bridge Protocol</h1>
     <p class="sub">
       The WebSocket protocol between the
-      <a href="https://github.com/Lil-Dank/DnD-Combat-Tracker">D&amp;D Combat Tracker</a>
+      <a href="https://github.com/Lil-Dank/deck-of-many-turns">Deck of Many Turns</a>
       desktop app and its Stream Deck plugin &mdash; documented so anything else
       can integrate the same way: stream overlays, macro pads, home-automation
       buttons, other tools.
@@ -208,8 +208,14 @@
         <td><code>applyDamage</code></td>
         <td><code>{"type":"applyDamage",
  "actorId":"6f0c…",
- "amount":7}</code></td>
-        <td>Damage floors at 0 HP; monsters die and leave the order, PCs go down.</td>
+ "amount":7,
+ "actorName":"Goblin 2",
+ "actorType":"monster",
+ "math":"1d6 [4] +2 = 6"}</code></td>
+        <td>Damage floors at 0 HP; monsters die and leave the order, PCs go
+          down. The last three fields are optional (v2.2+): they attribute the
+          combat-log entry to an attacker and record the dice composition
+          (DM-side only &mdash; player phones never receive it).</td>
       </tr>
       <tr>
         <td><code>applyHeal</code></td>
@@ -292,7 +298,7 @@
     <p class="sub" style="margin-top:32px">
       Source of truth: <code>app/src/main/bridge.ts</code> (server) and
       <code>plugin/src/bridge.ts</code> (reference client) in the
-      <a href="https://github.com/Lil-Dank/DnD-Combat-Tracker">repository</a>.
+      <a href="https://github.com/Lil-Dank/deck-of-many-turns">repository</a>.
     </p>
   </main>
 </div>

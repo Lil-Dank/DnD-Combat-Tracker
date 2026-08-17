@@ -22,6 +22,7 @@
   --badge-text: #e9d5ff;
   --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --warn: #f59e0b;
+  --miss: #9f3535;
   --current-border: var(--gold);
   --current-tint: rgba(212, 169, 79, 0.12);
   --current-shadow: rgba(212, 169, 79, 0.15);
@@ -51,6 +52,7 @@
   --badge-text: #f9ecd9;
   --font-ui: 'Book Antiqua', 'Palatino Linotype', Palatino, Georgia, serif;
   --warn: #8a5a12;
+  --miss: #7a2c20;
   --current-border: var(--gold);
   --current-tint: rgba(201, 173, 106, 0.2);
   --current-shadow: rgba(121, 94, 45, 0.18);
@@ -80,6 +82,7 @@
   --badge-text: #e5e7eb;
   --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --warn: #f59e0b;
+  --miss: #a03d3d;
   --current-border: var(--accent);
   --current-tint: rgba(96, 165, 250, 0.09);
   --current-shadow: rgba(96, 165, 250, 0.12);
@@ -109,6 +112,7 @@
   --badge-text: #3730a3;
   --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --warn: #b45309;
+  --miss: #8f2f2f;
   --current-border: var(--accent);
   --current-tint: rgba(37, 99, 235, 0.08);
   --current-shadow: rgba(37, 99, 235, 0.12);
@@ -535,6 +539,23 @@ textarea::placeholder {
   min-width: 0;
 }
 
+/* The shorthand above resets padding; selects still need chevron room. */
+.modal select {
+  padding-right: 26px;
+}
+
+/* Number inputs inside modals drop the native spinner (cramped columns). */
+.modal input[type='number']::-webkit-outer-spin-button,
+.modal input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+/* Extra-dice remove key lines up with the inputs beside it. */
+.form-row .attack-remove {
+  min-height: var(--control-h);
+  margin-bottom: 10px;
+}
+
 .modal input:focus, .search-box:focus {
   outline: none;
   border-color: var(--accent);
@@ -633,9 +654,17 @@ textarea::placeholder {
   min-width: 220px;
 }
 
+/* The pool-editing row sits with the dice; the roll action gets its own
+   full-width row below, so the two never share a baseline. */
+.dice-add-row {
+  margin-bottom: 12px;
+}
+
 .dice-roll-btn {
-  margin-bottom: 10px;
-  white-space: nowrap;
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  white-space: normal;
 }
 
 .dice-result {
@@ -780,14 +809,85 @@ textarea::placeholder {
   gap: 8px;
 }
 
+/* Equal-width cells so every row ends flush with the modal edge instead of
+   leaving a ragged right silhouette; long names truncate (tooltips carry
+   the full text). */
 .monster-pick-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 6px;
   max-height: 220px;
   overflow-y: auto;
   scrollbar-gutter: stable;
   padding-bottom: 4px;
+}
+
+.monster-pick-list .pick-btn {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monster-pick-list > .muted {
+  grid-column: 1 / -1;
+}
+
+/* Add-monster library: one full-width row per monster so long localized
+   names stay readable; rows toggle-select, the Add button applies them. */
+.monster-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-bottom: 4px;
+}
+
+.monster-select-list .select-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--control-h-sm);
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel-2);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+
+.monster-select-list .select-row:hover {
+  border-color: var(--accent);
+}
+
+.monster-select-list .select-row.selected {
+  background: var(--accent-dim);
+  border-color: var(--accent-dim);
+  color: #fff;
+}
+
+.monster-select-list .select-row.selected .muted {
+  color: #ddd0f5;
+}
+
+.select-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monster-select-list .select-row .muted {
+  flex-shrink: 0;
+}
+
+/* The quantity field doesn't need to rival the search field for width. */
+.form-row .qty-label {
+  flex: 0 0 90px;
 }
 
 .pick-btn {
@@ -1035,6 +1135,10 @@ textarea::placeholder {
   width: 100%;
 }
 
+.btn.ghost:disabled {
+  opacity: 0.28;
+}
+
 .roll-attack {
   flex-shrink: 0;
   white-space: nowrap;
@@ -1104,32 +1208,58 @@ textarea::placeholder {
 }
 
 /* ---- Kenku FM ---- */
+/* Shared grid columns: the label track sizes to the longest label (no
+   dead gap, no wrapped labels), selects align, delay + play line up. */
 .kenku-events {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-width: 640px;
+  display: grid;
+  grid-template-columns: max-content minmax(160px, 1fr) 90px auto;
+  gap: 6px 12px;
+  align-items: center;
+  max-width: 720px;
 }
 
 .kenku-event-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  display: contents;
 }
 
 .kenku-event-row .kenku-event-label {
-  flex: 0 0 170px;
   font-size: 13px;
 }
 
 .kenku-event-row select {
-  flex: 1;
-  min-width: 160px;
+  width: 100%;
+  min-width: 0;
 }
 
 .kenku-delay {
   width: 90px;
+}
+
+/* The address row squeezes its inputs, never the label or the button. */
+.kenku-address-row {
+  flex-wrap: wrap;
+}
+
+.kenku-address-row .inline-label-text,
+.kenku-address-row .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.kenku-address-row input[type='text'] {
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+
+/* Connection state sits right under the Test button, where the eye lands. */
+.kenku-status-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 2px 0 14px;
+}
+
+.kenku-status-row .bridge-status {
+  padding: 0;
 }
 
 .kenku-action-sound {
@@ -1695,10 +1825,15 @@ textarea::placeholder {
   width: 264px;
   flex-shrink: 0;
   position: sticky;
-  /* Pins below the sticky combat header; height keeps the bottom collapse
-     bar on-screen whether or not the list is scrolled. */
+  /* Pins below the sticky combat header; the height runs the panel down to
+     the bottom of the window in its natural (unscrolled) position, where
+     the panel sits ~65px from the top — no dead space under the collapse
+     bar, and only a slim margin once it pins at 40px while scrolled. The
+     negative bottom margin cancels the content's trailing padding so the
+     panel alone never forces the window into scrolling. */
   top: 40px;
-  height: calc(100vh - 108px);
+  height: calc(100vh - 66px);
+  margin-bottom: -16px;
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
@@ -1804,12 +1939,13 @@ textarea::placeholder {
 }
 
 .seg-hit {
-  color: var(--success);
+  color: var(--danger);
   font-weight: 600;
 }
 
 .seg-miss {
-  color: var(--text-muted);
+  color: var(--miss);
+  font-weight: 600;
 }
 
 .seg-cond {
@@ -1832,6 +1968,174 @@ textarea::placeholder {
 }
 
 .archive-log {
-  max-width: 760px;
   font-size: 14px;
+}
+
+/* ---- Shared damage editor (desktop sizing) ---- */
+
+.dmg-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  margin: 6px 0;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.dmg-row .attack-remove {
+  flex-shrink: 0;
+  margin-top: 18px;
+}
+
+.dmg-editor {
+  flex: 1;
+  min-width: 0;
+}
+
+.dmg-editor .field-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.dice-picker {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dice-manual {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dice-manual input {
+  width: 120px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.stepper button {
+  width: 28px;
+  min-height: var(--control-h);
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.stepper-value {
+  min-width: 28px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dice-picker select {
+  min-width: 76px;
+}
+
+.dice-picker .bonus-label,
+.dmg-type-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dice-picker .bonus-label input {
+  width: 76px;
+}
+
+.dice-preview {
+  align-self: center;
+  font-size: 13px;
+}
+
+.dmg-type-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.dmg-type-row select {
+  min-width: 140px;
+}
+
+.dmg-type-row input {
+  width: 150px;
+}
+
+/* ---- Archive: two-pane master-detail ---- */
+
+.archive-panes {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.archive-list-pane {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.archive-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.archive-item:hover {
+  background: var(--row-hover);
+}
+
+.archive-item.selected {
+  border-color: var(--accent);
+  background: var(--bg-panel-2);
+}
+
+.archive-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.archive-item-main .muted {
+  font-size: 12px;
+}
+
+.archive-log-pane {
+  flex: 1;
+  min-width: 0;
+}
+
+.archive-log-pane h2 {
+  font-size: 16px;
+  color: var(--gold);
+  margin-bottom: 10px;
 }

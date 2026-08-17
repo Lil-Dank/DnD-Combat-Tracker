@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
-import { formatDice, parseDice } from '../shared/dice';
-import { logEntrySegments, logEntryText, logRollMath } from '../shared/logText';
+import { abilityCodeLabel, abilityLabels, conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
+import { displayDice, formatDice, parseDice } from '../shared/dice';
+import { logEntrySegments, logEntryText } from '../shared/logText';
 import type { LogEntry, MonsterAction } from '../shared/types';
+import { ABILITY_KEYS, abilityMod } from '../shared/types';
 import { formToAction, actionToForm, emptyAction, ABILITIES, type ActionForm } from '../renderer/src/actionForm';
 import type {
   ArchiveEntryMsg,
@@ -12,6 +13,7 @@ import type {
   WireCombatant,
 } from './protocol';
 import { PlayerSocket, deviceToken } from './ws';
+import { DamageEditor } from '../components/DamageEditor';
 
 type View =
   | { id: 'home' }
@@ -82,7 +84,7 @@ export function App() {
   useEffect(() => {
     // Phones have no devtools: surface uncaught errors instead of dying
     // silently. (translate() falls through to the raw text for non-keys.)
-    const onError = (e: ErrorEvent) => setToast(e.message || 'Error');
+    const onError = (e: ErrorEvent) => setToast(e.message || 'mob.err.generic');
     const onReject = (e: PromiseRejectionEvent) => setToast(String(e.reason));
     window.addEventListener('error', onError);
     window.addEventListener('unhandledrejection', onReject);
@@ -96,7 +98,8 @@ export function App() {
     socketRef.current?.send({ ...msg, token: deviceToken() });
 
   if (!state) {
-    return <div className="center muted">{connected ? '…' : translate('en', 'mob.connecting')}</div>;
+    const guess: Lang = navigator.language?.toLowerCase().startsWith('de') ? 'de' : 'en';
+    return <div className="center muted">{translate(guess, 'mob.connecting')}</div>;
   }
 
   const you = state.you;
@@ -223,12 +226,16 @@ export function App() {
             <Sheet title={t('mob.archive')} onClose={() => setView({ id: 'myAttacks' })} t={t}>
               {archiveEntry ? (
                 <>
-                  <button className="linkish" onClick={() => setArchiveEntry(null)}>
+                  <button className="sheet-back" onClick={() => setArchiveEntry(null)}>
                     {t('common.back')}
                   </button>
                   <h3>
                     {archiveEntry.templateName}{' '}
-                    <span className="muted">{t('mob.rounds', { rounds: archiveEntry.rounds })}</span>
+                    <span className="muted">
+                    {archiveEntry.rounds === 1
+                      ? t('mob.roundsOne')
+                      : t('mob.rounds', { rounds: archiveEntry.rounds })}
+                  </span>
                   </h3>
                   <LogList log={archiveEntry.log} lang={lang} />
                 </>
@@ -241,8 +248,10 @@ export function App() {
                       <button onClick={() => send({ type: 'getArchive', archiveId: a.id })}>
                         <strong>{a.templateName}</strong>
                         <span className="muted">
-                          {new Date(a.endedAt).toLocaleDateString()} ·{' '}
-                          {t('mob.rounds', { rounds: a.rounds })}
+                          {new Date(a.endedAt).toLocaleDateString(
+                            state.language === 'de' ? 'de-DE' : 'en-US',
+                          )}{' '}
+                          · {a.rounds === 1 ? t('mob.roundsOne') : t('mob.rounds', { rounds: a.rounds })}
                         </span>
                       </button>
                     </li>
@@ -357,6 +366,22 @@ function InitiativeList({
               ))}
             </div>
           )}
+          {c.id === state.you?.combatantId && state.you.abilities && (
+            <div className="you-stats">
+              {ABILITY_KEYS.map((k) => {
+                const score = state.you!.abilities![k];
+                const mod = abilityMod(score);
+                return (
+                  <span key={k} className="you-stat tnum">
+                    <b>{abilityLabels(lang)[k]}</b> {score} ({mod >= 0 ? `+${mod}` : mod})
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {c.id === state.you?.combatantId && state.you.notes && (
+            <div className="you-notes">{state.you.notes}</div>
+          )}
         </li>
       ))}
     </ul>
@@ -425,7 +450,7 @@ function HpFlow({
             +{n}
           </button>
         ))}
-        <button onClick={() => setAmount('')}>C</button>
+        <button onClick={() => setAmount('')}>{t('mob.clear')}</button>
       </div>
       <button className="big primary" disabled={!valid} onClick={() => onDone(targets, parsed)}>
         {t('mob.apply')}
@@ -512,7 +537,7 @@ function AttackFlow({
             </div>
             <p>
               {result.targetName}
-              {result.die !== null && ` · d20: ${result.die}`}
+              {result.die !== null && ` · ${displayDice(state.language, 'd20')}: ${result.die}`}
               {` · ${result.total}`}
             </p>
             <p className="big-num">
@@ -560,7 +585,7 @@ function AttackFlow({
                 <button onClick={() => setAttack(a)}>
                   <strong>{a.name}</strong>
                   <span className="muted">
-                    {a.display.toHit ?? (a.save ? `${a.save.ability} ${a.save.dc}` : '')}
+                    {a.display.toHit ?? (a.save ? `${abilityCodeLabel(state.language, a.save.ability)} ${a.save.dc}` : '')}
                     {a.display.damage ? ` · ${a.display.damage}` : ''}
                   </span>
                 </button>
@@ -698,12 +723,13 @@ function MyAttacks({
                 <button onClick={() => setForm(actionToForm(a))}>
                   <strong>{a.name}</strong>
                   <span className="muted">
-                    {a.display.toHit ?? (a.save ? `${a.save.ability} ${a.save.dc}` : '')}
+                    {a.display.toHit ?? (a.save ? `${abilityCodeLabel(state.language, a.save.ability)} ${a.save.dc}` : '')}
                     {a.display.damage ? ` · ${a.display.damage}` : ''}
                   </span>
                 </button>
                 <button
                   className="delete"
+                  aria-label={t('common.delete')}
                   onClick={() => send({ type: 'deleteAttack', actionId: a.id })}
                 >
                   ✕
@@ -777,10 +803,24 @@ function MyAttacks({
           <DamageEditor
             t={t}
             lang={state.language}
-            dice={form.damage[0]?.dice ?? ''}
-            type={form.damage[0]?.type ?? ''}
-            onChange={(dice, type) =>
-              patch({ damage: [{ dice, flat: '', type, condition: '' }] })
+            value={{
+              dice: form.damage[0]?.dice ?? '',
+              flat: form.damage[0]?.flat ?? '',
+              type: form.damage[0]?.type ?? '',
+              condition: form.damage[0]?.condition ?? '',
+            }}
+            onChange={(p) =>
+              patch({
+                damage: [
+                  {
+                    dice: form.damage[0]?.dice ?? '',
+                    flat: form.damage[0]?.flat ?? '',
+                    type: form.damage[0]?.type ?? '',
+                    condition: form.damage[0]?.condition ?? '',
+                    ...p,
+                  },
+                ],
+              })
             }
           />
           <div className="form-pair">
@@ -794,125 +834,6 @@ function MyAttacks({
         </div>
       )}
     </Sheet>
-  );
-}
-
-// ---- damage editor ----------------------------------------------------------
-
-const DICE = [4, 6, 8, 10, 12, 20, 100];
-
-/**
- * Structured damage entry: die picker + count stepper + bonus, and a damage
- * type select with an "Other…" manual escape hatch. Round-trips through the
- * same NdM+B string the rest of the app stores; a hand-typed value the parser
- * doesn't understand falls back to a plain text field so nothing is lost.
- */
-function DamageEditor({
-  t,
-  lang,
-  dice,
-  type,
-  onChange,
-}: {
-  t: (k: string, p?: Record<string, string | number>) => string;
-  lang: Lang;
-  dice: string;
-  type: string;
-  onChange: (dice: string, type: string) => void;
-}) {
-  const parsed = dice.trim() === '' ? { count: 0, die: 8, bonus: 0 } : parseDice(dice);
-  const manual = parsed === null;
-  const cur = parsed ?? { count: 0, die: 8, bonus: 0 };
-
-  const knownTypes = Object.keys(DAMAGE_TYPE_DE);
-  const typeKnown = type === '' || knownTypes.includes(type.toLowerCase());
-  const [otherType, setOtherType] = useState(!typeKnown);
-
-  const emit = (count: number, die: number, bonus: number) => {
-    onChange(count <= 0 ? '' : formatDice(count, die, bonus), type);
-  };
-
-  return (
-    <>
-      <span className="field-label">{t('monsters.f.damageDice')}</span>
-      {manual ? (
-        <div className="form-pair">
-          <label>
-            <input value={dice} onChange={(e) => onChange(e.target.value, type)} />
-          </label>
-          <button className="linkish" onClick={() => onChange('1d8', type)}>
-            {t('mob.usePicker')}
-          </button>
-        </div>
-      ) : (
-        <div className="dice-picker">
-          <div className="stepper">
-            <button onClick={() => emit(Math.max(0, cur.count - 1), cur.die, cur.bonus)}>−</button>
-            <span className="stepper-value tnum">{cur.count}</span>
-            <button onClick={() => emit(Math.min(20, cur.count + 1), cur.die, cur.bonus)}>+</button>
-          </div>
-          <select
-            value={cur.die}
-            disabled={cur.count === 0}
-            onChange={(e) => emit(Math.max(1, cur.count), parseInt(e.target.value, 10), cur.bonus)}
-          >
-            {DICE.map((d) => (
-              <option key={d} value={d}>
-                d{d}
-              </option>
-            ))}
-          </select>
-          <label className="bonus-label">
-            {t('mob.bonus')}
-            <input
-              type="number"
-              inputMode="numeric"
-              disabled={cur.count === 0}
-              value={cur.count === 0 ? '' : cur.bonus}
-              onChange={(e) => emit(cur.count, cur.die, parseInt(e.target.value, 10) || 0)}
-            />
-          </label>
-        </div>
-      )}
-      {!manual && cur.count > 0 && (
-        <p className="muted dice-preview">
-          {formatDice(cur.count, cur.die, cur.bonus)}
-        </p>
-      )}
-
-      <label>
-        {t('mob.dmgType')}
-        <select
-          value={otherType ? '__other' : type.toLowerCase()}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === '__other') {
-              setOtherType(true);
-            } else {
-              setOtherType(false);
-              onChange(dice, v);
-            }
-          }}
-        >
-          <option value="">—</option>
-          {knownTypes.map((k) => (
-            <option key={k} value={k}>
-              {damageTypeLabel(lang, k)}
-            </option>
-          ))}
-          <option value="__other">{t('mob.typeOther')}</option>
-        </select>
-      </label>
-      {otherType && (
-        <label>
-          <input
-            placeholder={t('mob.typeCustom')}
-            value={type}
-            onChange={(e) => onChange(dice, e.target.value)}
-          />
-        </label>
-      )}
-    </>
   );
 }
 
@@ -931,7 +852,9 @@ function LogPeek({
   if (!last) return null;
   return (
     <button className="log-peek" onClick={onOpen}>
-      {logEntryText(lang, last)} ▴
+      <span className="peek-label">📜 {translate(lang, 'mob.logTitle')}</span>
+      <span className="peek-entry">{logEntryText(lang, last)}</span>
+      <span className="peek-chevron">▴</span>
     </button>
   );
 }
@@ -951,7 +874,6 @@ function LogList({ log, lang }: { log: LogEntry[]; lang: Lang }) {
             <div className="log-round">{translate(lang, 'log.round', { round: e.round })}</div>
           ) : null;
         lastRound = e.round > 0 ? e.round : lastRound;
-        const math = logRollMath(e);
         return (
           <div key={e.id}>
             {roundHeader}
@@ -966,7 +888,6 @@ function LogList({ log, lang }: { log: LogEntry[]; lang: Lang }) {
                 ),
               )}
             </div>
-            {math && <div className="log-roll">{math}</div>}
           </div>
         );
       })}
@@ -991,7 +912,7 @@ function Sheet({
   return (
     <div className="sheet">
       <header className="sheet-header">
-        <button className="linkish" onClick={onClose}>
+        <button className="sheet-back" onClick={onClose}>
           {t('common.back')}
         </button>
         <h2>{title}</h2>

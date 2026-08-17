@@ -18,6 +18,7 @@ import type {
   Settings,
 } from '../shared/types';
 import { DEFAULT_SETTINGS } from '../shared/types';
+import { monsterName } from '../shared/i18n';
 import { migrateActions } from './migrate';
 
 export type ChangeListener = (state: AppState) => void;
@@ -28,6 +29,10 @@ export interface ActionContext {
   /** Acting combatant's display name (player web actions carry their PC). */
   actorName?: string;
   actorType?: 'pc' | 'monster';
+  /** Rolled-damage composition for the log ("2d6 [3+5] +4 = 12"). */
+  math?: string;
+  /** Player-sourced actions: the claim's player name or a device label. */
+  sourceName?: string;
 }
 
 const DM_CTX: ActionContext = { source: 'dm' };
@@ -146,6 +151,11 @@ export class AppStore {
   /** In-mutator variant: fills fields and pushes, without its own persist. */
   private pushLog(combat: Combat, entry: Omit<LogEntry, 'id' | 'ts' | 'round'>): void {
     combat.log.push({ ...entry, id: randomUUID(), ts: Date.now(), round: combat.round });
+  }
+
+  /** Log snapshots carry names in the language active when the entry was made. */
+  private locName(name: string): string {
+    return monsterName(this.settings.get().language, name);
   }
 
   listArchive(): ArchivedCombat[] {
@@ -364,7 +374,7 @@ export class AppStore {
         currentHp: pc.maxHp,
         ac: pc.ac,
         initMod: pc.initMod,
-        abilities: null,
+        abilities: pc.abilities ?? null,
         attacks: pc.attacks.map((a) => ({ ...a })),
         conditions: [],
         initiative: rollMode === 'all' ? d20() + pc.initMod : null,
@@ -444,7 +454,7 @@ export class AppStore {
     if (first) {
       this.pushLog(combat, {
         kind: 'turn',
-        actorName: first.displayName,
+        actorName: this.locName(first.displayName),
         actorType: first.type,
         source: 'dm',
       });
@@ -510,7 +520,7 @@ export class AppStore {
     if (!current) return;
     this.pushLog(combat, {
       kind: 'turn',
-      actorName: current.displayName,
+      actorName: this.locName(current.displayName),
       actorType: current.type,
       source: ctx.source,
     });
@@ -527,19 +537,22 @@ export class AppStore {
       kind: 'damage',
       actorName: ctx.actorName,
       actorType: ctx.actorType,
-      targetName: c.displayName,
+      targetName: this.locName(c.displayName),
       targetType: c.type,
       amount,
+      math: ctx.math,
       source: ctx.source,
+      sourceName: ctx.sourceName,
     });
     let killedOrDowned: KenkuEventId | null = null;
     if (c.currentHp === 0) {
       killedOrDowned = c.type === 'monster' ? 'monsterKilled' : 'pcDowned';
       this.pushLog(combat, {
         kind: c.type === 'monster' ? 'kill' : 'down',
-        targetName: c.displayName,
+        targetName: this.locName(c.displayName),
         targetType: c.type,
         source: ctx.source,
+        sourceName: ctx.sourceName,
       });
       if (c.type === 'monster') {
         // Remove dead monsters from the order entirely.
@@ -573,10 +586,11 @@ export class AppStore {
       kind: 'heal',
       actorName: ctx.actorName,
       actorType: ctx.actorType,
-      targetName: c.displayName,
+      targetName: this.locName(c.displayName),
       targetType: c.type,
       amount,
       source: ctx.source,
+      sourceName: ctx.sourceName,
     });
     await this.setCombat(combat);
     this.emitCombatEvent('healApplied');
@@ -599,7 +613,7 @@ export class AppStore {
     }
     this.pushLog(combat, {
       kind: removing ? 'conditionRemoved' : 'conditionAdded',
-      targetName: c.displayName,
+      targetName: this.locName(c.displayName),
       targetType: c.type,
       condition,
       source: ctx.source,

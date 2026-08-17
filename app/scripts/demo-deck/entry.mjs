@@ -19,7 +19,7 @@ const COLS = 5;
 const ROWS = 3;
 const SLOTS = COLS * ROWS;
 const DEVICE = { id: 'demo-deck', size: { columns: COLS, rows: ROWS } };
-const SIDE_W = 348;
+const SIDE_W = 392;
 
 // Same palettes the real plugin uses for its turn keys.
 const TURN_PURPLE = { from: '#3b1d63', to: '#7c3aed' };
@@ -46,7 +46,7 @@ body.with-demo-side { padding-right: ${SIDE_W}px; }
 #demo-side .hint { padding: 6px 12px 8px; color: #8b8b92; font-size: 11px; }
 /* phone */
 #demo-phone .phone-frame { padding: 10px 10px 2px; display: flex; justify-content: center; }
-#demo-phone iframe { width: 305px; height: 540px; border: 6px solid #060607;
+#demo-phone iframe { width: 340px; height: 640px; border: 6px solid #060607;
   border-radius: 22px; background: #1a1423; display: block; }
 /* deck */
 #demo-deck-grid { display: grid; grid-template-columns: repeat(${COLS}, 1fr);

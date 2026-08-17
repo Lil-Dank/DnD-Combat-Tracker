@@ -173,8 +173,8 @@ function KenkuSection({ state }: { state: AppState }) {
 
       {kenku.enabled && (
         <>
-          <label className="inline-label">
-            {t('kenku.address')}
+          <label className="inline-label kenku-address-row">
+            <span className="inline-label-text">{t('kenku.address')}</span>
             <input
               type="text"
               defaultValue={kenku.host}
@@ -200,12 +200,14 @@ function KenkuSection({ state }: { state: AppState }) {
             >
               {t('kenku.test')}
             </button>
+          </label>
+          <div className="kenku-status-row">
             <span className={`bridge-status ${state.kenkuConnected ? 'on' : ''}`}>
               {(testResult ?? state.kenkuConnected)
                 ? `● ${t('kenku.statusConnected')}`
                 : `○ ${t('kenku.statusOffline')}`}
             </span>
-          </label>
+          </div>
 
           <h3>{t('kenku.events')}</h3>
           <p className="muted">{t('kenku.eventsNote')}</p>

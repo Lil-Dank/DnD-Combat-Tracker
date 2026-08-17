@@ -165,6 +165,8 @@ class Picker {
   private attackerSourceId = '';
   /** 'pc' | 'monster' when the app sends it; drives combat-log attribution. */
   private attackerType: string | undefined;
+  /** Composition of the last damage roll, sent with the apply for the log. */
+  private lastDamageMath = '';
   private selectedAttack: BridgeAttack | null = null;
   private lastRoll = '';
   /** Selected target ids (one for attack rolls, several for AoE saves). */
@@ -1021,20 +1023,30 @@ class Picker {
       this.clearPendingApply();
       let total = 0;
       const lines: string[] = [];
+      const mathParts: string[] = [];
       for (const d of atk.damage) {
         // Diceless entries use their flat/average value.
-        const value = d.dice ? (rollDice(d.dice)?.total ?? d.average ?? 0) : (d.average ?? 0);
+        const roll = d.dice ? rollDice(d.dice) : null;
+        const value = roll ? roll.total : (d.average ?? 0);
         if (d.condition) {
           // Conditional damage (e.g. "if the attack roll had Advantage") is
           // rolled but shown separately, not added to the base total.
           lines.push(`+${value} if…`);
         } else {
           total += value;
+          if (roll) {
+            const bonusStr =
+              roll.bonus === 0 ? '' : roll.bonus > 0 ? ` +${roll.bonus}` : ` ${roll.bonus}`;
+            mathParts.push(`${d.dice} [${roll.rolls.join('+')}]${bonusStr}`);
+          } else {
+            mathParts.push(`${value}`);
+          }
           if (atk.damage.filter((x) => !x.condition).length > 1) {
             lines.push(`${value} ${Picker.typeTag(d.type)}`);
           }
         }
       }
+      this.lastDamageMath = `${mathParts.join(' + ')} = ${total}`;
       this.sendAttackEvent('damageRoll');
       const summary = [`DMG ${total}`, ...lines.slice(0, 1)];
       if (atk.save) {
@@ -1050,7 +1062,7 @@ class Picker {
       // Attack roll: countdown, then apply to the target and return to the
       // profile the Monster Attack key was pressed on.
       this.startDamageApply(summary, () =>
-        this.targets.map((id) => ({ id, amount: total })),
+        this.targets.map((id) => ({ id, amount: total, math: this.lastDamageMath })),
       );
       await action.showOk();
       return this.render();
@@ -1060,7 +1072,7 @@ class Picker {
   /** Shared 5 s countdown → apply amounts → exit. */
   private startDamageApply(
     summary: string[],
-    amounts: () => { id: string; amount: number }[],
+    amounts: () => { id: string; amount: number; math?: string }[],
   ): void {
     this.clearPendingApply();
     let secondsLeft = Math.max(1, Math.round(this.applyDelayMs / 1000));
@@ -1076,8 +1088,15 @@ class Picker {
     }
     this.applyTimer = setTimeout(async () => {
       this.clearPendingApply();
-      for (const { id, amount } of amounts()) {
-        bridge.send({ type: 'applyDamage', actorId: id, amount });
+      for (const { id, amount, math } of amounts()) {
+        bridge.send({
+          type: 'applyDamage',
+          actorId: id,
+          amount,
+          actorName: this.actorName,
+          actorType: this.attackerType,
+          math,
+        });
       }
       this.sendAttackEvent('damageApplied');
       await this.exit();
@@ -1106,6 +1125,9 @@ class Picker {
         this.targets.map((id) => ({
           id,
           amount: this.savedTargets.includes(id) ? half : full,
+          math: this.savedTargets.includes(id)
+            ? `${this.lastDamageMath} → ½ ${half}`
+            : this.lastDamageMath,
         })),
       );
       return this.render();

@@ -104,7 +104,7 @@ function bannerSvg(d20) {
   <rect width="1280" height="640" fill="url(#bbg)"/>
   <g transform="translate(120, 64) scale(1)">${d20}</g>
   <text x="660" y="280" font-family="Georgia, 'Times New Roman', serif"
-        font-weight="bold" font-size="56" fill="#f2ead8">D&amp;D Combat Tracker</text>
+        font-weight="bold" font-size="56" fill="#f2ead8">Deck of Many Turns</text>
   <text x="660" y="348" font-family="Segoe UI, sans-serif" font-size="30"
         fill="#b8aecb">DM window \u00b7 Player View \u00b7 Stream Deck</text>
   <text x="660" y="400" font-family="Segoe UI, sans-serif" font-size="30"

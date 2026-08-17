@@ -16,7 +16,7 @@ interface PartForm {
  * (e.g. 2d8+1 +1d4) → roll → optionally apply the total as damage or healing.
  */
 export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: () => void }) {
-  const { t } = useI18n();
+  const { t, mon } = useI18n();
   const [parts, setParts] = useState<PartForm[]>([{ count: '1', die: '20' }]);
   const [mod, setMod] = useState('0');
   const [result, setResult] = useState<{ total: number; perPart: number[][]; expr: string } | null>(null);
@@ -114,7 +114,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
           </div>
         ))}
 
-        <div className="form-row">
+        <div className="dice-add-row">
           <button
             className="btn small"
             onClick={() => {
@@ -124,10 +124,10 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
           >
             {t('dice.addExtra')}
           </button>
-          <button className="btn primary dice-roll-btn" onClick={roll}>
-            {t('dice.rollPool', { pool: formatPool(poolOf(), modNum) })}
-          </button>
         </div>
+        <button className="btn primary dice-roll-btn" onClick={roll}>
+          {t('dice.rollPool', { pool: formatPool(poolOf(), modNum) })}
+        </button>
 
         {result && (
           <div className="dice-result">
@@ -149,7 +149,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
                   className={`pick-btn ${targets.has(c.id) ? 'picked' : ''}`}
                   onClick={() => toggleTarget(c.id)}
                 >
-                  {c.isDowned ? '💀 ' : ''}{c.displayName}
+                  {c.isDowned ? '💀 ' : ''}{mon(c.displayName)}
                 </button>
               ))}
             </div>

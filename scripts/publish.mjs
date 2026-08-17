@@ -54,7 +54,7 @@ const version = appPkg.version;
 const tag = `v${version}`;
 
 const assets = [
-  join(repo, 'release', `DnD Combat Tracker Setup ${version}.exe`),
+  join(repo, 'release', `Deck of Many Turns Setup ${version}.exe`),
   join(repo, 'release', 'com.dmtools.dnd-combat-tracker.streamDeckPlugin'),
 ];
 for (const a of assets) {

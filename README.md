@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/images/logo.png" width="140" alt="D&D Combat Tracker logo: a crimson d20 with a gold wireframe on a dark plate">
+<img src="docs/images/logo.png" width="140" alt="Deck of Many Turns logo: a crimson d20 with a gold wireframe on a dark plate">
 
-# D&D Combat Tracker
+# Deck of Many Turns
 
 **A Windows desktop app for Dungeon Masters to run D&D combat — with a second-monitor
 Player View, a phone companion for the players, and an Elgato Stream Deck plugin for
@@ -10,7 +10,7 @@ hardware turn, HP and condition control.**
 
 Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 
-**[▶ Try the live demo](https://lil-dank.github.io/DnD-Combat-Tracker/)** — the full app
+**[▶ Try the live demo](https://lil-dank.github.io/deck-of-many-turns/)** — the full app
 in your browser, with a simulated player phone, a simulated Stream Deck and a combat
 already in progress.
 
@@ -19,7 +19,7 @@ already in progress.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v2.1.0-success)
+![Release](https://img.shields.io/badge/release-v3.0.0-success)
 
 </div>
 
@@ -84,7 +84,7 @@ name, and the combat log keeps the story on the right.</i>
 
 ## Live demo
 
-**https://lil-dank.github.io/DnD-Combat-Tracker/** — the real renderer built for the
+**https://lil-dank.github.io/deck-of-many-turns/** — the real renderer built for the
 browser, seeded with characters, encounters, the full SRD library and a combat
 mid-fight. The sidebar carries two simulators that are not mock-ups: the **player
 phone** is the real mobile app, and the **Stream Deck** runs the plugin's actual picker
@@ -93,7 +93,7 @@ and watch the DM window and combat log react.
 
 Demo data lives entirely in your browser (localStorage; **Reset demo** starts over).
 The Kenku FM configuration UI is live with a sample soundboard but deliberately silent.
-The site also hosts the **[bridge protocol documentation](https://lil-dank.github.io/DnD-Combat-Tracker/bridge/)**
+The site also hosts the **[bridge protocol documentation](https://lil-dank.github.io/deck-of-many-turns/bridge/)**
 for anyone integrating their own hardware or overlays.
 
 ---
@@ -102,7 +102,7 @@ for anyone integrating their own hardware or overlays.
 
 Grab both files from the [**latest release**](../../releases/latest):
 
-1. **App** — run `DnD Combat Tracker Setup 2.1.0.exe` (NSIS installer, choose your own directory).
+1. **App** — run `Deck of Many Turns Setup 3.0.0.exe` (NSIS installer, choose your own directory).
 2. **Stream Deck plugin** — double-click `com.dmtools.dnd-combat-tracker.streamDeckPlugin`;
    the Stream Deck app installs it and registers the bundled picker profiles.
 3. Start the app. The plugin connects within a few seconds — the DM window's sidebar
@@ -119,7 +119,7 @@ The app works standalone; the plugin needs the app running to do anything.
   both sides). Normally there is nothing to configure.
 - **Port already in use?** Change it in the app under **Settings → Stream Deck bridge**,
   then set the same port on any of the plugin's actions (click the key in the Stream Deck
-  app → its inspector has *Tracker app bridge port*).
+  app → its inspector has *App bridge port*).
 - The plugin retries every 3 s forever, so the app and the plugin can start in any order.
 
 </details>
@@ -636,7 +636,7 @@ npm install
 npm run dev        # live-reload dev session
 npm run dev:mobile # (second terminal) rebuild the player web bundle on change
 npm run build      # compile main/preload/renderer + player web bundle to out/
-npm run dist       # → release/DnD Combat Tracker Setup 2.1.0.exe (NSIS)
+npm run dist       # → release/Deck of Many Turns Setup 3.0.0.exe (NSIS)
 ```
 
 The player web page is served as plain static files from `out/mobile` in dev and
@@ -799,9 +799,10 @@ Project code is MIT-licensed (see `app/package.json`).
 
 - **In-progress combat persists across restarts:** the live combat is saved on every
   change and restored on launch.
-- **Location:** `%APPDATA%/dnd-combat-tracker/data/*.json` — one file per store (PCs,
+- **Location:** `%APPDATA%/deck-of-many-turns/data/*.json` — one file per store (PCs,
   monsters, templates, settings, active combat, combat archive, player claims), loaded
   into id-indexed maps in the main process and written back atomically (temp file +
-  rename) on every change.
+  rename) on every change. First launch after the rename copies existing data from
+  the old `%APPDATA%/dnd-combat-tracker` location (the old folder stays as a backup).
 
 </details>

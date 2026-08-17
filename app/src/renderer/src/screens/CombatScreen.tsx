@@ -462,7 +462,11 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                     {t('combat.attacks')}
                   </button>
                 ) : (
-                  <span className="cell-empty" />
+                  /* Ghost button keeps the column shape readable and signals
+                     that attacks could live here (add them in Party/Monsters). */
+                  <button className="btn small cell-btn ghost" disabled>
+                    {t('combat.attacks')}
+                  </button>
                 )}
               </div>
 
@@ -516,11 +520,30 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
   const { t, mon } = useI18n();
   const [filter, setFilter] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const monsters = state.monsters.filter((m) =>
-    m.name.toLowerCase().includes(filter.toLowerCase()),
+  // Match the search against the localized name too, so a German UI finds
+  // "Drache" even though the canonical library name is "Dragon".
+  const q = filter.toLowerCase();
+  const monsters = state.monsters.filter(
+    (m) => m.name.toLowerCase().includes(q) || mon(m.name).toLowerCase().includes(q),
   );
   const qty = Math.max(1, parseInt(quantity, 10) || 1);
+  const total = qty * selected.size;
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const add = async () => {
+    for (const id of selected) await api.addMonsterToCombat(id, qty);
+    onClose();
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -530,7 +553,7 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
           {t('combat.initiativeAuto')}
         </p>
         <div className="form-row">
-          <label>
+          <label className="qty-label">
             {t('common.quantity')}
             <input
               type="number"
@@ -549,18 +572,15 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
             />
           </label>
         </div>
-        <div className="monster-pick-list">
+        <div className="monster-select-list">
           {monsters.slice(0, 60).map((m) => (
             <button
               key={m.id}
-              className="pick-btn"
-              title={`HP ${m.maxHp} · AC ${m.ac}`}
-              onClick={async () => {
-                await api.addMonsterToCombat(m.id, qty);
-                onClose();
-              }}
+              className={`select-row ${selected.has(m.id) ? 'selected' : ''}`}
+              onClick={() => toggle(m.id)}
             >
-              {qty > 1 ? `${qty}× ` : ''}{mon(m.name)}
+              <span className="select-row-name">{mon(m.name)}</span>
+              <span className="muted tnum">HP {m.maxHp} · AC {m.ac}</span>
             </button>
           ))}
           {monsters.length > 60 && (
@@ -569,6 +589,9 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
         </div>
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn primary" disabled={selected.size === 0} onClick={() => void add()}>
+            + {t('common.add')}{total > 0 ? ` (${total})` : ''}
+          </button>
         </div>
       </div>
     </div>

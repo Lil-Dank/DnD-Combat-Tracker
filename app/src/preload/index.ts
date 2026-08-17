@@ -69,8 +69,11 @@ const api = {
   endCombat: () => ipcRenderer.invoke('combat:end'),
   nextTurn: () => ipcRenderer.invoke('combat:nextTurn'),
   prevTurn: () => ipcRenderer.invoke('combat:prevTurn'),
-  applyDamage: (combatantId: string, amount: number) =>
-    ipcRenderer.invoke('combat:damage', { combatantId, amount }),
+  applyDamage: (
+    combatantId: string,
+    amount: number,
+    ctx?: { actorName?: string; actorType?: 'pc' | 'monster'; math?: string },
+  ) => ipcRenderer.invoke('combat:damage', { combatantId, amount, ctx }),
   applyHeal: (combatantId: string, amount: number) =>
     ipcRenderer.invoke('combat:heal', { combatantId, amount }),
   toggleCondition: (combatantId: string, condition: Condition) =>

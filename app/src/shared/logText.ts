@@ -1,5 +1,6 @@
 import type { LogEntry } from './types';
 import { conditionLabel, translate, type Lang } from './i18n';
+import { displayDice } from './dice';
 
 /**
  * Combat-log rendering. Entries store structured params; surfaces render
@@ -134,15 +135,20 @@ export function logEntryText(lang: Lang, e: LogEntry): string {
  * entry carries no numbers (monster rolls on player surfaces, old entries).
  * Manual rolls without a known die show just the total.
  */
-export function logRollMath(e: LogEntry): string | null {
+export function logRollMath(lang: Lang, e: LogEntry): string | null {
+  if (e.kind === 'damage') {
+    return e.math ? displayDice(lang, e.math) : null;
+  }
   if (e.kind !== 'attackRoll' || e.total === undefined) return null;
+  const d20 = lang === 'de' ? 'W20' : 'd20';
   if (e.die === undefined) return `= ${e.total}`;
   const mod = e.total - e.die;
   const modStr = mod === 0 ? '' : ` ${mod > 0 ? '+' : '−'} ${Math.abs(mod)}`;
-  return `d20 ${e.die}${modStr} = ${e.total}`;
+  return `${d20} ${e.die}${modStr} = ${e.total}`;
 }
 
-/** Short source tag ("DM", "Deck", "Phone") for the DM-side log views. */
+/** Short source tag ("DM", "Deck", "Phone (Alex)") for the DM-side log views. */
 export function logSourceTag(lang: Lang, e: LogEntry): string {
-  return translate(lang, `log.src.${e.source}`);
+  const base = translate(lang, `log.src.${e.source}`);
+  return e.sourceName ? `${base} (${e.sourceName})` : base;
 }

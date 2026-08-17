@@ -52,8 +52,8 @@ export function registerIpc(): void {
   ipcMain.handle('combat:end', () => store.endCombat());
   ipcMain.handle('combat:nextTurn', () => store.nextTurn());
   ipcMain.handle('combat:prevTurn', () => store.prevTurn());
-  ipcMain.handle('combat:damage', (_e, { combatantId, amount }) =>
-    store.applyDamage(combatantId, amount),
+  ipcMain.handle('combat:damage', (_e, { combatantId, amount, ctx }) =>
+    store.applyDamage(combatantId, amount, { source: 'dm', ...(ctx ?? {}) }),
   );
   ipcMain.handle('combat:heal', (_e, { combatantId, amount }) =>
     store.applyHeal(combatantId, amount),

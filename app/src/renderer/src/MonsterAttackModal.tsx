@@ -30,6 +30,7 @@ interface DmgRoll {
   total: number;
   parts: string[];
   conditional: string[];
+  math: string;
 }
 
 export function MonsterAttackModal({
@@ -99,12 +100,14 @@ export function MonsterAttackModal({
           attackId: attack.id,
           phase,
           // Roll details ride along for the combat log.
+          // Names are snapshotted into the log in the DM's current language,
+          // matching what the deck and phones record.
           roll: {
-            actorName: attacker.displayName,
+            actorName: mon(attacker.displayName),
             actorType: attacker.type,
-            targetName: singleTarget?.displayName,
+            targetName: singleTarget ? mon(singleTarget.displayName) : undefined,
             targetType: singleTarget?.type,
-            attackName: attack.name,
+            attackName: locAction(l10nDe, attack).name,
             die,
             total,
           },
@@ -118,11 +121,21 @@ export function MonsterAttackModal({
     let total = 0;
     const parts: string[] = [];
     const conditional: string[] = [];
+    const mathParts: string[] = [];
     for (const d of attack.onHit.damage) {
-      const value =
-        d.dice && d.count && d.die
-          ? rollPool([{ count: d.count, die: d.die }], d.bonus ?? 0).total
-          : (d.average ?? 0);
+      let value: number;
+      if (d.dice && d.count && d.die) {
+        const roll = rollPool([{ count: d.count, die: d.die }], d.bonus ?? 0);
+        value = roll.total;
+        if (!d.condition) {
+          const bonus = d.bonus ?? 0;
+          const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
+          mathParts.push(`${d.dice} [${roll.perPart[0].join('+')}]${bonusStr}`);
+        }
+      } else {
+        value = d.average ?? 0;
+        if (!d.condition) mathParts.push(`${value}`);
+      }
       if (d.condition) {
         conditional.push(`+${value} ${dmg(d.type)} (${d.condition})`);
       } else {
@@ -130,7 +143,7 @@ export function MonsterAttackModal({
         parts.push(`${value} ${dmg(d.type)}`);
       }
     }
-    setDmgRoll({ total, parts, conditional });
+    setDmgRoll({ total, parts, conditional, math: `${mathParts.join(' + ')} = ${total}` });
     setSaved(new Set());
     if (attacker) {
       void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'damageRoll' });
@@ -138,10 +151,15 @@ export function MonsterAttackModal({
   };
 
   const apply = async () => {
-    if (!dmgRoll) return;
+    if (!dmgRoll || !attacker) return;
     const half = Math.floor(dmgRoll.total / 2);
     for (const id of targets) {
-      await api.applyDamage(id, saved.has(id) ? half : dmgRoll.total);
+      const halved = saved.has(id);
+      await api.applyDamage(id, halved ? half : dmgRoll.total, {
+        actorName: mon(attacker.displayName),
+        actorType: attacker.type,
+        math: halved ? `${dmgRoll.math} → ½ ${half}` : dmgRoll.math,
+      });
     }
     if (attacker && attack) {
       void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'damageApplied' });
@@ -149,7 +167,7 @@ export function MonsterAttackModal({
     onClose();
   };
 
-  const targetName = (c: Combatant) => `${c.isDowned ? '💀 ' : ''}${c.displayName}`;
+  const targetName = (c: Combatant) => `${c.isDowned ? '💀 ' : ''}${mon(c.displayName)}`;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

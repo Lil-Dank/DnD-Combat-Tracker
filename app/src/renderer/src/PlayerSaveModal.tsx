@@ -25,7 +25,7 @@ export function PlayerSaveModal({
   pending: PlayerSavePendingInfo;
   onClose: () => void;
 }) {
-  const { t, abilityCode } = useI18n();
+  const { t, abilityCode, mon } = useI18n();
   const [rows, setRows] = useState<Record<string, RowState>>({});
 
   const targets = useMemo(() => {
@@ -94,7 +94,7 @@ export function PlayerSaveModal({
               const saved = total !== null && total >= pending.dc;
               return (
                 <tr key={c.id}>
-                  <td>{c.displayName}</td>
+                  <td>{mon(c.displayName)}</td>
                   <td>
                     <button className="btn small" onClick={() => roll(c.id, bonus)}>
                       🎲 {bonus !== null && (bonus >= 0 ? `+${bonus}` : bonus)}

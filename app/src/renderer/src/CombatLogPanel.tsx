@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LogEntry } from '../../shared/types';
-import { logEntrySegments, logRollMath, logSourceTag } from '../../shared/logText';
+import { LogEntries } from './LogEntries';
 import { useI18n } from './i18n';
 
 const COLLAPSE_KEY = 'dct-log-collapsed';
@@ -12,7 +12,7 @@ const COLLAPSE_KEY = 'dct-log-collapsed';
  * auto-scrolled.
  */
 export function CombatLogPanel({ log }: { log: LogEntry[] }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(COLLAPSE_KEY) === '1',
   );
@@ -40,7 +40,6 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
     );
   }
 
-  let lastRound = -1;
   return (
     <aside className="log-panel">
       <header className="log-panel-header">
@@ -48,34 +47,7 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
       </header>
       <div className="log-panel-body">
         {log.length === 0 && <p className="muted">{t('logPanel.empty')}</p>}
-        {log.map((e) => {
-          const header =
-            e.round !== lastRound && e.round > 0 ? (
-              <div className="log-round">{t('log.round', { round: e.round })}</div>
-            ) : null;
-          lastRound = e.round > 0 ? e.round : lastRound;
-          const math = logRollMath(e);
-          return (
-            <div key={e.id}>
-              {header}
-              <div className={`log-entry kind-${e.kind}`}>
-                <span className="log-text">
-                  {logEntrySegments(lang, e).map((seg, i) =>
-                    seg.cls ? (
-                      <span key={i} className={seg.cls}>
-                        {seg.text}
-                      </span>
-                    ) : (
-                      seg.text
-                    ),
-                  )}
-                </span>
-                <span className="log-src">{logSourceTag(lang, e)}</span>
-              </div>
-              {math && <div className="log-roll tnum">{math}</div>}
-            </div>
-          );
-        })}
+        <LogEntries log={log} />
         <div ref={endRef} />
       </div>
       <button className="log-panel-toggle" onClick={toggle} title={t('logPanel.collapse')}>

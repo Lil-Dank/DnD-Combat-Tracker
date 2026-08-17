@@ -110,6 +110,10 @@ export interface PC {
    * player web app.
    */
   attacks: MonsterAction[];
+  /** Optional stat block: six scores (modifiers derive) like manual monsters. */
+  abilities?: AbilityScores | null;
+  /** Free-text notes (class/level, passive perception, whatever the table wants). */
+  notes?: string;
 }
 
 export type MonsterSource = 'manual' | 'srd';
@@ -256,8 +260,12 @@ export interface LogEntry {
   outcome?: 'crit' | 'hit' | 'miss' | 'saved' | 'failed';
   /** attackRoll entries: the action's name (e.g. "Scimitar"). */
   attackName?: string;
+  /** damage entries: the dice composition ("2d6 [3+5] +4 = 12"), DM-only. */
+  math?: string;
   condition?: Condition;
   source: LogSource;
+  /** Player-sourced entries: the claim's player name or a device label. */
+  sourceName?: string;
 }
 
 /** An ended combat's log, kept until the DM deletes it. */

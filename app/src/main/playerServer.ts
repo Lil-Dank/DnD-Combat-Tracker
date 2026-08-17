@@ -38,6 +38,8 @@ interface Claim {
 interface SocketInfo {
   token: string | null;
   pcId: string | null;
+  /** Coarse device label from the connection's User-Agent ("iPhone", …). */
+  device: string | null;
 }
 
 interface PendingSave {
@@ -51,7 +53,11 @@ interface PendingSave {
   dc: number;
   targetIds: string[];
   damage: number;
+  /** Dice composition of the rolled damage, for the log (digital rolls). */
+  math?: string;
   socket: WebSocket;
+  /** Log attribution captured when the save was started. */
+  sourceName?: string;
 }
 
 let httpServer: Server | null = null;
@@ -191,13 +197,15 @@ function isBloodied(c: Combatant): boolean {
 }
 
 /**
- * The player log filter: monster attack-roll numbers stay hidden (players
- * see the outcome, not the d20 math). Everything else passes through.
+ * The player log filter: no dice compositions on player surfaces. Attack-roll
+ * numbers and damage math stay DM-side; save totals remain (table-announced).
  */
 function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
+  // No dice compositions on player surfaces at all: attack-roll numbers and
+  // damage math stay DM-side (save totals remain - they're table-announced).
   return log.map((e) =>
-    e.kind === 'attackRoll' && e.actorType === 'monster'
-      ? { ...e, die: undefined, total: undefined }
+    e.kind === 'attackRoll' || e.math !== undefined
+      ? { ...e, die: undefined, total: e.kind === 'attackRoll' ? undefined : e.total, math: undefined }
       : e,
   );
 }
@@ -253,6 +261,8 @@ function playerStateMessage(state: AppState, info: SocketInfo): string {
           maxHp: ownPc.maxHp,
           ac: ownPc.ac,
           initMod: ownPc.initMod,
+          abilities: ownPc.abilities ?? null,
+          notes: ownPc.notes ?? '',
           attacks: ownPc.attacks,
           combatantId: ownCombatant?.id ?? null,
         }
@@ -343,22 +353,57 @@ function validAmount(n: unknown): n is number {
 // ---- attack resolution -------------------------------------------------------
 
 /** Same convention as the DM attack modal: sum non-conditional damage rows. */
-function rollActionDamage(action: MonsterAction): number {
+function rollActionDamage(action: MonsterAction): { total: number; math: string } {
   let total = 0;
+  const mathParts: string[] = [];
   for (const d of action.onHit.damage) {
     if (d.condition) continue;
-    total +=
-      d.dice && d.count && d.die
-        ? rollPool([{ count: d.count, die: d.die }], d.bonus ?? 0).total
-        : (d.average ?? 0);
+    if (d.dice && d.count && d.die) {
+      const roll = rollPool([{ count: d.count, die: d.die }], d.bonus ?? 0);
+      total += roll.total;
+      const bonus = d.bonus ?? 0;
+      const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
+      mathParts.push(`${d.dice} [${roll.perPart[0].join('+')}]${bonusStr}`);
+    } else {
+      const value = d.average ?? 0;
+      total += value;
+      mathParts.push(`${value}`);
+    }
   }
-  return total;
+  return { total, math: `${mathParts.join(' + ')} = ${total}` };
 }
 
 interface AttackContext {
   pcId: string;
   pc: { name: string };
   action: MonsterAction;
+}
+
+/** Names entering the log (or a phone) are localized to the app language. */
+function locName(name: string): string {
+  return monsterName(store.getState().settings.language, name);
+}
+
+/** Coarse device label so anonymous phones are still tellable apart. */
+function deviceLabel(ua: string | undefined): string | null {
+  if (!ua) return null;
+  if (/iPhone/i.test(ua)) return 'iPhone';
+  if (/iPad/i.test(ua)) return 'iPad';
+  if (/Android/i.test(ua)) return 'Android';
+  if (/Windows/i.test(ua)) return 'Windows';
+  if (/Macintosh/i.test(ua)) return 'Mac';
+  if (/Linux/i.test(ua)) return 'Linux';
+  return null;
+}
+
+/**
+ * Log attribution for a player action: the name the player typed when
+ * claiming, falling back to the device label from their browser.
+ */
+function sourceNameOf(info: SocketInfo | undefined): string | undefined {
+  if (!info) return undefined;
+  const claimed = info.pcId ? claimsMap()[info.pcId]?.playerName : null;
+  return claimed || info.device || undefined;
 }
 
 /** Shared validation for all attack commands. */
@@ -386,6 +431,7 @@ async function resolveAttackRoll(
   const outcome =
     die === 20 ? 'crit' : die === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
 
+  const sourceName = sourceNameOf(sockets.get(socket));
   handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'attackRoll' });
   const phase = outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss';
   handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase });
@@ -394,30 +440,34 @@ async function resolveAttackRoll(
     {
       actorName: ctx.pc.name,
       actorType: 'pc',
-      targetName: target.displayName,
+      targetName: locName(target.displayName),
       targetType: target.type,
       attackName: ctx.action.name,
       die: die ?? undefined,
       total,
     },
     'player',
+    sourceName,
   );
 
   let damage: number | null = null;
   if (outcome !== 'miss') {
-    damage = rollActionDamage(ctx.action);
+    const rolled = rollActionDamage(ctx.action);
+    damage = rolled.total;
     handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageRoll' });
     await store.applyDamage(target.id, damage, {
       source: 'player',
       actorName: ctx.pc.name,
       actorType: 'pc',
+      math: rolled.math,
+      sourceName,
     });
     handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageApplied' });
   }
   send(socket, {
     type: 'attackResult',
     targetId,
-    targetName: target.displayName,
+    targetName: locName(target.displayName),
     die,
     total,
     outcome,
@@ -443,6 +493,7 @@ async function resolveManualAttack(socket: WebSocket, ctx: AttackContext, cmd: P
           ? 'hit'
           : 'miss';
 
+  const sourceName = sourceNameOf(sockets.get(socket));
   const phase = outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss';
   handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase });
   logAttackEvent(
@@ -450,13 +501,14 @@ async function resolveManualAttack(socket: WebSocket, ctx: AttackContext, cmd: P
     {
       actorName: ctx.pc.name,
       actorType: 'pc',
-      targetName: target.displayName,
+      targetName: locName(target.displayName),
       targetType: target.type,
       attackName: ctx.action.name,
       die: cmd.natural === 20 ? 20 : cmd.natural === 1 ? 1 : undefined,
       total: cmd.d20Total,
     },
     'player',
+    sourceName,
   );
 
   let damage: number | null = null;
@@ -466,13 +518,14 @@ async function resolveManualAttack(socket: WebSocket, ctx: AttackContext, cmd: P
       source: 'player',
       actorName: ctx.pc.name,
       actorType: 'pc',
+      sourceName,
     });
     handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageApplied' });
   }
   send(socket, {
     type: 'attackResult',
     targetId,
-    targetName: target.displayName,
+    targetName: locName(target.displayName),
     die: null,
     total: cmd.d20Total,
     outcome,
@@ -494,7 +547,10 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
     send(socket, { type: 'error', code: 'badTarget' });
     return;
   }
-  const damage = cmd.mode === 'manual' && validAmount(cmd.damage) ? cmd.damage : rollActionDamage(ctx.action);
+  const rolled = rollActionDamage(ctx.action);
+  const manual = cmd.mode === 'manual' && validAmount(cmd.damage);
+  const damage = manual ? (cmd.damage as number) : rolled.total;
+  const damageMath = manual ? undefined : rolled.math;
   handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageRoll' });
 
   const pending: PendingSave = {
@@ -507,7 +563,9 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
     dc: ctx.action.save.dc,
     targetIds,
     damage,
+    math: damageMath,
     socket,
+    sourceName: sourceNameOf(sockets.get(socket)),
   };
   pendingSaves.set(pending.id, pending);
   send(socket, { type: 'savePending', id: pending.id, damage });
@@ -539,7 +597,7 @@ export async function resolvePendingSave(
     const amount = r.saved ? half : pending.damage;
     void store.appendLog({
       kind: 'save',
-      actorName: target.displayName,
+      actorName: locName(target.displayName),
       actorType: target.type,
       targetName: pending.actorName,
       targetType: 'pc',
@@ -553,9 +611,15 @@ export async function resolvePendingSave(
         source: 'player',
         actorName: pending.actorName,
         actorType: 'pc',
+        math: pending.math
+          ? r.saved
+            ? `${pending.math} → ½ ${amount}`
+            : pending.math
+          : undefined,
+        sourceName: pending.sourceName,
       });
     }
-    applied.push({ targetId: r.targetId, targetName: target.displayName, saved: r.saved, amount });
+    applied.push({ targetId: r.targetId, targetName: locName(target.displayName), saved: r.saved, amount });
   }
   handleAttackEvent({ sourceId: pending.pcId, attackId: pending.attackId, phase: 'damageApplied' });
   send(pending.socket, { type: 'saveResolved', id, results: applied });
@@ -638,7 +702,12 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
         return;
       }
       const pc = store.getState().pcs.find((p) => p.id === info.pcId);
-      const ctx = { source: 'player' as const, actorName: pc?.name, actorType: 'pc' as const };
+      const ctx = {
+        source: 'player' as const,
+        actorName: pc?.name,
+        actorType: 'pc' as const,
+        sourceName: sourceNameOf(info),
+      };
       for (const id of targets) {
         if (cmd.type === 'applyDamage') await store.applyDamage(id, cmd.amount, ctx);
         else await store.applyHeal(id, cmd.amount, ctx);
@@ -757,8 +826,12 @@ function restart(): void {
   });
 
   wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  wss.on('connection', (socket) => {
-    sockets.set(socket, { token: null, pcId: null });
+  wss.on('connection', (socket, req) => {
+    sockets.set(socket, {
+      token: null,
+      pcId: null,
+      device: deviceLabel(req.headers['user-agent']),
+    });
     sendState(socket);
     socket.on('message', (data) => {
       try {

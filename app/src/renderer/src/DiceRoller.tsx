@@ -114,7 +114,7 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
           </div>
         ))}
 
-        <div className="form-row">
+        <div className="dice-add-row">
           <button
             className="btn small"
             onClick={() => {
@@ -124,10 +124,10 @@ export function DiceRollerModal({ state, onClose }: { state: AppState; onClose: 
           >
             {t('dice.addExtra')}
           </button>
-          <button className="btn primary dice-roll-btn" onClick={roll}>
-            {t('dice.rollPool', { pool: formatPool(poolOf(), modNum) })}
-          </button>
         </div>
+        <button className="btn primary dice-roll-btn" onClick={roll}>
+          {t('dice.rollPool', { pool: formatPool(poolOf(), modNum) })}
+        </button>
 
         {result && (
           <div className="dice-result">

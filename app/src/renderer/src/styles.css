@@ -654,11 +654,17 @@ textarea::placeholder {
   min-width: 220px;
 }
 
+/* The pool-editing row sits with the dice; the roll action gets its own
+   full-width row below, so the two never share a baseline. */
+.dice-add-row {
+  margin-bottom: 12px;
+}
+
 .dice-roll-btn {
-  margin-bottom: 10px;
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
   white-space: normal;
-  min-width: 0;
-  flex: 1 1 auto;
 }
 
 .dice-result {
@@ -803,14 +809,27 @@ textarea::placeholder {
   gap: 8px;
 }
 
+/* Equal-width cells so every row ends flush with the modal edge instead of
+   leaving a ragged right silhouette; long names truncate (tooltips carry
+   the full text). */
 .monster-pick-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 6px;
   max-height: 220px;
   overflow-y: auto;
   scrollbar-gutter: stable;
   padding-bottom: 4px;
+}
+
+.monster-pick-list .pick-btn {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monster-pick-list > .muted {
+  grid-column: 1 / -1;
 }
 
 .pick-btn {

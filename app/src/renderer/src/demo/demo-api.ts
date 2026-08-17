@@ -29,6 +29,7 @@ import type {
   Settings,
 } from '../../../shared/types';
 import { DEFAULT_SETTINGS } from '../../../shared/types';
+import { rollD20, type RollMode } from '../../../shared/dice';
 import {
   abilityCodeLabel,
   monsterName,
@@ -68,6 +69,7 @@ interface ActionCtx {
   actorName?: string;
   actorType?: 'pc' | 'monster';
   math?: string;
+  mathTypes?: (string | null)[];
   sourceName?: string;
 }
 
@@ -79,6 +81,7 @@ const deckCtx = (cmd: BridgeCommand): ActionCtx => ({
     actorName: cmd.actorName,
     actorType: cmd.actorType === 'pc' || cmd.actorType === 'monster' ? cmd.actorType : undefined,
     math: cmd.math,
+    mathTypes: cmd.mathTypes,
   });
 
 interface BridgeCommand {
@@ -90,6 +93,7 @@ interface BridgeCommand {
   actorName?: string;
   actorType?: string;
   math?: string;
+  mathTypes?: (string | null)[];
   roll?: {
     actorName?: string;
     actorType?: string;
@@ -97,6 +101,7 @@ interface BridgeCommand {
     targetType?: string;
     attackName?: string;
     die?: number;
+    dice?: number[];
     total?: number;
   };
 }
@@ -326,6 +331,7 @@ export function createDemoApi(): Api {
       targetType: c.type,
       amount,
       math: ctx.math,
+      mathTypes: ctx.mathTypes,
       source: ctx.source,
       sourceName: ctx.sourceName,
     });
@@ -466,6 +472,7 @@ export function createDemoApi(): Api {
       targetType: roll.targetType as 'pc' | 'monster' | undefined,
       attackName: roll.attackName,
       die: roll.die,
+      dice: roll.dice && roll.dice.length > 1 ? roll.dice : undefined,
       total: roll.total,
       outcome,
       source: 'deck',
@@ -874,8 +881,10 @@ export function createDemoApi(): Api {
         ? {
             ...e,
             die: undefined,
+            dice: undefined,
             total: e.kind === 'attackRoll' ? undefined : e.total,
             math: undefined,
+            // mathTypes stays: damage type is table knowledge.
           }
         : e,
     );
@@ -972,18 +981,27 @@ export function createDemoApi(): Api {
     return own !== undefined && targets.length === 1 && targets[0] === own.id;
   }
 
-  function rollActionDamage(action: MonsterAction): { total: number; math: string } {
+  function rollActionDamage(action: MonsterAction): {
+    total: number;
+    math: string;
+    mathTypes: (string | null)[];
+    rolls: number[];
+  } {
     let total = 0;
     const mathParts: string[] = [];
+    const mathTypes: (string | null)[] = [];
+    const allRolls: number[] = [];
     for (const d of action.onHit.damage) {
       if (d.condition) continue;
       if (d.count && d.die) {
         const rolls: number[] = [];
         for (let i = 0; i < d.count; i++) rolls.push(1 + Math.floor(Math.random() * d.die));
+        allRolls.push(...rolls);
         const bonus = d.bonus ?? 0;
         total += rolls.reduce((a, b) => a + b, 0) + bonus;
         const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
         mathParts.push(`${d.dice ?? `${d.count}d${d.die}`} [${rolls.join('+')}]${bonusStr}`);
+        mathTypes.push(d.type ?? null);
       } else {
         const value = d.average ?? 0;
         total += value;
@@ -991,7 +1009,7 @@ export function createDemoApi(): Api {
       }
     }
     total = Math.max(0, total);
-    return { total, math: `${mathParts.join(' + ')} = ${total}` };
+    return { total, math: `${mathParts.join(' + ')} = ${total}`, mathTypes, rolls: allRolls };
   }
 
   function sourceNameFor(pcId: string): string | undefined {
@@ -1062,6 +1080,100 @@ export function createDemoApi(): Api {
         if (type === 'applyDamage') applyDamage(id, amount, ctx);
         else applyHeal(id, amount, ctx);
       }
+      return;
+    }
+
+    if (type === 'attackRollDigital') {
+      // Mirror of the real server's split flow, stage 1: d20 only.
+      const pc = data.pcs.find((p) => p.id === pcId);
+      const action = pc?.attacks.find((a) => a.id === cmd.attackId);
+      const targetIds = (cmd.targetIds as string[]) ?? [];
+      if (!pc || !action || action.type === 'save' || action.save) {
+        sendTo({ type: 'error', code: 'badAttack' });
+        return;
+      }
+      if (!playerGateAllows(pcId, targetIds, 'attack')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      const combat = data.combat;
+      const target = combat?.combatants.find((c) => c.id === targetIds[0]);
+      if (!combat || !target) {
+        sendTo({ type: 'error', code: 'badTarget' });
+        return;
+      }
+      const mode = cmd.advantage === 'adv' || cmd.advantage === 'dis' ? cmd.advantage : 'normal';
+      const { die, dice } = rollD20(mode as RollMode);
+      const total = die + (action.attack?.toHit ?? 0);
+      const outcome =
+        die === 20 ? 'crit' : die === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
+      pushLog(combat, {
+        kind: 'attackRoll',
+        actorName: pc.name,
+        actorType: 'pc',
+        targetName: target.displayName,
+        targetType: target.type,
+        attackName: action.name,
+        die,
+        dice: dice.length > 1 ? dice : undefined,
+        total,
+        outcome,
+        source: 'player',
+        sourceName: sourceNameFor(pcId),
+      });
+      kenkuAttackEvent({
+        sourceId: pcId,
+        attackId: action.id,
+        phase: outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss',
+      });
+      save();
+      sendTo({
+        type: 'attackRollResult',
+        targetId: target.id,
+        targetName: target.displayName,
+        die,
+        dice,
+        total,
+        outcome,
+      });
+      return;
+    }
+
+    if (type === 'damageRollDigital') {
+      // Stage 2: roll and apply the damage.
+      const pc = data.pcs.find((p) => p.id === pcId);
+      const action = pc?.attacks.find((a) => a.id === cmd.attackId);
+      const targetIds = (cmd.targetIds as string[]) ?? [];
+      if (!pc || !action) {
+        sendTo({ type: 'error', code: 'badAttack' });
+        return;
+      }
+      if (!playerGateAllows(pcId, targetIds, 'attack')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      const combat = data.combat;
+      const target = combat?.combatants.find((c) => c.id === targetIds[0]);
+      if (!combat || !target) {
+        sendTo({ type: 'error', code: 'badTarget' });
+        return;
+      }
+      const rolled = rollActionDamage(action);
+      applyDamage(target.id, rolled.total, {
+        ...playerCtx(pcId),
+        math: rolled.math,
+        mathTypes: rolled.mathTypes,
+      });
+      kenkuAttackEvent({ sourceId: pcId, attackId: action.id, phase: 'damageApplied' });
+      sendTo({
+        type: 'damageResult',
+        targetId: target.id,
+        targetName: target.displayName,
+        damage: rolled.total,
+        rolls: rolled.rolls,
+        math: rolled.math,
+        mathTypes: rolled.mathTypes,
+      });
       return;
     }
 
@@ -1157,6 +1269,7 @@ export function createDemoApi(): Api {
         applyDamage(target.id, damage, {
           ...playerCtx(pcId),
           math: manualDmg ? undefined : rolledDmg.math,
+          mathTypes: manualDmg ? undefined : rolledDmg.mathTypes,
         });
       } else {
         save();

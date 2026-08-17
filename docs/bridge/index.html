@@ -211,11 +211,17 @@
  "amount":7,
  "actorName":"Goblin 2",
  "actorType":"monster",
- "math":"1d6 [4] +2 = 6"}</code></td>
+ "math":"1d6 [4] +2 = 6",
+ "mathTypes":["slashing"]}</code></td>
         <td>Damage floors at 0 HP; monsters die and leave the order, PCs go
-          down. The last three fields are optional (v2.2+): they attribute the
+          down. The trailing fields are optional: <code>actorName</code> /
+          <code>actorType</code> / <code>math</code> (v2.2+) attribute the
           combat-log entry to an attacker and record the dice composition
-          (DM-side only &mdash; player phones never receive it).</td>
+          (DM-side only &mdash; player phones never receive it);
+          <code>mathTypes</code> (v3.1+) names the canonical damage type of
+          each <code>[…]</code> bracket group in <code>math</code>, in order
+          (<code>null</code> for unknown), so the log tints the rolled
+          numbers.</td>
       </tr>
       <tr>
         <td><code>applyHeal</code></td>
@@ -241,7 +247,8 @@
   "actorType":"monster",
   "targetName":"Aria",
   "attackName":"Scimitar",
-  "die":14,"total":18}}</code></td>
+  "die":14,"dice":[14,9],
+  "total":18}}</code></td>
         <td>
           Attack-flow progress report. <strong>No HP/turn change</strong> &mdash;
           it triggers Kenku&nbsp;FM sounds the DM has configured for that
@@ -253,6 +260,9 @@
           ignored on non-verdict phases; when a client omits it, the app still
           logs the verdict by resolving the attacker from the current turn or
           the attack id &mdash; just without the die and total.
+          <code>dice</code> (v3.1+, optional) lists every d20 thrown under
+          advantage/disadvantage &mdash; <code>die</code> is the kept one, and
+          the log shows the discarded die struck through.
         </td>
       </tr>
     </table>

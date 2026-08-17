@@ -31,6 +31,8 @@ export interface ActionContext {
   actorType?: 'pc' | 'monster';
   /** Rolled-damage composition for the log ("2d6 [3+5] +4 = 12"). */
   math?: string;
+  /** Damage type per bracket group of `math` (null = unknown). */
+  mathTypes?: (string | null)[];
   /** Player-sourced actions: the claim's player name or a device label. */
   sourceName?: string;
 }
@@ -541,6 +543,7 @@ export class AppStore {
       targetType: c.type,
       amount,
       math: ctx.math,
+      mathTypes: ctx.mathTypes,
       source: ctx.source,
       sourceName: ctx.sourceName,
     });

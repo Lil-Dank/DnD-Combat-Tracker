@@ -1,5 +1,5 @@
 import type { LogEntry } from '../../shared/types';
-import { logEntrySegments, logRollMath, logSourceTag } from '../../shared/logText';
+import { logEntrySegments, logRollSegments, logSourceTag } from '../../shared/logText';
 import { useI18n } from './i18n';
 
 /**
@@ -18,7 +18,7 @@ export function LogEntries({ log }: { log: LogEntry[] }) {
             <div className="log-round">{t('log.round', { round: e.round })}</div>
           ) : null;
         lastRound = e.round > 0 ? e.round : lastRound;
-        const math = logRollMath(lang, e);
+        const math = logRollSegments(lang, e);
         return (
           <div key={e.id}>
             {header}
@@ -36,7 +36,19 @@ export function LogEntries({ log }: { log: LogEntry[] }) {
               </span>
               <span className="log-src">{logSourceTag(lang, e)}</span>
             </div>
-            {math && <div className="log-roll tnum">{math}</div>}
+            {math && (
+              <div className="log-roll tnum">
+                {math.map((seg, i) =>
+                  seg.cls ? (
+                    <span key={i} className={seg.cls}>
+                      {seg.text}
+                    </span>
+                  ) : (
+                    seg.text
+                  ),
+                )}
+              </div>
+            )}
           </div>
         );
       })}

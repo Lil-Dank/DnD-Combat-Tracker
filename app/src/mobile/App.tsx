@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { abilityCodeLabel, abilityLabels, conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
-import { displayDice, formatDice, parseDice } from '../shared/dice';
-import { logEntrySegments, logEntryText } from '../shared/logText';
+import { displayDice, formatDice, parseDice, type RollMode } from '../shared/dice';
+import {
+  damageTypeSegments,
+  logEntrySegments,
+  logEntryText,
+  rollMathSegments,
+} from '../shared/logText';
 import type { LogEntry, MonsterAction } from '../shared/types';
 import { ABILITY_KEYS, abilityMod } from '../shared/types';
 import { formToAction, actionToForm, emptyAction, ABILITIES, type ActionForm } from '../renderer/src/actionForm';
 import type {
   ArchiveEntryMsg,
   AttackResultMsg,
+  AttackRollResultMsg,
+  DamageResultMsg,
   SaveResolvedMsg,
   StateMsg,
   WireCombatant,
@@ -33,6 +40,8 @@ export function App() {
   const [view, setView] = useState<View>({ id: 'home' });
   const [toast, setToast] = useState<string | null>(null);
   const [attackMsg, setAttackMsg] = useState<AttackResultMsg | SaveResolvedMsg | null>(null);
+  const [atkRollMsg, setAtkRollMsg] = useState<AttackRollResultMsg | null>(null);
+  const [dmgMsg, setDmgMsg] = useState<DamageResultMsg | null>(null);
   const [waitingSave, setWaitingSave] = useState(false);
   const [archiveEntry, setArchiveEntry] = useState<ArchiveEntryMsg | null>(null);
   const socketRef = useRef<PlayerSocket | null>(null);
@@ -48,6 +57,12 @@ export function App() {
           break;
         case 'attackResult':
           setAttackMsg(msg);
+          break;
+        case 'attackRollResult':
+          setAtkRollMsg(msg);
+          break;
+        case 'damageResult':
+          setDmgMsg(msg);
           break;
         case 'savePending':
           setWaitingSave(true);
@@ -196,10 +211,14 @@ export function App() {
               t={t}
               send={send}
               result={attackMsg}
+              atkRoll={atkRollMsg}
+              dmgResult={dmgMsg}
               waiting={waitingSave}
               clearResult={() => setAttackMsg(null)}
               onClose={() => {
                 setAttackMsg(null);
+                setAtkRollMsg(null);
+                setDmgMsg(null);
                 setWaitingSave(false);
                 setView({ id: 'home' });
               }}
@@ -466,6 +485,8 @@ function AttackFlow({
   t,
   send,
   result,
+  atkRoll,
+  dmgResult,
   waiting,
   clearResult,
   onClose,
@@ -474,6 +495,8 @@ function AttackFlow({
   t: (k: string, p?: Record<string, string | number>) => string;
   send: (msg: Record<string, unknown>) => void;
   result: AttackResultMsg | SaveResolvedMsg | null;
+  atkRoll: AttackRollResultMsg | null;
+  dmgResult: DamageResultMsg | null;
   waiting: boolean;
   clearResult: () => void;
   onClose: () => void;
@@ -485,9 +508,53 @@ function AttackFlow({
   const [d20, setD20] = useState('');
   const [natural, setNatural] = useState<20 | 1 | null>(null);
   const [damage, setDamage] = useState('');
+  const [rollMode, setRollMode] = useState<RollMode>('normal');
+  // Save-based digital rolls hold the DM-wait screen behind a short tumble.
+  const [rolling, setRolling] = useState(false);
+  // Split digital flow: tumble → the dice settle on their numbers → the
+  // verdict builds around them → damage tumbles and settles in place.
+  const [phase, setPhase] = useState<
+    'form' | 'tumbling' | 'settled' | 'verdict' | 'dmgTumbling' | 'dmgSettled'
+  >('form');
+  const [tumbleDone, setTumbleDone] = useState(false);
 
   const attacks = useMemo(() => you.attacks.filter(rollable), [you.attacks]);
   const isSave = attack ? attack.type === 'save' || attack.save !== null : false;
+
+  // One animated die per damage die of the attack (capped to stay readable).
+  const dmgDiceSizes = useMemo(() => {
+    if (!attack) return [6];
+    const sizes: number[] = [];
+    for (const d of attack.onHit.damage) {
+      if (d.condition || !d.count || !d.die) continue;
+      for (let i = 0; i < d.count && sizes.length < 12; i++) sizes.push(d.die);
+    }
+    return sizes.length > 0 ? sizes : [6];
+  }, [attack]);
+
+  // The d20 tumble ends AND the server result is in → settle on the number.
+  useEffect(() => {
+    if (phase === 'tumbling' && tumbleDone && atkRoll) setPhase('settled');
+  }, [phase, tumbleDone, atkRoll]);
+
+  // Hold the settled number for a beat, then build the verdict around it.
+  useEffect(() => {
+    if (phase !== 'settled') return;
+    const id = setTimeout(() => setPhase('verdict'), 950);
+    return () => clearTimeout(id);
+  }, [phase]);
+
+  // Damage tumble ends AND the damage arrived → settle on the rolled dice.
+  useEffect(() => {
+    if (phase === 'dmgTumbling' && tumbleDone && dmgResult) setPhase('dmgSettled');
+  }, [phase, tumbleDone, dmgResult]);
+
+  // Hold the settled damage dice, then show breakdown and total.
+  useEffect(() => {
+    if (phase !== 'dmgSettled') return;
+    const id = setTimeout(() => setPhase('verdict'), 950);
+    return () => clearTimeout(id);
+  }, [phase]);
 
   const toggleTarget = (id: string) => {
     if (isSave) {
@@ -497,12 +564,30 @@ function AttackFlow({
     }
   };
 
-  const fireDigital = () => {
-    send(
-      isSave
-        ? { type: 'attackDigital', attackId: attack!.id, targetIds: targets }
-        : { type: 'attackDigital', attackId: attack!.id, targetIds: targets },
-    );
+  // Save-based actions keep the one-shot flow (the DM adjudicates them).
+  const fireDigitalSave = () => {
+    setRolling(true);
+    setTimeout(() => setRolling(false), 3500);
+    send({ type: 'attackDigital', attackId: attack!.id, targetIds: targets });
+  };
+
+  const fireAttackRoll = () => {
+    setPhase('tumbling');
+    setTumbleDone(false);
+    setTimeout(() => setTumbleDone(true), 3000);
+    send({
+      type: 'attackRollDigital',
+      attackId: attack!.id,
+      targetIds: targets,
+      advantage: rollMode === 'normal' ? undefined : rollMode,
+    });
+  };
+
+  const fireDamageRoll = () => {
+    setPhase('dmgTumbling');
+    setTumbleDone(false);
+    setTimeout(() => setTumbleDone(true), 2200);
+    send({ type: 'damageRollDigital', attackId: attack!.id, targetIds: targets });
   };
 
   const fireManual = () => {
@@ -524,6 +609,98 @@ function AttackFlow({
       damage: parseInt(damage, 10) || 0,
     });
   };
+
+  // The dice are in the air: the result stays hidden until the tumble ends.
+  if (rolling || phase === 'tumbling') {
+    return (
+      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+        <RollingDice
+          label={t('mob.rolling')}
+          sizes={!rolling && rollMode !== 'normal' ? [20, 20] : [20]}
+        />
+      </Sheet>
+    );
+  }
+
+  // The dice settle on their numbers and hold a beat before the verdict.
+  if (phase === 'settled' && atkRoll) {
+    return (
+      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+        <div className="rolling">
+          <DiceValues
+            dice={atkRoll.dice}
+            kept={atkRoll.die}
+            size={atkRoll.dice.length > 1 ? 76 : 96}
+            settled
+          />
+        </div>
+      </Sheet>
+    );
+  }
+
+  // The verdict builds around the settled dice, which stay put.
+  if ((phase === 'verdict' || phase === 'dmgTumbling' || phase === 'dmgSettled') && atkRoll) {
+    const bonus = atkRoll.total - atkRoll.die;
+    const bonusStr = bonus === 0 ? '' : ` ${bonus > 0 ? '+' : '−'} ${Math.abs(bonus)}`;
+    return (
+      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+        <div className="result">
+          <DiceValues dice={atkRoll.dice} kept={atkRoll.die} size={atkRoll.dice.length > 1 ? 64 : 80} />
+          <div className={`verdict ${atkRoll.outcome}`}>
+            {t(`log.outcome.${atkRoll.outcome}`)}
+          </div>
+          <p className="atk-math tnum">
+            {atkRoll.die}
+            {bonusStr} = <strong className="atk-total">{atkRoll.total}</strong>
+          </p>
+          <p className="muted">{atkRoll.targetName}</p>
+          {phase === 'dmgTumbling' && (
+            <RollingDice label={t('mob.rolling')} sizes={dmgDiceSizes} inline />
+          )}
+          {phase === 'dmgSettled' && dmgResult && (
+            <div className="rolling inline">
+              <DiceValues dice={dmgResult.rolls} size={dmgResult.rolls.length > 6 ? 44 : 58} settled />
+            </div>
+          )}
+          {phase === 'verdict' && dmgResult && (
+            <div className="dmg-detail">
+              <p className="dmg-breakdown tnum">
+                {rollMathSegments(
+                  displayDice(state.language, dmgResult.math),
+                  dmgResult.mathTypes,
+                ).map((seg, i) =>
+                  seg.cls ? (
+                    <span key={i} className={seg.cls}>
+                      {seg.text}
+                    </span>
+                  ) : (
+                    seg.text
+                  ),
+                )}
+              </p>
+              <p className="dmg-total tnum">{dmgResult.damage}</p>
+              <p className="muted">{t('mob.dmgDealtShort')}</p>
+            </div>
+          )}
+          {phase === 'verdict' && (
+            <>
+              {atkRoll.outcome !== 'miss' && !dmgResult && (
+                <button className="big primary" onClick={fireDamageRoll}>
+                  {t('mob.rollDamage')}
+                </button>
+              )}
+              <button
+                className={`big ${atkRoll.outcome === 'miss' || dmgResult ? 'primary' : ''}`}
+                onClick={onClose}
+              >
+                {t('mob.done')}
+              </button>
+            </>
+          )}
+        </div>
+      </Sheet>
+    );
+  }
 
   // Result view (single attack or resolved saves)
   if (result || waiting) {
@@ -586,7 +763,9 @@ function AttackFlow({
                   <strong>{a.name}</strong>
                   <span className="muted">
                     {a.display.toHit ?? (a.save ? `${abilityCodeLabel(state.language, a.save.ability)} ${a.save.dc}` : '')}
-                    {a.display.damage ? ` · ${a.display.damage}` : ''}
+                    {a.display.damage ? (
+                      <> · <DmgText lang={state.language} text={a.display.damage} /></>
+                    ) : ''}
                   </span>
                 </button>
               </li>
@@ -625,8 +804,36 @@ function AttackFlow({
                 </button>
               </div>
 
-              {!manual && (
-                <button className="big primary" onClick={fireDigital}>
+              {!manual && !isSave && (
+                <>
+                  <div className="mode-toggle adv-toggle">
+                    <button
+                      className={rollMode === 'dis' ? 'selected' : ''}
+                      onClick={() => setRollMode(rollMode === 'dis' ? 'normal' : 'dis')}
+                    >
+                      {t('roll.dis')}
+                    </button>
+                    <button
+                      className={rollMode === 'normal' ? 'selected' : ''}
+                      onClick={() => setRollMode('normal')}
+                    >
+                      {t('roll.normal')}
+                    </button>
+                    <button
+                      className={rollMode === 'adv' ? 'selected' : ''}
+                      onClick={() => setRollMode(rollMode === 'adv' ? 'normal' : 'adv')}
+                    >
+                      {t('roll.adv')}
+                    </button>
+                  </div>
+                  <button className="big primary" onClick={fireAttackRoll}>
+                    {t('mob.rollAttack')}
+                  </button>
+                </>
+              )}
+
+              {!manual && isSave && (
+                <button className="big primary" onClick={fireDigitalSave}>
                   {t('mob.roll')}
                 </button>
               )}
@@ -637,6 +844,11 @@ function AttackFlow({
                     <>
                       <label>
                         {t('mob.d20Total')}
+                        {attack.display.toHit && (
+                          <span className="roll-hint tnum">
+                            🎲 {displayDice(state.language, 'd20')} {attack.display.toHit}
+                          </span>
+                        )}
                         <input
                           type="number"
                           inputMode="numeric"
@@ -662,6 +874,11 @@ function AttackFlow({
                   )}
                   <label>
                     {t('mob.damageRolled')}
+                    {attack.display.damage && (
+                      <span className="roll-hint tnum">
+                        🎲 <DmgText lang={state.language} text={attack.display.damage} />
+                      </span>
+                    )}
                     <input
                       type="number"
                       inputMode="numeric"
@@ -724,7 +941,9 @@ function MyAttacks({
                   <strong>{a.name}</strong>
                   <span className="muted">
                     {a.display.toHit ?? (a.save ? `${abilityCodeLabel(state.language, a.save.ability)} ${a.save.dc}` : '')}
-                    {a.display.damage ? ` · ${a.display.damage}` : ''}
+                    {a.display.damage ? (
+                      <> · <DmgText lang={state.language} text={a.display.damage} /></>
+                    ) : ''}
                   </span>
                 </button>
                 <button
@@ -856,6 +1075,125 @@ function LogPeek({
       <span className="peek-entry">{logEntryText(lang, last)}</span>
       <span className="peek-chevron">▴</span>
     </button>
+  );
+}
+
+/**
+ * The suspense dice: a tumbling die cycling random faces, decelerating
+ * toward the end of the ~3.5 s hold before the real result shows.
+ */
+/** Flat polyhedral die (d20 silhouette) with the number on its face. */
+function DieGlyph({
+  value,
+  size,
+  className = '',
+}: {
+  value: number | string;
+  size: number;
+  className?: string;
+}) {
+  return (
+    <div className={`die-glyph ${className}`} style={{ width: size, height: size }}>
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <polygon points="50,2 92,26 92,74 50,98 8,74 8,26" className="die-outline" />
+        <polygon points="50,22 78,66 22,66" className="die-face" />
+        <line x1="50" y1="2" x2="50" y2="22" />
+        <line x1="92" y1="26" x2="78" y2="66" />
+        <line x1="8" y1="26" x2="22" y2="66" />
+        <line x1="92" y1="74" x2="78" y2="66" />
+        <line x1="8" y1="74" x2="22" y2="66" />
+        <line x1="50" y1="98" x2="78" y2="66" />
+        <line x1="50" y1="98" x2="22" y2="66" />
+      </svg>
+      <span className="die-glyph-num tnum" style={{ fontSize: Math.round(size * 0.34) }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** A row of settled dice; under adv/dis the discarded one dims out. */
+function DiceValues({
+  dice,
+  kept,
+  size,
+  settled,
+}: {
+  dice: number[];
+  kept?: number;
+  size: number;
+  settled?: boolean;
+}) {
+  let keptShown = false;
+  return (
+    <div className="die-row">
+      {dice.map((d, i) => {
+        let cls = 'kept';
+        if (kept !== undefined && dice.length > 1) {
+          if (d === kept && !keptShown) {
+            keptShown = true;
+          } else {
+            cls = 'dropped';
+          }
+        }
+        return (
+          <DieGlyph key={i} value={d} size={size} className={`${cls} ${settled ? 'settle-pop' : ''}`} />
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The suspense dice: one tumbling die per die thrown, cycling random faces
+ * (each within its own die size) and decelerating toward the reveal.
+ */
+function RollingDice({ label, sizes, inline }: { label: string; sizes: number[]; inline?: boolean }) {
+  const [faces, setFaces] = useState<number[]>(() => sizes.map(() => 1));
+  useEffect(() => {
+    let delay = 80;
+    let stopped = false;
+    let id: number;
+    const tick = () => {
+      if (stopped) return;
+      setFaces(sizes.map((s) => 1 + Math.floor(Math.random() * s)));
+      delay = Math.min(280, delay * 1.09);
+      id = window.setTimeout(tick, delay);
+    };
+    tick();
+    return () => {
+      stopped = true;
+      clearTimeout(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const size = inline ? (sizes.length > 6 ? 44 : 58) : sizes.length > 1 ? 76 : 96;
+  return (
+    <div className={`rolling ${inline ? 'inline' : ''}`}>
+      <div className="die-row">
+        {faces.map((f, i) => (
+          <DieGlyph key={i} value={f} size={size} className="tumbling" />
+        ))}
+      </div>
+      <p className="muted">{label}</p>
+    </div>
+  );
+}
+
+/** Damage display string with dt-<type> colored damage-type words. */
+function DmgText({ lang, text }: { lang: Lang; text: string }) {
+  return (
+    <>
+      {damageTypeSegments(lang, text).map((seg, i) =>
+        seg.cls ? (
+          <span key={i} className={seg.cls}>
+            {seg.text}
+          </span>
+        ) : (
+          seg.text
+        ),
+      )}
+    </>
   );
 }
 

@@ -257,11 +257,15 @@ export interface LogEntry {
   die?: number;
   /** Attack rolls: die + toHit; saves: the save total. */
   total?: number;
+  /** Adv/dis attack rolls: both d20s thrown (`die` is the kept one). */
+  dice?: number[];
   outcome?: 'crit' | 'hit' | 'miss' | 'saved' | 'failed';
   /** attackRoll entries: the action's name (e.g. "Scimitar"). */
   attackName?: string;
   /** damage entries: the dice composition ("2d6 [3+5] +4 = 12"), DM-only. */
   math?: string;
+  /** Damage type per bracket group of `math`, for type-tinted rendering. */
+  mathTypes?: (string | null)[];
   condition?: Condition;
   source: LogSource;
   /** Player-sourced entries: the claim's player name or a device label. */

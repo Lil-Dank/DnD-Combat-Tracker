@@ -19,6 +19,22 @@ export function averageOf(count: number, die: number, bonus: number): number {
   return Math.floor((count * (die + 1)) / 2) + bonus;
 }
 
+export type RollMode = 'normal' | 'adv' | 'dis';
+
+/**
+ * Roll a d20 honoring advantage/disadvantage: two dice, keep the higher
+ * (adv) or lower (dis); the bonus is applied by the caller AFTER choosing.
+ * `dice` lists every die thrown so surfaces can show the discarded one.
+ */
+export function rollD20(mode: RollMode = 'normal'): { die: number; dice: number[] } {
+  const one = () => 1 + Math.floor(Math.random() * 20);
+  const first = one();
+  if (mode === 'normal') return { die: first, dice: [first] };
+  const second = one();
+  const die = mode === 'adv' ? Math.max(first, second) : Math.min(first, second);
+  return { die, dice: [first, second] };
+}
+
 export interface DicePoolPart {
   count: number;
   die: number;

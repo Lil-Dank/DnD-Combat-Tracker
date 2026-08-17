@@ -4,7 +4,7 @@ node_modules/
 # Electron app build output
 app/out/
 app/release/
-app/release-tmp/
+app/release-tmp*/
 app/demo-dist/
 
 # Stream Deck plugin build output

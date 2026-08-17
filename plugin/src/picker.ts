@@ -167,6 +167,10 @@ class Picker {
   private attackerType: string | undefined;
   /** Composition of the last damage roll, sent with the apply for the log. */
   private lastDamageMath = '';
+  /** Damage type per bracket group of lastDamageMath (log tinting). */
+  private lastDamageMathTypes: (string | null)[] = [];
+  /** Attack-roll advantage state, toggled on the attack screen. */
+  private advMode: 'normal' | 'adv' | 'dis' = 'normal';
   private selectedAttack: BridgeAttack | null = null;
   private lastRoll = '';
   /** Selected target ids (one for attack rolls, several for AoE saves). */
@@ -260,7 +264,7 @@ class Picker {
    */
   private sendAttackEvent(
     phase: 'attackRoll' | 'attackHit' | 'attackCrit' | 'attackMiss' | 'damageRoll' | 'damageApplied',
-    roll?: { die: number; total: number },
+    roll?: { die: number; dice?: number[]; total: number },
   ): void {
     if (!this.selectedAttack) return;
     const target = roll ? this.alive().find((c) => c.id === this.targets[0]) : undefined;
@@ -278,6 +282,7 @@ class Picker {
               targetType: target?.type,
               attackName: this.selectedAttack.name,
               die: roll.die,
+              dice: roll.dice,
               total: roll.total,
             },
           }
@@ -389,6 +394,15 @@ class Picker {
     return this.slotCount - 1 - this.cols; // directly above Roll Damage
   }
 
+  /** Advantage / disadvantage toggles, left of the two roll keys. */
+  private get advSlot(): number {
+    return this.rollAttackSlot - 1;
+  }
+
+  private get disSlot(): number {
+    return this.rollDamageSlot - 1;
+  }
+
   private async exit(): Promise<void> {
     this.clearPendingApply();
     if (this.idleTimer) {
@@ -399,6 +413,7 @@ class Picker {
     this.mode = null;
     this.op = null;
     this.actorId = null;
+    this.advMode = 'normal';
     if (deviceId) {
       // Switching without a profile returns to the previously active profile.
       await streamDeck.profiles.switchToProfile(deviceId);
@@ -698,6 +713,12 @@ class Picker {
       }
       if (slot === this.rollAttackSlot && atk.toHit !== null) return K(L('rollAttack'), 'confirm');
       if (slot === this.rollDamageSlot && atk.damage.length > 0) return K(L('rollDamage'), 'confirm');
+      if (slot === this.advSlot && atk.toHit !== null) {
+        return K(L('adv'), this.advMode === 'adv' ? 'selected' : 'item');
+      }
+      if (slot === this.disSlot && atk.toHit !== null) {
+        return K(L('dis'), this.advMode === 'dis' ? 'selected' : 'item');
+      }
       return BLANK;
     }
 
@@ -1003,19 +1024,28 @@ class Picker {
       return this.render();
     }
     if (slot === this.cancelSlot) return this.exit(); // clears any pending apply
+    if (slot === this.advSlot && atk.toHit !== null) {
+      this.advMode = this.advMode === 'adv' ? 'normal' : 'adv';
+      return this.render();
+    }
+    if (slot === this.disSlot && atk.toHit !== null) {
+      this.advMode = this.advMode === 'dis' ? 'normal' : 'dis';
+      return this.render();
+    }
     if (slot === this.rollAttackSlot && atk.toHit !== null) {
-      const { die, total } = rollD20(atk.toHit);
+      const { die, dice, total } = rollD20(atk.toHit, this.advMode);
       const target = this.alive().find((c) => c.id === this.targets[0]);
       const ac = target?.ac ?? null;
       // Nat 20 always hits, nat 1 always misses; otherwise meet-or-beat AC.
       const hit = die === 20 ? true : die === 1 ? false : ac !== null ? total >= ac : null;
-      const note = die === 20 ? L('crit') : die === 1 ? L('nat1') : `d20: ${die}`;
+      const pair = dice.length > 1 ? `${dice[0]}|${dice[1]}` : `${die}`;
+      const note = die === 20 ? L('crit') : die === 1 ? L('nat1') : `d20: ${pair}`;
       const verdict = hit === null ? '' : `\n${L(hit ? 'hit' : 'miss')}`;
       this.lastRoll = `${L('atk')} ${total}\n${note}${verdict}`;
       this.sendAttackEvent('attackRoll');
-      if (die === 20) this.sendAttackEvent('attackCrit', { die, total });
-      else if (hit === true) this.sendAttackEvent('attackHit', { die, total });
-      else if (hit === false) this.sendAttackEvent('attackMiss', { die, total });
+      if (die === 20) this.sendAttackEvent('attackCrit', { die, dice, total });
+      else if (hit === true) this.sendAttackEvent('attackHit', { die, dice, total });
+      else if (hit === false) this.sendAttackEvent('attackMiss', { die, dice, total });
       await action.showOk();
       return this.render();
     }
@@ -1024,6 +1054,7 @@ class Picker {
       let total = 0;
       const lines: string[] = [];
       const mathParts: string[] = [];
+      const mathTypes: (string | null)[] = [];
       for (const d of atk.damage) {
         // Diceless entries use their flat/average value.
         const roll = d.dice ? rollDice(d.dice) : null;
@@ -1038,6 +1069,7 @@ class Picker {
             const bonusStr =
               roll.bonus === 0 ? '' : roll.bonus > 0 ? ` +${roll.bonus}` : ` ${roll.bonus}`;
             mathParts.push(`${d.dice} [${roll.rolls.join('+')}]${bonusStr}`);
+            mathTypes.push(d.type ?? null);
           } else {
             mathParts.push(`${value}`);
           }
@@ -1047,6 +1079,7 @@ class Picker {
         }
       }
       this.lastDamageMath = `${mathParts.join(' + ')} = ${total}`;
+      this.lastDamageMathTypes = mathTypes;
       this.sendAttackEvent('damageRoll');
       const summary = [`DMG ${total}`, ...lines.slice(0, 1)];
       if (atk.save) {
@@ -1096,6 +1129,7 @@ class Picker {
           actorName: this.actorName,
           actorType: this.attackerType,
           math,
+          mathTypes: math ? this.lastDamageMathTypes : undefined,
         });
       }
       this.sendAttackEvent('damageApplied');

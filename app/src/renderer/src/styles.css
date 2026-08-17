@@ -1039,19 +1039,31 @@ textarea::placeholder {
   vertical-align: middle;
 }
 
-/* Sticky combat header: stays put while the initiative list scrolls. */
-.combat-sticky {
-  position: sticky;
-  /* The sticky inset tracks the margin box: -16px pins the visible part
-     flush with the scrollport while swallowing the container's top padding
-     so rows never peek above the bar. */
-  top: -16px;
-  margin-top: -16px;
-  padding-top: 16px;
+/* The active combat screen owns the viewport: header on top, then the
+   initiative list scrolling in its own column (scrollbar right beside it,
+   left of the log) - the header never has rows sliding underneath it. */
+.combat-screen {
+  display: flex;
+  flex-direction: column;
+  /* Content padding around the combat screen: 16px top + 6px bottom. */
+  height: calc(100vh - 22px);
+  min-height: 0;
+}
+
+/* The combat screen never scrolls at the content level, so the reserved
+   scrollbar gutter is dead space - reclaim it and slim the side padding.
+   Bottom matches the right so the log frames evenly. */
+.content:has(.combat-screen) {
+  scrollbar-gutter: auto;
+  padding-left: 14px;
+  padding-right: 6px;
+  padding-bottom: 6px;
+}
+
+.combat-header {
+  flex-shrink: 0;
   padding-bottom: 12px;
   margin-bottom: 6px;
-  background: var(--bg);
-  z-index: 10;
   border-bottom: 1px solid var(--border-soft);
 }
 
@@ -1063,8 +1075,7 @@ textarea::placeholder {
 }
 
 .combat-row {
-  /* Keep auto-scrolled rows clear of the sticky header. */
-  scroll-margin-top: 72px;
+  scroll-margin-top: 8px;
 }
 
 .combat-row {
@@ -1811,31 +1822,29 @@ textarea::placeholder {
 /* ---- Combat log sidebar + archive ---- */
 
 .combat-with-log {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  gap: 14px;
-  align-items: flex-start;
+  gap: 6px;
+  align-items: stretch;
 }
 
+/* The initiative list scrolls in its own column, so its scrollbar sits
+   right beside it (left of the log), not at the window edge. */
 .combat-with-log > .combat-list {
   flex: 1;
   min-width: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 2px;
 }
 
 .log-panel {
-  width: 264px;
+  width: 320px;
   flex-shrink: 0;
-  position: sticky;
-  /* Pins below the sticky combat header; the height runs the panel down to
-     the bottom of the window in its natural (unscrolled) position, where
-     the panel sits ~65px from the top — no dead space under the collapse
-     bar, and only a slim margin once it pins at 40px while scrolled. The
-     negative bottom margin cancels the content's trailing padding so the
-     panel alone never forces the window into scrolling. */
-  top: 40px;
-  height: calc(100vh - 66px);
-  margin-bottom: -16px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -1960,6 +1969,72 @@ textarea::placeholder {
   padding: 0 0 3px 10px;
   border-bottom: 1px solid rgba(128, 128, 128, 0.12);
 }
+
+/* Inside the math line: the dice thrown vs the numbers they rolled. */
+.log-roll .lr-dice {
+  color: var(--accent);
+  opacity: 0.9;
+}
+
+.log-roll .lr-rolls {
+  color: var(--warn);
+  opacity: 0.85;
+}
+
+/* The discarded die of an adv/dis attack roll. */
+.log-roll .lr-dropped {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+/* Explicit roll-mode tags so nobody has to deduce from the dropped die. */
+.log-roll .lr-adv {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.log-roll .lr-dis {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Advantage / normal / disadvantage selector in the attack modal. */
+.adv-toggle-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* The discarded die of an adv/dis pair. */
+.die-dropped {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+/* ---- Damage-type tints (dt-<canonical type>) ---- */
+.dt-fire { color: #e0623c; }
+.dt-cold { color: #58a6d8; }
+.dt-lightning { color: #d8b93f; }
+.dt-thunder { color: #9d8fc0; }
+.dt-poison { color: #58b86a; }
+.dt-acid { color: #96b83a; }
+.dt-necrotic { color: #9d6fd0; }
+.dt-radiant { color: #e0c060; }
+.dt-psychic { color: #d070b8; }
+.dt-force { color: #7a9fe0; }
+.dt-bludgeoning { color: #b09a78; }
+.dt-piercing { color: #93a8bc; }
+.dt-slashing { color: #c08878; }
+
+/* The pale hues need darker inks on the light-paper themes. */
+:root[data-theme='light'] .dt-lightning, :root[data-theme='phb'] .dt-lightning { color: #a3841c; }
+:root[data-theme='light'] .dt-radiant, :root[data-theme='phb'] .dt-radiant { color: #ac7f1d; }
+:root[data-theme='light'] .dt-acid, :root[data-theme='phb'] .dt-acid { color: #6e8a20; }
+:root[data-theme='light'] .dt-cold, :root[data-theme='phb'] .dt-cold { color: #2e7dbf; }
+:root[data-theme='light'] .dt-poison, :root[data-theme='phb'] .dt-poison { color: #2f8f4e; }
+:root[data-theme='light'] .dt-bludgeoning, :root[data-theme='phb'] .dt-bludgeoning { color: #8a7758; }
+:root[data-theme='light'] .dt-piercing, :root[data-theme='phb'] .dt-piercing { color: #5f7691; }
+:root[data-theme='light'] .dt-slashing, :root[data-theme='phb'] .dt-slashing { color: #a05f4e; }
 
 .log-src {
   opacity: 0.55;

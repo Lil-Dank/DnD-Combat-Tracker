@@ -72,7 +72,12 @@ const api = {
   applyDamage: (
     combatantId: string,
     amount: number,
-    ctx?: { actorName?: string; actorType?: 'pc' | 'monster'; math?: string },
+    ctx?: {
+      actorName?: string;
+      actorType?: 'pc' | 'monster';
+      math?: string;
+      mathTypes?: (string | null)[];
+    },
   ) => ipcRenderer.invoke('combat:damage', { combatantId, amount, ctx }),
   applyHeal: (combatantId: string, amount: number) =>
     ipcRenderer.invoke('combat:heal', { combatantId, amount }),

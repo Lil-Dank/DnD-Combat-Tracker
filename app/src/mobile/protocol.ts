@@ -78,6 +78,33 @@ export interface AttackResultMsg {
   damage: number | null;
 }
 
+/** Stage 1 of the split digital flow: the d20 verdict, no damage yet. */
+export interface AttackRollResultMsg {
+  type: 'attackRollResult';
+  targetId: string;
+  targetName: string;
+  /** The die that counts (higher/lower of `dice` under adv/dis). */
+  die: number;
+  /** Every d20 thrown: one entry normally, two under adv/dis. */
+  dice: number[];
+  total: number;
+  outcome: 'crit' | 'hit' | 'miss';
+}
+
+/** Stage 2: damage rolled and applied. The roller sees their own numbers. */
+export interface DamageResultMsg {
+  type: 'damageResult';
+  targetId: string;
+  targetName: string;
+  damage: number;
+  /** Every individual die result, in roll order (settle animation). */
+  rolls: number[];
+  /** Breakdown string ("1d8 [7] +3 = 10"). */
+  math: string;
+  /** Damage type per bracket group of `math`. */
+  mathTypes: (string | null)[];
+}
+
 export interface SaveResolvedMsg {
   type: 'saveResolved';
   id: string;
@@ -97,6 +124,8 @@ export interface ArchiveEntryMsg {
 export type ServerMsg =
   | StateMsg
   | AttackResultMsg
+  | AttackRollResultMsg
+  | DamageResultMsg
   | SaveResolvedMsg
   | ArchiveEntryMsg
   | { type: 'claimResult'; ok: boolean; reason?: string }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ActionKind, AttackKind, KenkuAttackTrigger, PC } from '../../shared/types';
 import { api } from './api';
 import { useI18n } from './i18n';
+import { DmgText } from './DmgText';
 import { DamageEditor } from '../../components/DamageEditor';
 import { useKenkuLibrary } from './useKenkuLibrary';
 import {
@@ -49,7 +50,7 @@ export function PcAttackEditor({ pc, kenkuOn }: { pc: PC; kenkuOn: boolean }) {
               <strong>{a.name}</strong>{' '}
               <span className="muted">
                 {a.display.toHit ?? (a.save ? `${a.save.ability} ${a.save.dc}` : '')}
-                {a.display.damage ? ` · ${a.display.damage}` : ''}
+                {a.display.damage ? <> · <DmgText text={a.display.damage} /></> : ''}
               </span>
             </span>
             <span className="pc-attack-buttons">

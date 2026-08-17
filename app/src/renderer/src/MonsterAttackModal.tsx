@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { AppState, Combatant, MonsterAction } from '../../shared/types';
-import { rollPool } from '../../shared/dice';
+import { rollD20, rollPool, type RollMode } from '../../shared/dice';
 import { api } from './api';
+import { DmgText } from './DmgText';
 import { useI18n } from './i18n';
 
 /**
@@ -20,6 +21,8 @@ export const hasRollableAttacks = (c: Combatant) => c.attacks.some(isRollable);
 
 interface AtkRoll {
   die: number;
+  /** Every d20 thrown: one entry normally, two under adv/dis. */
+  dice: number[];
   total: number;
   verdict: 'hit' | 'miss' | null;
   crit: boolean;
@@ -31,6 +34,8 @@ interface DmgRoll {
   parts: string[];
   conditional: string[];
   math: string;
+  /** Damage type per bracket group of `math`, for the log's tinting. */
+  mathTypes: (string | null)[];
 }
 
 export function MonsterAttackModal({
@@ -49,6 +54,7 @@ export function MonsterAttackModal({
 
   const [step, setStep] = useState<Step>('attack');
   const [attack, setAttack] = useState<MonsterAction | null>(null);
+  const [advMode, setAdvMode] = useState<RollMode>('normal');
   const [targets, setTargets] = useState<string[]>([]);
   const [atkRoll, setAtkRoll] = useState<AtkRoll | null>(null);
   const [dmgRoll, setDmgRoll] = useState<DmgRoll | null>(null);
@@ -84,12 +90,13 @@ export function MonsterAttackModal({
 
   const rollAttack = () => {
     if (!attack?.attack) return;
-    const die = Math.floor(Math.random() * 20) + 1;
+    // Advantage/disadvantage: two dice, keep one, THEN add the bonus.
+    const { die, dice } = rollD20(advMode);
     const total = die + attack.attack.toHit;
     const ac = singleTarget?.ac ?? null;
     const verdict =
       die === 20 ? 'hit' : die === 1 ? 'miss' : ac !== null ? (total >= ac ? 'hit' : 'miss') : null;
-    setAtkRoll({ die, total, verdict, crit: die === 20, nat1: die === 1 });
+    setAtkRoll({ die, dice, total, verdict, crit: die === 20, nat1: die === 1 });
     if (attacker) {
       void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'attackRoll' });
       const phase =
@@ -109,6 +116,7 @@ export function MonsterAttackModal({
             targetType: singleTarget?.type,
             attackName: locAction(l10nDe, attack).name,
             die,
+            dice,
             total,
           },
         });
@@ -122,6 +130,7 @@ export function MonsterAttackModal({
     const parts: string[] = [];
     const conditional: string[] = [];
     const mathParts: string[] = [];
+    const mathTypes: (string | null)[] = [];
     for (const d of attack.onHit.damage) {
       let value: number;
       if (d.dice && d.count && d.die) {
@@ -131,6 +140,7 @@ export function MonsterAttackModal({
           const bonus = d.bonus ?? 0;
           const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
           mathParts.push(`${d.dice} [${roll.perPart[0].join('+')}]${bonusStr}`);
+          mathTypes.push(d.type ?? null);
         }
       } else {
         value = d.average ?? 0;
@@ -143,7 +153,7 @@ export function MonsterAttackModal({
         parts.push(`${value} ${dmg(d.type)}`);
       }
     }
-    setDmgRoll({ total, parts, conditional, math: `${mathParts.join(' + ')} = ${total}` });
+    setDmgRoll({ total, parts, conditional, math: `${mathParts.join(' + ')} = ${total}`, mathTypes });
     setSaved(new Set());
     if (attacker) {
       void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'damageRoll' });
@@ -159,6 +169,7 @@ export function MonsterAttackModal({
         actorName: mon(attacker.displayName),
         actorType: attacker.type,
         math: halved ? `${dmgRoll.math} → ½ ${half}` : dmgRoll.math,
+        mathTypes: dmgRoll.mathTypes,
       });
     }
     if (attacker && attack) {
@@ -247,16 +258,40 @@ export function MonsterAttackModal({
                 : singleTarget
                   ? t('attack.vsTarget', { name: targetName(singleTarget), ac: singleTarget.ac })
                   : ''}
-              {locAction(l10nDe, attack).damage && ` · ${locAction(l10nDe, attack).damage}`}
+              {locAction(l10nDe, attack).damage && (
+                <> · <DmgText text={locAction(l10nDe, attack).damage!} /></>
+              )}
             </p>
 
+            {attack.attack && (
+              <div className="adv-toggle-row">
+                {(['dis', 'normal', 'adv'] as const).map((m) => (
+                  <button
+                    key={m}
+                    className={`btn small ${advMode === m ? 'primary' : ''}`}
+                    onClick={() => setAdvMode(m)}
+                  >
+                    {t(`roll.${m}`)}
+                  </button>
+                ))}
+              </div>
+            )}
             {attack.attack && (
               <div className="dice-result">
                 <button className="btn primary" onClick={rollAttack}>{t('attack.rollAttack')}</button>
                 {atkRoll && (
                   <span className="dice-total atk-result">
                     {' '}ATK {atkRoll.total}
-                    <span className="muted"> (d20: {atkRoll.die})</span>{' '}
+                    <span className="muted">
+                      {' '}(d20:{' '}
+                      {atkRoll.dice.map((d, i) => (
+                        <span key={i}>
+                          {i > 0 && ' · '}
+                          <span className={d === atkRoll.die ? '' : 'die-dropped'}>{d}</span>
+                        </span>
+                      ))}
+                      )
+                    </span>{' '}
                     {atkRoll.crit
                       ? t('attack.crit')
                       : atkRoll.nat1
@@ -278,10 +313,10 @@ export function MonsterAttackModal({
                   <span className="dice-total atk-result">
                     {' '}DMG {dmgRoll.total}
                     {dmgRoll.parts.length > 1 && (
-                      <span className="muted"> ({dmgRoll.parts.join(' + ')})</span>
+                      <span className="muted"> (<DmgText text={dmgRoll.parts.join(' + ')} />)</span>
                     )}
                     {dmgRoll.conditional.map((c) => (
-                      <span key={c} className="muted"> · {c}</span>
+                      <span key={c} className="muted"> · <DmgText text={c} /></span>
                     ))}
                   </span>
                 )}

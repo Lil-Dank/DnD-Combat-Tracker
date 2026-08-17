@@ -85,6 +85,8 @@ export type BridgeCommand =
         targetType?: string;
         attackName: string;
         die: number;
+        /** Adv/dis: both d20s thrown (`die` is the kept one). */
+        dice?: number[];
         total: number;
       };
     };

@@ -247,7 +247,8 @@
   "actorType":"monster",
   "targetName":"Aria",
   "attackName":"Scimitar",
-  "die":14,"total":18}}</code></td>
+  "die":14,"dice":[14,9],
+  "total":18}}</code></td>
         <td>
           Attack-flow progress report. <strong>No HP/turn change</strong> &mdash;
           it triggers Kenku&nbsp;FM sounds the DM has configured for that
@@ -259,6 +260,9 @@
           ignored on non-verdict phases; when a client omits it, the app still
           logs the verdict by resolving the attacker from the current turn or
           the attack id &mdash; just without the die and total.
+          <code>dice</code> (v3.1+, optional) lists every d20 thrown under
+          advantage/disadvantage &mdash; <code>die</code> is the kept one, and
+          the log shows the discarded die struck through.
         </td>
       </tr>
     </table>

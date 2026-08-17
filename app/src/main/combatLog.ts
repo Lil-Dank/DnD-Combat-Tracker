@@ -15,6 +15,8 @@ export interface AttackRollDetails {
   attackName?: string;
   /** Raw d20 (absent for manually entered totals without a die). */
   die?: number;
+  /** Adv/dis: both d20s thrown (`die` is the kept one). */
+  dice?: number[];
   /** die + toHit, or the manually entered total. */
   total?: number;
 }
@@ -46,6 +48,7 @@ export function logAttackEvent(
     targetType: details.targetType,
     attackName: details.attackName,
     die: details.die,
+    dice: details.dice && details.dice.length > 1 ? details.dice : undefined,
     total: details.total,
     outcome,
     source,

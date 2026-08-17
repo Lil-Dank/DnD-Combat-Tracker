@@ -405,20 +405,74 @@ h3 {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 48px 0;
+  padding: 40px 0;
 }
 
-.rolling-die {
-  font-size: 64px;
+/* Flat polyhedral die: SVG silhouette with the number on its face. */
+.die-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.die-glyph {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.die-glyph svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.die-glyph .die-outline {
+  fill: #241c38;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.die-glyph .die-face {
+  fill: rgba(212, 175, 55, 0.1);
+  stroke: rgba(212, 175, 55, 0.5);
+  stroke-width: 1.5;
+}
+
+.die-glyph svg line {
+  stroke: rgba(212, 175, 55, 0.32);
+  stroke-width: 1.5;
+}
+
+/* The number must read clearly off the die face. */
+.die-glyph-num {
+  position: relative;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.die-glyph.tumbling {
   animation: dice-tumble 0.55s infinite ease-in-out;
 }
 
-.rolling-face {
-  font-size: 42px;
-  font-weight: 700;
+.die-glyph.kept .die-glyph-num {
   color: var(--gold);
-  min-width: 64px;
-  text-align: center;
+  text-shadow: 0 0 14px rgba(212, 175, 55, 0.55);
+}
+
+.die-glyph.dropped {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+
+.die-glyph.settle-pop {
+  animation: die-settle 0.45s ease-out;
 }
 
 @keyframes dice-tumble {
@@ -429,36 +483,10 @@ h3 {
   100% { transform: rotate(-16deg) translateY(0); }
 }
 
-/* The die settles: the number pops and glows, then the verdict builds
-   around it while it stays put. */
-.rolling-face.settled {
-  font-size: 56px;
-  animation: die-settle 0.45s ease-out;
-  text-shadow: 0 0 18px rgba(212, 175, 55, 0.45);
-}
-
 @keyframes die-settle {
   0% { transform: scale(0.6); opacity: 0.4; }
   60% { transform: scale(1.18); opacity: 1; }
   100% { transform: scale(1); }
-}
-
-/* Both d20s under advantage/disadvantage; the discarded one dims out. */
-.dice-pair {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  font-size: 16px;
-}
-
-.dice-pair .kept {
-  color: var(--gold);
-  font-weight: 700;
-}
-
-.dice-pair .dropped {
-  text-decoration: line-through;
-  opacity: 0.55;
 }
 
 /* The damage roll tumbles inline on the verdict screen. */
@@ -466,20 +494,50 @@ h3 {
   padding: 10px 0;
 }
 
-.rolling.inline .rolling-die {
-  font-size: 40px;
+.result .die-row {
+  margin-bottom: 6px;
 }
 
-.rolling.inline .rolling-face {
-  font-size: 26px;
+/* Attack math under the verdict: the total is what matters. */
+.atk-math {
+  font-size: 19px;
+  margin: 2px 0;
 }
 
-.result .rolling-face.settled {
-  margin-bottom: 2px;
+.atk-total {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--gold);
 }
 
-.result .dice-pair {
-  margin-bottom: 8px;
+/* Damage reveal: breakdown small, the dealt total is the biggest number. */
+.dmg-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 8px 0 4px;
+}
+
+.dmg-breakdown {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.dmg-breakdown .lr-dice {
+  color: #8ab4f8;
+}
+
+.dmg-breakdown .lr-rolls {
+  color: var(--gold);
+}
+
+.dmg-total {
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--gold);
+  line-height: 1.1;
+  margin: 0;
 }
 
 /* Damage-type tints (dt-<canonical type>), matching the DM window. */

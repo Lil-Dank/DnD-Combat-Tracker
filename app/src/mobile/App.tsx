@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { abilityCodeLabel, abilityLabels, conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
 import { displayDice, formatDice, parseDice, type RollMode } from '../shared/dice';
-import { damageTypeSegments, logEntrySegments, logEntryText } from '../shared/logText';
+import {
+  damageTypeSegments,
+  logEntrySegments,
+  logEntryText,
+  rollMathSegments,
+} from '../shared/logText';
 import type { LogEntry, MonsterAction } from '../shared/types';
 import { ABILITY_KEYS, abilityMod } from '../shared/types';
 import { formToAction, actionToForm, emptyAction, ABILITIES, type ActionForm } from '../renderer/src/actionForm';
@@ -506,15 +511,26 @@ function AttackFlow({
   const [rollMode, setRollMode] = useState<RollMode>('normal');
   // Save-based digital rolls hold the DM-wait screen behind a short tumble.
   const [rolling, setRolling] = useState(false);
-  // Split digital flow: tumble → the die settles on its number → the verdict
-  // builds around it → damage rolls in place.
-  const [phase, setPhase] = useState<'form' | 'tumbling' | 'settled' | 'verdict' | 'dmgTumbling'>(
-    'form',
-  );
+  // Split digital flow: tumble → the dice settle on their numbers → the
+  // verdict builds around them → damage tumbles and settles in place.
+  const [phase, setPhase] = useState<
+    'form' | 'tumbling' | 'settled' | 'verdict' | 'dmgTumbling' | 'dmgSettled'
+  >('form');
   const [tumbleDone, setTumbleDone] = useState(false);
 
   const attacks = useMemo(() => you.attacks.filter(rollable), [you.attacks]);
   const isSave = attack ? attack.type === 'save' || attack.save !== null : false;
+
+  // One animated die per damage die of the attack (capped to stay readable).
+  const dmgDiceSizes = useMemo(() => {
+    if (!attack) return [6];
+    const sizes: number[] = [];
+    for (const d of attack.onHit.damage) {
+      if (d.condition || !d.count || !d.die) continue;
+      for (let i = 0; i < d.count && sizes.length < 12; i++) sizes.push(d.die);
+    }
+    return sizes.length > 0 ? sizes : [6];
+  }, [attack]);
 
   // The d20 tumble ends AND the server result is in → settle on the number.
   useEffect(() => {
@@ -528,10 +544,17 @@ function AttackFlow({
     return () => clearTimeout(id);
   }, [phase]);
 
-  // Damage tumble ends AND the damage arrived → back to the verdict screen.
+  // Damage tumble ends AND the damage arrived → settle on the rolled dice.
   useEffect(() => {
-    if (phase === 'dmgTumbling' && tumbleDone && dmgResult) setPhase('verdict');
+    if (phase === 'dmgTumbling' && tumbleDone && dmgResult) setPhase('dmgSettled');
   }, [phase, tumbleDone, dmgResult]);
+
+  // Hold the settled damage dice, then show breakdown and total.
+  useEffect(() => {
+    if (phase !== 'dmgSettled') return;
+    const id = setTimeout(() => setPhase('verdict'), 950);
+    return () => clearTimeout(id);
+  }, [phase]);
 
   const toggleTarget = (id: string) => {
     if (isSave) {
@@ -591,57 +614,74 @@ function AttackFlow({
   if (rolling || phase === 'tumbling') {
     return (
       <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
-        <RollingDice label={t('mob.rolling')} />
+        <RollingDice
+          label={t('mob.rolling')}
+          sizes={!rolling && rollMode !== 'normal' ? [20, 20] : [20]}
+        />
       </Sheet>
     );
   }
 
-  // The die settles on its number and holds a beat before the verdict.
+  // The dice settle on their numbers and hold a beat before the verdict.
   if (phase === 'settled' && atkRoll) {
     return (
       <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
         <div className="rolling">
-          <div className="rolling-face tnum settled">{atkRoll.die}</div>
-          {atkRoll.dice.length > 1 && (
-            <div className="dice-pair muted tnum">
-              {atkRoll.dice.map((d, i) => (
-                <span key={i} className={d === atkRoll.die ? 'kept' : 'dropped'}>
-                  {d}
-                </span>
-              ))}
-            </div>
-          )}
+          <DiceValues
+            dice={atkRoll.dice}
+            kept={atkRoll.die}
+            size={atkRoll.dice.length > 1 ? 76 : 96}
+            settled
+          />
         </div>
       </Sheet>
     );
   }
 
-  // The verdict builds around the settled number, which stays put.
-  if ((phase === 'verdict' || phase === 'dmgTumbling') && atkRoll) {
+  // The verdict builds around the settled dice, which stay put.
+  if ((phase === 'verdict' || phase === 'dmgTumbling' || phase === 'dmgSettled') && atkRoll) {
+    const bonus = atkRoll.total - atkRoll.die;
+    const bonusStr = bonus === 0 ? '' : ` ${bonus > 0 ? '+' : '−'} ${Math.abs(bonus)}`;
     return (
       <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
         <div className="result">
-          <div className="rolling-face tnum settled">{atkRoll.die}</div>
-          {atkRoll.dice.length > 1 && (
-            <div className="dice-pair muted tnum">
-              {atkRoll.dice.map((d, i) => (
-                <span key={i} className={d === atkRoll.die ? 'kept' : 'dropped'}>
-                  {d}
-                </span>
-              ))}
-            </div>
-          )}
+          <DiceValues dice={atkRoll.dice} kept={atkRoll.die} size={atkRoll.dice.length > 1 ? 64 : 80} />
           <div className={`verdict ${atkRoll.outcome}`}>
             {t(`log.outcome.${atkRoll.outcome}`)}
           </div>
-          <p>
-            {atkRoll.targetName} · {atkRoll.total}
+          <p className="atk-math tnum">
+            {atkRoll.die}
+            {bonusStr} = <strong className="atk-total">{atkRoll.total}</strong>
           </p>
-          {phase === 'dmgTumbling' ? (
-            <RollingDice label={t('mob.rolling')} inline />
-          ) : dmgResult ? (
-            <p className="big-num">{t('mob.dmgDealt', { damage: dmgResult.damage })}</p>
-          ) : null}
+          <p className="muted">{atkRoll.targetName}</p>
+          {phase === 'dmgTumbling' && (
+            <RollingDice label={t('mob.rolling')} sizes={dmgDiceSizes} inline />
+          )}
+          {phase === 'dmgSettled' && dmgResult && (
+            <div className="rolling inline">
+              <DiceValues dice={dmgResult.rolls} size={dmgResult.rolls.length > 6 ? 44 : 58} settled />
+            </div>
+          )}
+          {phase === 'verdict' && dmgResult && (
+            <div className="dmg-detail">
+              <p className="dmg-breakdown tnum">
+                {rollMathSegments(
+                  displayDice(state.language, dmgResult.math),
+                  dmgResult.mathTypes,
+                ).map((seg, i) =>
+                  seg.cls ? (
+                    <span key={i} className={seg.cls}>
+                      {seg.text}
+                    </span>
+                  ) : (
+                    seg.text
+                  ),
+                )}
+              </p>
+              <p className="dmg-total tnum">{dmgResult.damage}</p>
+              <p className="muted">{t('mob.dmgDealtShort')}</p>
+            </div>
+          )}
           {phase === 'verdict' && (
             <>
               {atkRoll.outcome !== 'miss' && !dmgResult && (
@@ -1042,15 +1082,81 @@ function LogPeek({
  * The suspense dice: a tumbling die cycling random faces, decelerating
  * toward the end of the ~3.5 s hold before the real result shows.
  */
-function RollingDice({ label, inline }: { label: string; inline?: boolean }) {
-  const [face, setFace] = useState(1);
+/** Flat polyhedral die (d20 silhouette) with the number on its face. */
+function DieGlyph({
+  value,
+  size,
+  className = '',
+}: {
+  value: number | string;
+  size: number;
+  className?: string;
+}) {
+  return (
+    <div className={`die-glyph ${className}`} style={{ width: size, height: size }}>
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <polygon points="50,2 92,26 92,74 50,98 8,74 8,26" className="die-outline" />
+        <polygon points="50,22 78,66 22,66" className="die-face" />
+        <line x1="50" y1="2" x2="50" y2="22" />
+        <line x1="92" y1="26" x2="78" y2="66" />
+        <line x1="8" y1="26" x2="22" y2="66" />
+        <line x1="92" y1="74" x2="78" y2="66" />
+        <line x1="8" y1="74" x2="22" y2="66" />
+        <line x1="50" y1="98" x2="78" y2="66" />
+        <line x1="50" y1="98" x2="22" y2="66" />
+      </svg>
+      <span className="die-glyph-num tnum" style={{ fontSize: Math.round(size * 0.34) }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** A row of settled dice; under adv/dis the discarded one dims out. */
+function DiceValues({
+  dice,
+  kept,
+  size,
+  settled,
+}: {
+  dice: number[];
+  kept?: number;
+  size: number;
+  settled?: boolean;
+}) {
+  let keptShown = false;
+  return (
+    <div className="die-row">
+      {dice.map((d, i) => {
+        let cls = 'kept';
+        if (kept !== undefined && dice.length > 1) {
+          if (d === kept && !keptShown) {
+            keptShown = true;
+          } else {
+            cls = 'dropped';
+          }
+        }
+        return (
+          <DieGlyph key={i} value={d} size={size} className={`${cls} ${settled ? 'settle-pop' : ''}`} />
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The suspense dice: one tumbling die per die thrown, cycling random faces
+ * (each within its own die size) and decelerating toward the reveal.
+ */
+function RollingDice({ label, sizes, inline }: { label: string; sizes: number[]; inline?: boolean }) {
+  const [faces, setFaces] = useState<number[]>(() => sizes.map(() => 1));
   useEffect(() => {
     let delay = 80;
     let stopped = false;
     let id: number;
     const tick = () => {
       if (stopped) return;
-      setFace(1 + Math.floor(Math.random() * 20));
+      setFaces(sizes.map((s) => 1 + Math.floor(Math.random() * s)));
       delay = Math.min(280, delay * 1.09);
       id = window.setTimeout(tick, delay);
     };
@@ -1059,11 +1165,16 @@ function RollingDice({ label, inline }: { label: string; inline?: boolean }) {
       stopped = true;
       clearTimeout(id);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const size = inline ? (sizes.length > 6 ? 44 : 58) : sizes.length > 1 ? 76 : 96;
   return (
     <div className={`rolling ${inline ? 'inline' : ''}`}>
-      <div className="rolling-die">🎲</div>
-      <div className="rolling-face tnum">{face}</div>
+      <div className="die-row">
+        {faces.map((f, i) => (
+          <DieGlyph key={i} value={f} size={size} className="tumbling" />
+        ))}
+      </div>
       <p className="muted">{label}</p>
     </div>
   );

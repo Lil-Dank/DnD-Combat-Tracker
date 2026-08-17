@@ -209,6 +209,7 @@ function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
       ? {
           ...e,
           die: undefined,
+          dice: undefined,
           total: e.kind === 'attackRoll' ? undefined : e.total,
           math: undefined,
           mathTypes: undefined,
@@ -366,17 +367,21 @@ function rollActionDamage(action: MonsterAction): {
   total: number;
   math: string;
   mathTypes: (string | null)[];
+  /** Every individual die result, in roll order (for phone animations). */
+  rolls: number[];
 } {
   let total = 0;
   const mathParts: string[] = [];
   // One entry per bracket group in the math, so the log can tint the rolled
   // numbers with their damage type.
   const mathTypes: (string | null)[] = [];
+  const rolls: number[] = [];
   for (const d of action.onHit.damage) {
     if (d.condition) continue;
     if (d.dice && d.count && d.die) {
       const roll = rollPool([{ count: d.count, die: d.die }], d.bonus ?? 0);
       total += roll.total;
+      rolls.push(...roll.perPart[0]);
       const bonus = d.bonus ?? 0;
       const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
       mathParts.push(`${d.dice} [${roll.perPart[0].join('+')}]${bonusStr}`);
@@ -387,7 +392,7 @@ function rollActionDamage(action: MonsterAction): {
       mathParts.push(`${value}`);
     }
   }
-  return { total, math: `${mathParts.join(' + ')} = ${total}`, mathTypes };
+  return { total, math: `${mathParts.join(' + ')} = ${total}`, mathTypes, rolls };
 }
 
 interface AttackContext {
@@ -774,6 +779,7 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
           targetType: target.type,
           attackName: ctx.action.name,
           die,
+          dice,
           total,
         },
         'player',
@@ -820,11 +826,16 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
         sourceName: sourceNameOf(info),
       });
       handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageApplied' });
+      // The roller sees their own numbers: per-die results for the settle
+      // animation plus the breakdown string (other phones still get nothing).
       send(socket, {
         type: 'damageResult',
         targetId: target.id,
         targetName: locName(target.displayName),
         damage: rolled.total,
+        rolls: rolled.rolls,
+        math: rolled.math,
+        mathTypes: rolled.mathTypes,
       });
       return;
     }

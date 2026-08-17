@@ -264,7 +264,7 @@ class Picker {
    */
   private sendAttackEvent(
     phase: 'attackRoll' | 'attackHit' | 'attackCrit' | 'attackMiss' | 'damageRoll' | 'damageApplied',
-    roll?: { die: number; total: number },
+    roll?: { die: number; dice?: number[]; total: number },
   ): void {
     if (!this.selectedAttack) return;
     const target = roll ? this.alive().find((c) => c.id === this.targets[0]) : undefined;
@@ -282,6 +282,7 @@ class Picker {
               targetType: target?.type,
               attackName: this.selectedAttack.name,
               die: roll.die,
+              dice: roll.dice,
               total: roll.total,
             },
           }
@@ -1042,9 +1043,9 @@ class Picker {
       const verdict = hit === null ? '' : `\n${L(hit ? 'hit' : 'miss')}`;
       this.lastRoll = `${L('atk')} ${total}\n${note}${verdict}`;
       this.sendAttackEvent('attackRoll');
-      if (die === 20) this.sendAttackEvent('attackCrit', { die, total });
-      else if (hit === true) this.sendAttackEvent('attackHit', { die, total });
-      else if (hit === false) this.sendAttackEvent('attackMiss', { die, total });
+      if (die === 20) this.sendAttackEvent('attackCrit', { die, dice, total });
+      else if (hit === true) this.sendAttackEvent('attackHit', { die, dice, total });
+      else if (hit === false) this.sendAttackEvent('attackMiss', { die, dice, total });
       await action.showOk();
       return this.render();
     }

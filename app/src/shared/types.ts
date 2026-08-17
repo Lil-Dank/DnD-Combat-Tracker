@@ -257,6 +257,8 @@ export interface LogEntry {
   die?: number;
   /** Attack rolls: die + toHit; saves: the save total. */
   total?: number;
+  /** Adv/dis attack rolls: both d20s thrown (`die` is the kept one). */
+  dice?: number[];
   outcome?: 'crit' | 'hit' | 'miss' | 'saved' | 'failed';
   /** attackRoll entries: the action's name (e.g. "Scimitar"). */
   attackName?: string;

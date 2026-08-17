@@ -101,6 +101,7 @@ interface BridgeCommand {
     targetType?: string;
     attackName?: string;
     die?: number;
+    dice?: number[];
     total?: number;
   };
 }
@@ -471,6 +472,7 @@ export function createDemoApi(): Api {
       targetType: roll.targetType as 'pc' | 'monster' | undefined,
       attackName: roll.attackName,
       die: roll.die,
+      dice: roll.dice && roll.dice.length > 1 ? roll.dice : undefined,
       total: roll.total,
       outcome,
       source: 'deck',
@@ -879,6 +881,7 @@ export function createDemoApi(): Api {
         ? {
             ...e,
             die: undefined,
+            dice: undefined,
             total: e.kind === 'attackRoll' ? undefined : e.total,
             math: undefined,
             mathTypes: undefined,
@@ -982,15 +985,18 @@ export function createDemoApi(): Api {
     total: number;
     math: string;
     mathTypes: (string | null)[];
+    rolls: number[];
   } {
     let total = 0;
     const mathParts: string[] = [];
     const mathTypes: (string | null)[] = [];
+    const allRolls: number[] = [];
     for (const d of action.onHit.damage) {
       if (d.condition) continue;
       if (d.count && d.die) {
         const rolls: number[] = [];
         for (let i = 0; i < d.count; i++) rolls.push(1 + Math.floor(Math.random() * d.die));
+        allRolls.push(...rolls);
         const bonus = d.bonus ?? 0;
         total += rolls.reduce((a, b) => a + b, 0) + bonus;
         const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
@@ -1003,7 +1009,7 @@ export function createDemoApi(): Api {
       }
     }
     total = Math.max(0, total);
-    return { total, math: `${mathParts.join(' + ')} = ${total}`, mathTypes };
+    return { total, math: `${mathParts.join(' + ')} = ${total}`, mathTypes, rolls: allRolls };
   }
 
   function sourceNameFor(pcId: string): string | undefined {
@@ -1109,6 +1115,7 @@ export function createDemoApi(): Api {
         targetType: target.type,
         attackName: action.name,
         die,
+        dice: dice.length > 1 ? dice : undefined,
         total,
         outcome,
         source: 'player',
@@ -1163,6 +1170,9 @@ export function createDemoApi(): Api {
         targetId: target.id,
         targetName: target.displayName,
         damage: rolled.total,
+        rolls: rolled.rolls,
+        math: rolled.math,
+        mathTypes: rolled.mathTypes,
       });
       return;
     }

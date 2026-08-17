@@ -1970,6 +1970,12 @@ textarea::placeholder {
   opacity: 0.85;
 }
 
+/* The discarded die of an adv/dis attack roll. */
+.log-roll .lr-dropped {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
 /* Advantage / normal / disadvantage selector in the attack modal. */
 .adv-toggle-row {
   display: flex;

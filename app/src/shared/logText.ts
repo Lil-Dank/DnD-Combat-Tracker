@@ -136,6 +136,10 @@ export function logEntryText(lang: Lang, e: LogEntry): string {
  * damage type's own tint when the entry knows which type each bracket group
  * rolled (types aligns with bracket order; null = unknown).
  */
+export function rollMathSegments(s: string, types?: (string | null)[]): LogSegment[] {
+  return mathSegments(s, types);
+}
+
 function mathSegments(s: string, types?: (string | null)[]): LogSegment[] {
   const out: LogSegment[] = [];
   const re = /(\d*[dW]\d+|\[[^\]]*\])/g;
@@ -170,12 +174,24 @@ export function logRollSegments(lang: Lang, e: LogEntry): LogSegment[] | null {
   if (e.die === undefined) return [{ text: `= ${e.total}` }];
   const mod = e.total - e.die;
   const modStr = mod === 0 ? '' : ` ${mod > 0 ? '+' : '−'} ${Math.abs(mod)}`;
-  return [
-    { text: d20, cls: 'lr-dice' },
-    { text: ' ' },
-    { text: String(e.die), cls: 'lr-rolls' },
-    { text: `${modStr} = ${e.total}` },
-  ];
+  const out: LogSegment[] = [{ text: d20, cls: 'lr-dice' }, { text: ' ' }];
+  if (e.dice && e.dice.length > 1) {
+    // Adv/dis: both d20s, the discarded one struck through.
+    let keptShown = false;
+    e.dice.forEach((d, i) => {
+      if (i > 0) out.push({ text: ' · ' });
+      if (d === e.die && !keptShown) {
+        keptShown = true;
+        out.push({ text: String(d), cls: 'lr-rolls' });
+      } else {
+        out.push({ text: String(d), cls: 'lr-dropped' });
+      }
+    });
+  } else {
+    out.push({ text: String(e.die), cls: 'lr-rolls' });
+  }
+  out.push({ text: `${modStr} = ${e.total}` });
+  return out;
 }
 
 // Damage-type words, matched case-insensitively in display strings. German

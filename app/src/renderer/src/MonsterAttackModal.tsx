@@ -116,6 +116,7 @@ export function MonsterAttackModal({
             targetType: singleTarget?.type,
             attackName: locAction(l10nDe, attack).name,
             die,
+            dice,
             total,
           },
         });

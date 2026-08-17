@@ -264,6 +264,8 @@ export interface LogEntry {
   math?: string;
   condition?: Condition;
   source: LogSource;
+  /** Player-sourced entries: the claim's player name or a device label. */
+  sourceName?: string;
 }
 
 /** An ended combat's log, kept until the DM deletes it. */

@@ -169,7 +169,7 @@ function synthesizeRollDetails(
     if (current?.attacks.some((a) => a.id === attackId)) {
       const action = current.attacks.find((a) => a.id === attackId);
       return {
-        actorName: current.displayName,
+        actorName: monsterName(state.settings.language, current.displayName),
         actorType: current.type,
         attackName: action?.name,
       };
@@ -183,7 +183,11 @@ function synthesizeRollDetails(
   if (!owner) return undefined;
   const action = owner.attacks.find((a) => a.id === attackId);
   const isPc = state.pcs.some((p) => p.id === owner.id);
-  return { actorName: owner.name, actorType: isPc ? 'pc' : 'monster', attackName: action?.name };
+  return {
+    actorName: monsterName(state.settings.language, owner.name),
+    actorType: isPc ? 'pc' : 'monster',
+    attackName: action?.name,
+  };
 }
 
 function broadcast(): void {

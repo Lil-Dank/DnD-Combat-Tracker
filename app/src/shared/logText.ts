@@ -147,7 +147,8 @@ export function logRollMath(lang: Lang, e: LogEntry): string | null {
   return `${d20} ${e.die}${modStr} = ${e.total}`;
 }
 
-/** Short source tag ("DM", "Deck", "Phone") for the DM-side log views. */
+/** Short source tag ("DM", "Deck", "Phone (Alex)") for the DM-side log views. */
 export function logSourceTag(lang: Lang, e: LogEntry): string {
-  return translate(lang, `log.src.${e.source}`);
+  const base = translate(lang, `log.src.${e.source}`);
+  return e.sourceName ? `${base} (${e.sourceName})` : base;
 }

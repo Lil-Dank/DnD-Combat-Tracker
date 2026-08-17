@@ -68,6 +68,7 @@ interface ActionCtx {
   actorName?: string;
   actorType?: 'pc' | 'monster';
   math?: string;
+  sourceName?: string;
 }
 
 const DM_CTX: ActionCtx = { source: 'dm' };
@@ -326,6 +327,7 @@ export function createDemoApi(): Api {
       amount,
       math: ctx.math,
       source: ctx.source,
+      sourceName: ctx.sourceName,
     });
     let downedOrKilled: KenkuEventId | null = null;
     if (c.currentHp === 0) {
@@ -335,6 +337,7 @@ export function createDemoApi(): Api {
         targetName: c.displayName,
         targetType: c.type,
         source: ctx.source,
+        sourceName: ctx.sourceName,
       });
       if (c.type === 'monster') {
         combat.combatants.splice(idx, 1);
@@ -370,6 +373,7 @@ export function createDemoApi(): Api {
       targetType: c.type,
       amount,
       source: ctx.source,
+      sourceName: ctx.sourceName,
     });
     save();
     kenkuCombatEvent('healApplied');
@@ -990,9 +994,13 @@ export function createDemoApi(): Api {
     return { total, math: `${mathParts.join(' + ')} = ${total}` };
   }
 
+  function sourceNameFor(pcId: string): string | undefined {
+    return playerClaims.get(pcId)?.playerName ?? undefined;
+  }
+
   function playerCtx(pcId: string): ActionCtx {
     const pc = data.pcs.find((p) => p.id === pcId);
-    return { source: 'player', actorName: pc?.name, actorType: 'pc' };
+    return { source: 'player', actorName: pc?.name, actorType: 'pc', sourceName: sourceNameFor(pcId) };
   }
 
   function handlePlayerCommand(session: PlayerSession, cmd: Record<string, unknown>): void {
@@ -1132,6 +1140,7 @@ export function createDemoApi(): Api {
           total,
           outcome,
           source: 'player',
+          sourceName: sourceNameFor(pcId),
         });
       }
       kenkuAttackEvent({
@@ -1230,7 +1239,12 @@ export function createDemoApi(): Api {
         });
       }
       if (amount > 0) {
-        applyDamage(r.targetId, amount, { source: 'player', actorName: pending.actorName, actorType: 'pc' });
+        applyDamage(r.targetId, amount, {
+          source: 'player',
+          actorName: pending.actorName,
+          actorType: 'pc',
+          sourceName: sourceNameFor(pending.pcId),
+        });
       }
       applied.push({ targetId: r.targetId, targetName: target.displayName, saved: r.saved, amount });
     }

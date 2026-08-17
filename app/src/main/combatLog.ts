@@ -34,6 +34,7 @@ export function logAttackEvent(
   phase: string,
   details: AttackRollDetails | undefined,
   source: LogSource,
+  sourceName?: string,
 ): void {
   const outcome = VERDICT_OUTCOME[phase];
   if (!outcome || !details?.actorName) return;
@@ -48,5 +49,6 @@ export function logAttackEvent(
     total: details.total,
     outcome,
     source,
+    sourceName,
   });
 }

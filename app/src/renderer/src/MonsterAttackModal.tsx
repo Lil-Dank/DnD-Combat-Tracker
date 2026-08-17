@@ -100,12 +100,14 @@ export function MonsterAttackModal({
           attackId: attack.id,
           phase,
           // Roll details ride along for the combat log.
+          // Names are snapshotted into the log in the DM's current language,
+          // matching what the deck and phones record.
           roll: {
-            actorName: attacker.displayName,
+            actorName: mon(attacker.displayName),
             actorType: attacker.type,
-            targetName: singleTarget?.displayName,
+            targetName: singleTarget ? mon(singleTarget.displayName) : undefined,
             targetType: singleTarget?.type,
-            attackName: attack.name,
+            attackName: locAction(l10nDe, attack).name,
             die,
             total,
           },
@@ -154,7 +156,7 @@ export function MonsterAttackModal({
     for (const id of targets) {
       const halved = saved.has(id);
       await api.applyDamage(id, halved ? half : dmgRoll.total, {
-        actorName: attacker.displayName,
+        actorName: mon(attacker.displayName),
         actorType: attacker.type,
         math: halved ? `${dmgRoll.math} → ½ ${half}` : dmgRoll.math,
       });
@@ -165,7 +167,7 @@ export function MonsterAttackModal({
     onClose();
   };
 
-  const targetName = (c: Combatant) => `${c.isDowned ? '💀 ' : ''}${c.displayName}`;
+  const targetName = (c: Combatant) => `${c.isDowned ? '💀 ' : ''}${mon(c.displayName)}`;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

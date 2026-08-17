@@ -173,8 +173,8 @@ function KenkuSection({ state }: { state: AppState }) {
 
       {kenku.enabled && (
         <>
-          <label className="inline-label">
-            {t('kenku.address')}
+          <label className="inline-label kenku-address-row">
+            <span className="inline-label-text">{t('kenku.address')}</span>
             <input
               type="text"
               defaultValue={kenku.host}

@@ -134,7 +134,11 @@ export function createDemoApi(): Api {
       // The simulated deck on this page counts as a connected client.
       bridgeClientCount: 1,
       kenkuConnected,
-      playerClients: [],
+      playerClients: [...playerClaims.entries()].map(([pcId, claim]) => ({
+        pcId,
+        playerName: claim.playerName,
+        connected: [...playerSessions].some((s) => s.pcId === pcId),
+      })),
     };
   }
 
@@ -800,9 +804,423 @@ export function createDemoApi(): Api {
     for (const cb of focusListeners) cb();
   }
 
+  // ---- fake player server (demo) ---------------------------------------------
+  // Speaks the playerServer.ts protocol to the phone-sim iframe: same
+  // disclosure rules (monster HP/AC never sent, monster roll numbers stripped
+  // from the log), same commands, strict turn gating.
+
+  interface PlayerSession {
+    token: string | null;
+    pcId: string | null;
+    onMessage: (json: string) => void;
+  }
+
+  const playerSessions = new Set<PlayerSession>();
+  const playerClaims = new Map<string, { token: string; playerName: string | null }>();
+  const savePendingListeners = new Set<(pending: object) => void>();
+  interface PendingSave {
+    id: string;
+    pcId: string;
+    actorName: string;
+    attackId: string;
+    attackName: string;
+    damage: number;
+    targetIds: string[];
+    session: PlayerSession;
+  }
+  const pendingSaves = new Map<string, PendingSave>();
+
+  function tokenPcId(token: string | null): string | null {
+    if (!token) return null;
+    for (const [pcId, claim] of playerClaims) if (claim.token === token) return pcId;
+    return null;
+  }
+
+  function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
+    return log.map((e) =>
+      e.kind === 'attackRoll' && e.actorType === 'monster'
+        ? { ...e, die: undefined, total: undefined }
+        : e,
+    );
+  }
+
+  function playerStateMessage(session: PlayerSession): string {
+    const lang = data.settings.language;
+    const combat = data.combat;
+    const active = combat !== null && combat.phase === 'active';
+    const ownPc = session.pcId ? data.pcs.find((p) => p.id === session.pcId) ?? null : null;
+    const ownCombatant = active
+      ? combat.combatants.find((c) => c.type === 'pc' && c.sourceId === session.pcId) ?? null
+      : null;
+
+    const combatants = active
+      ? combat.combatants.map((c, i) => {
+          const base = {
+            id: c.id,
+            name: monsterName(lang, c.displayName),
+            type: c.type,
+            isCurrentTurn: i === combat.currentIndex,
+            isDowned: c.isDowned,
+            conditions: c.conditions,
+            isBloodied: c.type === 'monster' ? c.currentHp < c.maxHp * 0.5 : undefined,
+          };
+          if (c.type !== 'pc') return base;
+          const pcExtra = { currentHp: c.currentHp, maxHp: c.maxHp };
+          if (c.sourceId !== session.pcId) return { ...base, ...pcExtra };
+          return { ...base, ...pcExtra, ac: c.ac, initiative: c.initiative };
+        })
+      : [];
+
+    return JSON.stringify({
+      type: 'state',
+      language: lang,
+      gating: data.settings.playerWeb.gating,
+      combatActive: active,
+      round: active ? combat.round : 0,
+      currentIndex: active ? combat.currentIndex : 0,
+      myTurn: ownCombatant
+        ? combat!.combatants.indexOf(ownCombatant) === combat!.currentIndex
+        : false,
+      claims: data.pcs.map((p) => ({
+        pcId: p.id,
+        name: p.name,
+        taken: playerClaims.has(p.id),
+        mine: p.id === session.pcId,
+        playerName: playerClaims.get(p.id)?.playerName ?? null,
+      })),
+      you: ownPc
+        ? {
+            pcId: ownPc.id,
+            name: ownPc.name,
+            maxHp: ownPc.maxHp,
+            ac: ownPc.ac,
+            initMod: ownPc.initMod,
+            attacks: ownPc.attacks,
+            combatantId: ownCombatant?.id ?? null,
+          }
+        : null,
+      combatants,
+      log: active ? filterLogForPlayers(combat.log).slice(-200) : [],
+      archive: data.archive.map((a) => ({
+        id: a.id,
+        templateName: a.templateName,
+        endedAt: a.endedAt,
+        rounds: a.rounds,
+      })),
+    });
+  }
+
+  function playerBroadcast(): void {
+    for (const s of playerSessions) s.onMessage(playerStateMessage(s));
+  }
+  stateListeners.add(() => playerBroadcast());
+
+  function publishPlayerClients(): void {
+    notify();
+  }
+
+  function playerIsMyTurn(pcId: string): boolean {
+    const combat = data.combat;
+    if (!combat || combat.phase !== 'active') return false;
+    const own = combat.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+    return own !== undefined && combat.combatants.indexOf(own) === combat.currentIndex;
+  }
+
+  function playerGateAllows(pcId: string, targets: string[], kind: 'hpChange' | 'attack'): boolean {
+    if (playerIsMyTurn(pcId)) return true;
+    if (data.settings.playerWeb.gating !== 'relaxed' || kind !== 'hpChange') return false;
+    const own = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+    return own !== undefined && targets.length === 1 && targets[0] === own.id;
+  }
+
+  function rollActionDamage(action: MonsterAction): number {
+    let total = 0;
+    for (const d of action.onHit.damage) {
+      if (d.condition) continue;
+      if (d.count && d.die) {
+        for (let i = 0; i < d.count; i++) total += 1 + Math.floor(Math.random() * d.die);
+        total += d.bonus ?? 0;
+      } else {
+        total += d.average ?? 0;
+      }
+    }
+    return Math.max(0, total);
+  }
+
+  function playerCtx(pcId: string): ActionCtx {
+    const pc = data.pcs.find((p) => p.id === pcId);
+    return { source: 'player', actorName: pc?.name, actorType: 'pc' };
+  }
+
+  function handlePlayerCommand(session: PlayerSession, cmd: Record<string, unknown>): void {
+    const sendTo = (msg: object) => session.onMessage(JSON.stringify(msg));
+    const type = cmd.type as string;
+
+    if (type === 'hello') {
+      session.token = typeof cmd.token === 'string' ? cmd.token : null;
+      session.pcId = tokenPcId(session.token);
+      sendTo(JSON.parse(playerStateMessage(session)));
+      return;
+    }
+
+    if (type === 'claim') {
+      const pcId = cmd.pcId as string;
+      const token = cmd.token as string;
+      if (!data.pcs.some((p) => p.id === pcId)) {
+        sendTo({ type: 'claimResult', ok: false, reason: 'unknownPc' });
+        return;
+      }
+      const existing = playerClaims.get(pcId);
+      if (existing && existing.token !== token) {
+        sendTo({ type: 'claimResult', ok: false, reason: 'taken' });
+        return;
+      }
+      for (const [otherId, claim] of playerClaims) {
+        if (otherId !== pcId && claim.token === token) playerClaims.delete(otherId);
+      }
+      const name = typeof cmd.playerName === 'string' ? cmd.playerName.trim().slice(0, 40) : '';
+      playerClaims.set(pcId, { token, playerName: name || null });
+      session.token = token;
+      session.pcId = pcId;
+      sendTo({ type: 'claimResult', ok: true });
+      publishPlayerClients();
+      return;
+    }
+
+    if (type === 'release') {
+      if (session.pcId) playerClaims.delete(session.pcId);
+      session.pcId = null;
+      session.token = null;
+      publishPlayerClients();
+      return;
+    }
+
+    if (!session.pcId) return;
+    const pcId = session.pcId;
+
+    if (type === 'applyDamage' || type === 'applyHeal') {
+      const targets = (cmd.targets as string[]) ?? [];
+      const amount = cmd.amount as number;
+      if (!Number.isInteger(amount) || amount < 1 || amount > 999) return;
+      if (!playerGateAllows(pcId, targets, 'hpChange')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      const ctx = playerCtx(pcId);
+      for (const id of targets) {
+        if (type === 'applyDamage') applyDamage(id, amount, ctx);
+        else applyHeal(id, amount, ctx);
+      }
+      return;
+    }
+
+    if (type === 'attackDigital' || type === 'attackManual') {
+      const pc = data.pcs.find((p) => p.id === pcId);
+      const action = pc?.attacks.find((a) => a.id === cmd.attackId);
+      const targetIds = (cmd.targetIds as string[]) ?? [];
+      if (!pc || !action) {
+        sendTo({ type: 'error', code: 'badAttack' });
+        return;
+      }
+      if (!playerGateAllows(pcId, targetIds, 'attack')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      if (action.type === 'save' || action.save) {
+        const damage =
+          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0
+            ? (cmd.damage as number)
+            : rollActionDamage(action);
+        const pending: PendingSave = {
+          id: uuid(),
+          pcId,
+          actorName: pc.name,
+          attackId: action.id,
+          attackName: action.name,
+          damage,
+          targetIds,
+          session,
+        };
+        pendingSaves.set(pending.id, pending);
+        sendTo({ type: 'savePending', id: pending.id, damage });
+        for (const cb of savePendingListeners) {
+          cb({
+            id: pending.id,
+            actorName: pending.actorName,
+            attackName: pending.attackName,
+            ability: action.save?.ability ?? 'DEX',
+            dc: action.save?.dc ?? 10,
+            damage: pending.damage,
+            targetIds: pending.targetIds,
+          });
+        }
+        return;
+      }
+      const combat = data.combat;
+      const target = combat?.combatants.find((c) => c.id === targetIds[0]);
+      if (!combat || !target) {
+        sendTo({ type: 'error', code: 'badTarget' });
+        return;
+      }
+      let die: number | null = null;
+      let total: number;
+      let outcome: 'crit' | 'hit' | 'miss';
+      if (type === 'attackDigital') {
+        die = 1 + Math.floor(Math.random() * 20);
+        total = die + (action.attack?.toHit ?? 0);
+        outcome = die === 20 ? 'crit' : die === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
+      } else {
+        total = (cmd.d20Total as number) ?? 0;
+        const natural = cmd.natural as number | undefined;
+        die = natural === 20 ? 20 : natural === 1 ? 1 : null;
+        outcome = natural === 20 ? 'crit' : natural === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
+      }
+      const combatForLog = data.combat;
+      if (combatForLog) {
+        pushLog(combatForLog, {
+          kind: 'attackRoll',
+          actorName: pc.name,
+          actorType: 'pc',
+          targetName: target.displayName,
+          attackName: action.name,
+          die: die ?? undefined,
+          total,
+          outcome,
+          source: 'player',
+        });
+      }
+      kenkuAttackEvent({
+        sourceId: pcId,
+        attackId: action.id,
+        phase: outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss',
+      });
+      let damage: number | null = null;
+      if (outcome !== 'miss') {
+        damage =
+          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0
+            ? (cmd.damage as number)
+            : rollActionDamage(action);
+        applyDamage(target.id, damage, playerCtx(pcId));
+      } else {
+        save();
+      }
+      sendTo({
+        type: 'attackResult',
+        targetId: target.id,
+        targetName: target.displayName,
+        die,
+        total,
+        outcome,
+        damage,
+      });
+      return;
+    }
+
+    if (type === 'saveAttack') {
+      const action = cmd.action as MonsterAction;
+      const pc = data.pcs.find((p) => p.id === pcId);
+      if (!pc || !action || typeof action.id !== 'string') return;
+      const idx = pc.attacks.findIndex((a) => a.id === action.id);
+      if (idx === -1) pc.attacks.push(action);
+      else pc.attacks[idx] = action;
+      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
+      save();
+      return;
+    }
+
+    if (type === 'deleteAttack') {
+      const pc = data.pcs.find((p) => p.id === pcId);
+      if (!pc) return;
+      pc.attacks = pc.attacks.filter((a) => a.id !== cmd.actionId);
+      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
+      save();
+      return;
+    }
+
+    if (type === 'getArchive') {
+      const found = data.archive.find((a) => a.id === cmd.archiveId);
+      if (!found) return;
+      sendTo({
+        type: 'archiveEntry',
+        id: found.id,
+        templateName: found.templateName,
+        endedAt: found.endedAt,
+        rounds: found.rounds,
+        log: filterLogForPlayers(found.log),
+      });
+      return;
+    }
+  }
+
+  function resolvePlayerSave(
+    id: string,
+    results: Array<{ targetId: string; saved: boolean; total?: number }>,
+  ): void {
+    const pending = pendingSaves.get(id);
+    if (!pending) return;
+    pendingSaves.delete(id);
+    const combat = data.combat;
+    const half = Math.floor(pending.damage / 2);
+    const applied: Array<{ targetId: string; targetName: string; saved: boolean; amount: number }> = [];
+    for (const r of results) {
+      const target = combat?.combatants.find((c) => c.id === r.targetId);
+      if (!target || !pending.targetIds.includes(r.targetId)) continue;
+      const amount = r.saved ? half : pending.damage;
+      if (combat) {
+        pushLog(combat, {
+          kind: 'save',
+          actorName: target.displayName,
+          actorType: target.type,
+          targetName: pending.actorName,
+          attackName: pending.attackName,
+          total: r.total,
+          outcome: r.saved ? 'saved' : 'failed',
+          source: 'dm',
+        });
+      }
+      if (amount > 0) {
+        applyDamage(r.targetId, amount, { source: 'player', actorName: pending.actorName, actorType: 'pc' });
+      }
+      applied.push({ targetId: r.targetId, targetName: target.displayName, saved: r.saved, amount });
+    }
+    save();
+    pending.session.onMessage(
+      JSON.stringify({ type: 'saveResolved', id, results: applied }),
+    );
+  }
+
+  function dismissPlayerSave(id: string): void {
+    const pending = pendingSaves.get(id);
+    if (!pending) return;
+    pendingSaves.delete(id);
+    pending.session.onMessage(
+      JSON.stringify({ type: 'saveResolved', id, cancelled: true, results: [] }),
+    );
+  }
+
   (window as unknown as { __demo?: object }).__demo = {
     bridgeState,
     command,
+    /** The phone-sim iframe attaches its fake WebSocket here. */
+    playerAttach: (onMessage: (json: string) => void) => {
+      const session: PlayerSession = { token: null, pcId: null, onMessage };
+      playerSessions.add(session);
+      onMessage(playerStateMessage(session));
+      return {
+        send: (json: string) => {
+          try {
+            handlePlayerCommand(session, JSON.parse(json) as Record<string, unknown>);
+          } catch {
+            /* malformed frames are dropped, like the real server */
+          }
+        },
+        close: () => {
+          playerSessions.delete(session);
+        },
+      };
+    },
     onState: (cb: () => void) => {
       const wrapped = () => cb();
       stateListeners.add(wrapped);
@@ -1063,12 +1481,26 @@ export function createDemoApi(): Api {
       channel.postMessage('pv-fullscreen');
     },
 
-    // Player web + archive: inert in the browser demo (no LAN server here).
+    // Player web: backed by the in-page fake player server (phone-sim iframe).
     getPlayerWebQr: async () => ({ urls: [], port: 0, error: null, dataUrls: [] }),
-    kickPlayer: async () => {},
-    resolvePlayerSave: async () => {},
-    dismissPlayerSave: async () => {},
-    onPlayerSavePending: () => () => {},
+    kickPlayer: async (pcId) => {
+      playerClaims.delete(pcId);
+      for (const s of playerSessions) {
+        if (s.pcId === pcId) {
+          s.pcId = null;
+          s.token = null;
+          s.onMessage(JSON.stringify({ type: 'kicked' }));
+        }
+      }
+      publishPlayerClients();
+    },
+    resolvePlayerSave: async (id, results) => resolvePlayerSave(id, results),
+    dismissPlayerSave: async (id) => dismissPlayerSave(id),
+    onPlayerSavePending: (cb) => {
+      const wrapped = (pending: object) => cb(pending as Parameters<typeof cb>[0]);
+      savePendingListeners.add(wrapped);
+      return () => savePendingListeners.delete(wrapped);
+    },
     listArchive: async () => data.archive,
     deleteArchivedCombat: async (id) => {
       data.archive = data.archive.filter((a) => a.id !== id);

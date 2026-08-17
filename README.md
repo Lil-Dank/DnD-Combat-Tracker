@@ -4,9 +4,9 @@
 
 # Deck of Many Turns
 
-*The name is a play on the **Deck of Many Things**, D&D's most infamous magic item —
-chosen because this project started with a single idea: a D&D combat tracker whose
-flow of turns is controlled from an Elgato Stream **Deck**.*
+> <sub><em>The name is a play on the <strong>Deck of Many Things</strong>, D&D's most infamous
+> magic item — chosen because this project started with a single idea: a D&D combat
+> tracker whose flow of turns is controlled from an Elgato Stream <strong>Deck</strong>.</em></sub>
 
 **A Windows desktop app for Dungeon Masters to run D&D combat — with a second-monitor
 Player View, a phone companion for the players, and an Elgato Stream Deck plugin for

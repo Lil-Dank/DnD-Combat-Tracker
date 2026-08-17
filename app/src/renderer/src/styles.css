@@ -20,7 +20,11 @@
   --badge-bg: #4c1d95;
   --badge-border: #7c3aed;
   --badge-text: #e9d5ff;
-  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --warn: #f59e0b;
+  --current-border: var(--gold);
+  --current-tint: rgba(212, 169, 79, 0.12);
+  --current-shadow: rgba(212, 169, 79, 0.15);
 }
 
 /* PHB Style — parchment + dark-red headings, serif, like official 5e books. */
@@ -46,6 +50,10 @@
   --badge-border: #c9ad6a;
   --badge-text: #f9ecd9;
   --font-ui: 'Book Antiqua', 'Palatino Linotype', Palatino, Georgia, serif;
+  --warn: #8a5a12;
+  --current-border: var(--gold);
+  --current-tint: rgba(201, 173, 106, 0.2);
+  --current-shadow: rgba(121, 94, 45, 0.18);
 }
 
 /* Generic dark. */
@@ -70,7 +78,11 @@
   --badge-bg: #374151;
   --badge-border: #4b5563;
   --badge-text: #e5e7eb;
-  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --warn: #f59e0b;
+  --current-border: var(--accent);
+  --current-tint: rgba(96, 165, 250, 0.09);
+  --current-shadow: rgba(96, 165, 250, 0.12);
 }
 
 /* Generic light. */
@@ -95,7 +107,26 @@
   --badge-bg: #e0e7ff;
   --badge-border: #a5b4fc;
   --badge-text: #3730a3;
-  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --warn: #b45309;
+  --current-border: var(--accent);
+  --current-tint: rgba(37, 99, 235, 0.08);
+  --current-shadow: rgba(37, 99, 235, 0.12);
+}
+
+/* ---- Design tokens (theme-independent) ---- */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --control-h: 30px;
+  --control-h-sm: 26px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
 }
 
 * {
@@ -119,6 +150,66 @@ input, button, select, textarea {
   font: inherit;
 }
 
+/* ---- Form controls, app-wide (not just inside modals) ---- */
+
+input:not([type='checkbox']):not([type='radio']):not([type='color']),
+textarea,
+select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  padding: 4px 9px;
+  min-height: var(--control-h);
+}
+
+select {
+  appearance: none;
+  padding-right: 26px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent-dim);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+input[type='color'] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  padding: 2px;
+  height: var(--control-h);
+  cursor: pointer;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
 .loading {
   padding: 40px;
   color: var(--text-muted);
@@ -132,7 +223,7 @@ input, button, select, textarea {
 }
 
 .sidebar {
-  width: 200px;
+  width: 188px;
   flex-shrink: 0;
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
@@ -196,14 +287,14 @@ input, button, select, textarea {
   overflow-y: auto;
   /* Reserve the scrollbar gutter so content doesn't shift when it appears. */
   scrollbar-gutter: stable;
-  padding: 24px 28px;
+  padding: 16px 20px;
 }
 
 .screen-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -827,12 +918,12 @@ input, button, select, textarea {
 /* Sticky combat header: stays put while the initiative list scrolls. */
 .combat-sticky {
   position: sticky;
-  /* The sticky inset tracks the margin box: -24px pins the visible part
+  /* The sticky inset tracks the margin box: -16px pins the visible part
      flush with the scrollport while swallowing the container's top padding
      so rows never peek above the bar. */
-  top: -24px;
-  margin-top: -24px;
-  padding-top: 24px;
+  top: -16px;
+  margin-top: -16px;
+  padding-top: 16px;
   padding-bottom: 12px;
   margin-bottom: 6px;
   background: var(--bg);
@@ -868,9 +959,9 @@ input, button, select, textarea {
 }
 
 .combat-row.current {
-  border-color: var(--gold);
-  background: linear-gradient(90deg, rgba(212, 169, 79, 0.12), var(--bg-panel) 55%);
-  box-shadow: 0 0 12px rgba(212, 169, 79, 0.15);
+  border-color: var(--current-border);
+  background: linear-gradient(90deg, var(--current-tint), var(--bg-panel) 55%);
+  box-shadow: 0 0 12px var(--current-shadow);
 }
 
 .combat-row.downed {
@@ -931,7 +1022,7 @@ input, button, select, textarea {
 }
 
 .hp.low {
-  color: #f59e0b;
+  color: var(--warn);
 }
 
 /* ---- Kenku FM ---- */
@@ -1010,7 +1101,7 @@ input, button, select, textarea {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #c22f2f;
+  color: var(--danger);
   border: 1px solid rgba(194, 47, 47, 0.55);
   border-radius: 999px;
   padding: 1px 8px;
@@ -1498,7 +1589,7 @@ input, button, select, textarea {
   max-height: calc(100vh - 120px);
   display: flex;
   flex-direction: column;
-  background: var(--panel-bg, rgba(0, 0, 0, 0.15));
+  background: var(--bg-panel);
   border: 1px solid var(--border, rgba(128, 128, 128, 0.3));
   border-radius: 10px;
 }

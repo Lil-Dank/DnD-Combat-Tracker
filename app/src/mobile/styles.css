@@ -29,8 +29,17 @@ body {
 body {
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font: 16px/1.45 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   overscroll-behavior: none;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
 }
 
 button {

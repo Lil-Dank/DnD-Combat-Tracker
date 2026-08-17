@@ -42,7 +42,7 @@ export function ArchiveScreen() {
                 <div className="log-round">{t('log.round', { round: e.round })}</div>
               ) : null;
             lastRound = e.round > 0 ? e.round : lastRound;
-            const math = logRollMath(e);
+            const math = logRollMath(lang, e);
             return (
               <div key={e.id}>
                 {header}

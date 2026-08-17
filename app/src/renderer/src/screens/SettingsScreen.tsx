@@ -376,9 +376,9 @@ export function SettingsScreen({ state }: { state: AppState }) {
         </p>
       </section>
 
-      <KenkuSection state={state} />
-
       <PlayerWebSection state={state} />
+
+      <KenkuSection state={state} />
 
       <section className="settings-section">
         <h2>{t('settings.about')}</h2>

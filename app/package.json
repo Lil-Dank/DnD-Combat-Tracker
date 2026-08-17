@@ -1,6 +1,6 @@
 {
   "name": "dnd-combat-tracker",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "D&D Combat Tracker for Dungeon Masters \u2014 DM window, Player View, Stream Deck integration",
   "main": "out/main/index.js",
   "author": "DM Tools",

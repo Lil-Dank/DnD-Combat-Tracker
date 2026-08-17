@@ -64,9 +64,9 @@ const act = (s) => ({
 });
 
 const combatants = [
-  { id: 'c1', displayName: 'Dragonmerry', currentHp: 0, maxHp: 24, ac: 14, isCurrentTurn: false, isDowned: true, conditions: [], attacks: [] },
-  { id: 'c2', displayName: 'Kobold Warrior 4', currentHp: 5, maxHp: 5, ac: 14, isCurrentTurn: false, conditions: [], attacks: [] },
-  { id: 'c3', displayName: 'Adult Black Dragon', currentHp: 148, maxHp: 195, ac: 19, isCurrentTurn: true, conditions: [],
+  { id: 'c1', type: 'pc', displayName: 'Dragonmerry', currentHp: 0, maxHp: 24, ac: 14, isCurrentTurn: false, isDowned: true, conditions: [], attacks: [] },
+  { id: 'c2', type: 'monster', displayName: 'Kobold Warrior 4', currentHp: 5, maxHp: 5, ac: 14, isCurrentTurn: false, conditions: [], attacks: [] },
+  { id: 'c3', type: 'monster', displayName: 'Adult Black Dragon', currentHp: 148, maxHp: 195, ac: 19, isCurrentTurn: true, conditions: [],
     attacks: [
       { id: 'k.bite', name: 'Bite', toHit: 11, save: null, damage: [
         { dice: '2d10+6', average: 17, type: 'slashing', condition: null },
@@ -76,12 +76,12 @@ const combatants = [
       { id: 'k.breath', name: 'Acid Breath', toHit: null, save: 'DEX 18', damage: [
         { dice: '12d8', average: 54, type: 'acid', condition: null } ] },
     ] },
-  { id: 'c4', displayName: "Gul'dan", currentHp: 0, maxHp: 28, ac: 15, isCurrentTurn: false, isDowned: true, conditions: [], attacks: [] },
-  { id: 'c5', displayName: 'Kobold Warrior 2', currentHp: 2, maxHp: 5, ac: 14, isCurrentTurn: false, conditions: [], attacks: [] },
-  { id: 'c6', displayName: 'Kobold Warrior 3', currentHp: 5, maxHp: 5, ac: 14, isCurrentTurn: false, conditions: ['Prone'], attacks: [] },
-  { id: 'c7', displayName: 'White Dragon Wyrmling', currentHp: 32, maxHp: 32, ac: 16, isCurrentTurn: false, conditions: [], attacks: [] },
-  { id: 'c8', displayName: 'Hermann der Grosse', currentHp: 20, maxHp: 20, ac: 18, isCurrentTurn: false, conditions: [], attacks: [] },
-  { id: 'c9', displayName: 'Salazir', currentHp: 10, maxHp: 10, ac: 13, isCurrentTurn: false, conditions: [], attacks: [] },
+  { id: 'c4', type: 'pc', displayName: "Gul'dan", currentHp: 0, maxHp: 28, ac: 15, isCurrentTurn: false, isDowned: true, conditions: [], attacks: [] },
+  { id: 'c5', type: 'monster', displayName: 'Kobold Warrior 2', currentHp: 2, maxHp: 5, ac: 14, isCurrentTurn: false, conditions: [], attacks: [] },
+  { id: 'c6', type: 'monster', displayName: 'Kobold Warrior 3', currentHp: 5, maxHp: 5, ac: 14, isCurrentTurn: false, conditions: ['Prone'], attacks: [] },
+  { id: 'c7', type: 'monster', displayName: 'White Dragon Wyrmling', currentHp: 32, maxHp: 32, ac: 16, isCurrentTurn: false, conditions: [], attacks: [] },
+  { id: 'c8', type: 'pc', displayName: 'Hermann der Grosse', currentHp: 20, maxHp: 20, ac: 18, isCurrentTurn: false, conditions: [], attacks: [] },
+  { id: 'c9', type: 'pc', displayName: 'Salazir', currentHp: 10, maxHp: 10, ac: 13, isCurrentTurn: false, conditions: [], attacks: [] },
 ];
 
 bridge.start();

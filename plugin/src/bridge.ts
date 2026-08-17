@@ -72,6 +72,7 @@ export type BridgeCommand =
         actorName: string;
         actorType?: string;
         targetName?: string;
+        targetType?: string;
         attackName: string;
         die: number;
         total: number;

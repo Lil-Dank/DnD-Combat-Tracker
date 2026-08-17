@@ -128,13 +128,49 @@ async function handleCommand(cmd: BridgeCommand): Promise<void> {
       // per-attack sound from the attack id alone (older clients).
       if (typeof c.attackId === 'string' && c.phase) {
         handleAttackEvent({ sourceId: c.sourceId ?? '', attackId: c.attackId, phase: c.phase });
-        logAttackEvent(c.phase, cmd.roll, 'deck');
+        // Log the verdict. Clients that don't send roll details (older
+        // plugins, third-party bridge users) still get a log line - the
+        // attacker resolves from the current turn / attack id.
+        logAttackEvent(c.phase, cmd.roll ?? synthesizeRollDetails(c.sourceId, c.attackId), 'deck');
       }
       return;
     }
     default:
       return;
   }
+}
+
+/**
+ * Fallback attacker resolution for verdict logging when a client sent no
+ * roll block: prefer the current-turn combatant when it matches the attack,
+ * else name the attack's owning template/PC.
+ */
+function synthesizeRollDetails(
+  sourceId: string | undefined,
+  attackId: string,
+): AttackRollDetails | undefined {
+  const state = store.getState();
+  const combat = state.combat;
+  if (combat && combat.phase === 'active') {
+    const current = combat.combatants[combat.currentIndex];
+    if (current?.attacks.some((a) => a.id === attackId)) {
+      const action = current.attacks.find((a) => a.id === attackId);
+      return {
+        actorName: current.displayName,
+        actorType: current.type,
+        attackName: action?.name,
+      };
+    }
+  }
+  const owner =
+    state.monsters.find((m) => m.id === sourceId) ??
+    state.pcs.find((p) => p.id === sourceId) ??
+    state.monsters.find((m) => m.attacks.some((a) => a.id === attackId)) ??
+    state.pcs.find((p) => p.attacks.some((a) => a.id === attackId));
+  if (!owner) return undefined;
+  const action = owner.attacks.find((a) => a.id === attackId);
+  const isPc = state.pcs.some((p) => p.id === owner.id);
+  return { actorName: owner.name, actorType: isPc ? 'pc' : 'monster', attackName: action?.name };
 }
 
 function broadcast(): void {

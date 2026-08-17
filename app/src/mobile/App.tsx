@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { conditionLabel, translate, type Lang } from '../shared/i18n';
-import { logEntryText } from '../shared/logText';
+import { conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
+import { formatDice, parseDice } from '../shared/dice';
+import { logEntrySegments, logEntryText, logRollMath } from '../shared/logText';
 import type { LogEntry, MonsterAction } from '../shared/types';
 import { formToAction, actionToForm, emptyAction, ABILITIES, type ActionForm } from '../renderer/src/actionForm';
 import type {
@@ -327,7 +328,7 @@ function InitiativeList({
       {state.combatants.map((c) => (
         <li
           key={c.id}
-          className={`init-row ${c.isCurrentTurn ? 'current' : ''} ${
+          className={`init-row ${c.type} ${c.isCurrentTurn ? 'current' : ''} ${
             c.id === state.you?.combatantId ? 'me' : ''
           } ${c.isDowned ? 'downed' : ''}`}
         >
@@ -399,7 +400,7 @@ function HpFlow({
           .map((c) => (
             <button
               key={c.id}
-              className={`target ${targets.includes(c.id) ? 'selected' : ''}`}
+              className={`target ${c.type} ${targets.includes(c.id) ? 'selected' : ''}`}
               onClick={() => toggle(c.id)}
             >
               {c.name}
@@ -580,7 +581,7 @@ function AttackFlow({
               .map((c) => (
                 <button
                   key={c.id}
-                  className={`target ${targets.includes(c.id) ? 'selected' : ''}`}
+                  className={`target ${c.type} ${targets.includes(c.id) ? 'selected' : ''}`}
                   onClick={() => toggleTarget(c.id)}
                 >
                   {c.name}
@@ -773,46 +774,15 @@ function MyAttacks({
               </label>
             </div>
           )}
-          <div className="form-pair">
-            <label>
-              {t('monsters.f.damageDice')}
-              <input
-                placeholder="1d8+3"
-                value={form.damage[0]?.dice ?? ''}
-                onChange={(e) =>
-                  patch({
-                    damage: [
-                      {
-                        dice: e.target.value,
-                        flat: '',
-                        type: form.damage[0]?.type ?? '',
-                        condition: '',
-                      },
-                    ],
-                  })
-                }
-              />
-            </label>
-            <label>
-              {t('common.type')}
-              <input
-                placeholder="slashing"
-                value={form.damage[0]?.type ?? ''}
-                onChange={(e) =>
-                  patch({
-                    damage: [
-                      {
-                        dice: form.damage[0]?.dice ?? '',
-                        flat: '',
-                        type: e.target.value,
-                        condition: '',
-                      },
-                    ],
-                  })
-                }
-              />
-            </label>
-          </div>
+          <DamageEditor
+            t={t}
+            lang={state.language}
+            dice={form.damage[0]?.dice ?? ''}
+            type={form.damage[0]?.type ?? ''}
+            onChange={(dice, type) =>
+              patch({ damage: [{ dice, flat: '', type, condition: '' }] })
+            }
+          />
           <div className="form-pair">
             <button className="big" onClick={() => setForm(null)}>
               {t('common.cancel')}
@@ -824,6 +794,125 @@ function MyAttacks({
         </div>
       )}
     </Sheet>
+  );
+}
+
+// ---- damage editor ----------------------------------------------------------
+
+const DICE = [4, 6, 8, 10, 12, 20, 100];
+
+/**
+ * Structured damage entry: die picker + count stepper + bonus, and a damage
+ * type select with an "Other…" manual escape hatch. Round-trips through the
+ * same NdM+B string the rest of the app stores; a hand-typed value the parser
+ * doesn't understand falls back to a plain text field so nothing is lost.
+ */
+function DamageEditor({
+  t,
+  lang,
+  dice,
+  type,
+  onChange,
+}: {
+  t: (k: string, p?: Record<string, string | number>) => string;
+  lang: Lang;
+  dice: string;
+  type: string;
+  onChange: (dice: string, type: string) => void;
+}) {
+  const parsed = dice.trim() === '' ? { count: 0, die: 8, bonus: 0 } : parseDice(dice);
+  const manual = parsed === null;
+  const cur = parsed ?? { count: 0, die: 8, bonus: 0 };
+
+  const knownTypes = Object.keys(DAMAGE_TYPE_DE);
+  const typeKnown = type === '' || knownTypes.includes(type.toLowerCase());
+  const [otherType, setOtherType] = useState(!typeKnown);
+
+  const emit = (count: number, die: number, bonus: number) => {
+    onChange(count <= 0 ? '' : formatDice(count, die, bonus), type);
+  };
+
+  return (
+    <>
+      <span className="field-label">{t('monsters.f.damageDice')}</span>
+      {manual ? (
+        <div className="form-pair">
+          <label>
+            <input value={dice} onChange={(e) => onChange(e.target.value, type)} />
+          </label>
+          <button className="linkish" onClick={() => onChange('1d8', type)}>
+            {t('mob.usePicker')}
+          </button>
+        </div>
+      ) : (
+        <div className="dice-picker">
+          <div className="stepper">
+            <button onClick={() => emit(Math.max(0, cur.count - 1), cur.die, cur.bonus)}>−</button>
+            <span className="stepper-value tnum">{cur.count}</span>
+            <button onClick={() => emit(Math.min(20, cur.count + 1), cur.die, cur.bonus)}>+</button>
+          </div>
+          <select
+            value={cur.die}
+            disabled={cur.count === 0}
+            onChange={(e) => emit(Math.max(1, cur.count), parseInt(e.target.value, 10), cur.bonus)}
+          >
+            {DICE.map((d) => (
+              <option key={d} value={d}>
+                d{d}
+              </option>
+            ))}
+          </select>
+          <label className="bonus-label">
+            {t('mob.bonus')}
+            <input
+              type="number"
+              inputMode="numeric"
+              disabled={cur.count === 0}
+              value={cur.count === 0 ? '' : cur.bonus}
+              onChange={(e) => emit(cur.count, cur.die, parseInt(e.target.value, 10) || 0)}
+            />
+          </label>
+        </div>
+      )}
+      {!manual && cur.count > 0 && (
+        <p className="muted dice-preview">
+          {formatDice(cur.count, cur.die, cur.bonus)}
+        </p>
+      )}
+
+      <label>
+        {t('mob.dmgType')}
+        <select
+          value={otherType ? '__other' : type.toLowerCase()}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === '__other') {
+              setOtherType(true);
+            } else {
+              setOtherType(false);
+              onChange(dice, v);
+            }
+          }}
+        >
+          <option value="">—</option>
+          {knownTypes.map((k) => (
+            <option key={k} value={k}>
+              {damageTypeLabel(lang, k)}
+            </option>
+          ))}
+          <option value="__other">{t('mob.typeOther')}</option>
+        </select>
+      </label>
+      {otherType && (
+        <label>
+          <input
+            placeholder={t('mob.typeCustom')}
+            value={type}
+            onChange={(e) => onChange(dice, e.target.value)}
+          />
+        </label>
+      )}
+    </>
   );
 }
 
@@ -862,10 +951,22 @@ function LogList({ log, lang }: { log: LogEntry[]; lang: Lang }) {
             <div className="log-round">{translate(lang, 'log.round', { round: e.round })}</div>
           ) : null;
         lastRound = e.round > 0 ? e.round : lastRound;
+        const math = logRollMath(e);
         return (
           <div key={e.id}>
             {roundHeader}
-            <div className={`log-entry kind-${e.kind}`}>{logEntryText(lang, e)}</div>
+            <div className={`log-entry kind-${e.kind}`}>
+              {logEntrySegments(lang, e).map((seg, i) =>
+                seg.cls ? (
+                  <span key={i} className={seg.cls}>
+                    {seg.text}
+                  </span>
+                ) : (
+                  seg.text
+                ),
+              )}
+            </div>
+            {math && <div className="log-roll">{math}</div>}
           </div>
         );
       })}

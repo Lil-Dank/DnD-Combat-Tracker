@@ -241,12 +241,12 @@
           it triggers Kenku&nbsp;FM sounds the DM has configured for that
           attack or for the global crit/hit/miss events, and (on the verdict
           phases <code>attackCrit</code>/<code>attackHit</code>/<code>attackMiss</code>)
-          writes one combat-log line when the optional <code>roll</code> block
-          is present. <code>sourceId</code> is recommended but optional: the
-          app can resolve the attack from <code>attackId</code> alone (action
-          ids are unique). <code>roll</code> is optional and ignored on
-          non-verdict phases; older clients that omit it simply produce no log
-          line.
+          writes one combat-log line. <code>sourceId</code> is recommended but
+          optional: the app can resolve the attack from <code>attackId</code>
+          alone (action ids are unique). <code>roll</code> is optional and
+          ignored on non-verdict phases; when a client omits it, the app still
+          logs the verdict by resolving the attacker from the current turn or
+          the attack id &mdash; just without the die and total.
         </td>
       </tr>
     </table>

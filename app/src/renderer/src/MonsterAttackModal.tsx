@@ -103,6 +103,7 @@ export function MonsterAttackModal({
             actorName: attacker.displayName,
             actorType: attacker.type,
             targetName: singleTarget?.displayName,
+            targetType: singleTarget?.type,
             attackName: attack.name,
             die,
             total,

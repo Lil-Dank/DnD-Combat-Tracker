@@ -18,8 +18,12 @@ import type {
   Combat,
   Combatant,
   Condition,
+  ArchivedCombat,
   EncounterTemplate,
   KenkuEventId,
+  LogEntry,
+  LogSource,
+  MonsterAction,
   MonsterTemplate,
   PC,
   Settings,
@@ -40,12 +44,11 @@ import {
   demoKenkuPlaySound,
   demoKenkuStopAll,
   demoKenkuStopSound,
-  kenkuReachable,
 } from './demo-kenku';
 
-// v2: reseeds visitors who stored a pre-Kenku demo state, so the sample
-// sound configuration shows up for everyone.
-const LS_KEY = 'dnd-combat-tracker-demo-v2';
+// v3: reseeds visitors so PC attacks, the combat log and the archive from
+// the UI overhaul show up for everyone.
+const LS_KEY = 'dnd-combat-tracker-demo-v3';
 const uuid = () => crypto.randomUUID();
 const d20 = () => 1 + Math.floor(Math.random() * 20);
 
@@ -55,14 +58,35 @@ interface DemoData {
   templates: EncounterTemplate[];
   settings: Settings;
   combat: Combat | null;
+  archive: ArchivedCombat[];
   seeded: boolean;
 }
+
+/** Who performed a mutation, for the demo combat log. */
+interface ActionCtx {
+  source: LogSource;
+  actorName?: string;
+  actorType?: 'pc' | 'monster';
+}
+
+const DM_CTX: ActionCtx = { source: 'dm' };
+const DECK_CTX: ActionCtx = { source: 'deck' };
 
 interface BridgeCommand {
   type: string;
   actorId?: string;
   amount?: number;
   condition?: string;
+  phase?: string;
+  roll?: {
+    actorName?: string;
+    actorType?: string;
+    targetName?: string;
+    targetType?: string;
+    attackName?: string;
+    die?: number;
+    total?: number;
+  };
 }
 
 export function createDemoApi(): Api {
@@ -72,6 +96,7 @@ export function createDemoApi(): Api {
     templates: [],
     settings: { ...DEFAULT_SETTINGS },
     combat: null,
+    archive: [],
     seeded: false,
   };
 
@@ -86,6 +111,8 @@ export function createDemoApi(): Api {
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return null;
       const stored = JSON.parse(raw) as DemoData;
+      if (!Array.isArray(stored.archive)) stored.archive = [];
+      if (stored.combat && !Array.isArray(stored.combat.log)) stored.combat.log = [];
       // Same deep-merge as main/state.ts: settings gain new sections over time.
       stored.settings = {
         ...DEFAULT_SETTINGS,
@@ -108,7 +135,11 @@ export function createDemoApi(): Api {
       // The simulated deck on this page counts as a connected client.
       bridgeClientCount: 1,
       kenkuConnected,
-      playerClients: [],
+      playerClients: [...playerClaims.entries()].map(([pcId, claim]) => ({
+        pcId,
+        playerName: claim.playerName,
+        connected: [...playerSessions].some((s) => s.pcId === pcId),
+      })),
     };
   }
 
@@ -142,34 +173,23 @@ export function createDemoApi(): Api {
   });
 
   // ---- Kenku (demo): trigger engine mirroring main/kenku.ts -------------------
-  // Real Kenku is used when reachable (its remote has no CORS as of 1.x, so a
-  // hosted page usually cannot reach it); otherwise sounds synthesize locally.
+  // The demo simulates a connected Kenku: the full configuration UI works and
+  // "playing" states light up, but everything is silent by design.
 
-  let kenkuConnected = false;
+  const kenkuConnected = true;
   const kenkuPending = new Set<ReturnType<typeof setTimeout>>();
 
   const kenkuSettings = () => data.settings.kenku;
 
-  setInterval(() => {
-    const k = kenkuSettings();
-    if (!k.enabled) {
-      if (kenkuConnected) { kenkuConnected = false; notify(); }
-      return;
-    }
-    void kenkuReachable(k).then((r) => {
-      if (r !== kenkuConnected) { kenkuConnected = r; notify(); }
-    });
-  }, 5000);
-
   function kenkuFire(ref: { soundId: string; delayMs?: number }): void {
     const delay = ref.delayMs ?? 0;
     if (delay <= 0) {
-      void demoKenkuPlaySound(kenkuSettings(), ref.soundId);
+      void demoKenkuPlaySound(ref.soundId);
       return;
     }
     const timer = setTimeout(() => {
       kenkuPending.delete(timer);
-      void demoKenkuPlaySound(kenkuSettings(), ref.soundId);
+      void demoKenkuPlaySound(ref.soundId);
     }, delay);
     kenkuPending.add(timer);
   }
@@ -187,7 +207,7 @@ export function createDemoApi(): Api {
       kenkuEvent(event);
       if (!k.enabled) return;
       const tpl = data.templates.find((t) => t.id === data.combat?.sourceTemplateId);
-      if (tpl?.kenkuPlaylistId) void demoKenkuPlayPlaylist(k, tpl.kenkuPlaylistId);
+      if (tpl?.kenkuPlaylistId) void demoKenkuPlayPlaylist(tpl.kenkuPlaylistId);
       return;
     }
     if (event === 'combatEnd') {
@@ -196,7 +216,7 @@ export function createDemoApi(): Api {
       kenkuEvent(event);
       if (!k.enabled) return;
       const tpl = data.templates.find((t) => t.id === data.combat?.sourceTemplateId);
-      if (tpl?.kenkuPlaylistId) void demoKenkuPausePlayback(k);
+      if (tpl?.kenkuPlaylistId) void demoKenkuPausePlayback();
       return;
     }
     kenkuEvent(event);
@@ -245,6 +265,22 @@ export function createDemoApi(): Api {
     });
   }
 
+  /** Mirror of main/state.ts pushLog: structured entries, rendered via i18n. */
+  function pushLog(combat: Combat, entry: Omit<LogEntry, 'id' | 'ts' | 'round'>): void {
+    combat.log.push({ ...entry, id: uuid(), ts: Date.now(), round: combat.round });
+  }
+
+  function logTurn(combat: Combat, ctx: ActionCtx): void {
+    const current = combat.combatants[combat.currentIndex];
+    if (!current) return;
+    pushLog(combat, {
+      kind: 'turn',
+      actorName: current.displayName,
+      actorType: current.type,
+      source: ctx.source,
+    });
+  }
+
   function combatantFrom(m: MonsterTemplate, displayName: string): Combatant {
     return {
       id: uuid(),
@@ -263,16 +299,31 @@ export function createDemoApi(): Api {
     };
   }
 
-  function applyDamage(combatantId: string, amount: number): void {
+  function applyDamage(combatantId: string, amount: number, ctx: ActionCtx = DM_CTX): void {
     const combat = data.combat;
     if (!combat || amount <= 0) return;
     const idx = combat.combatants.findIndex((c) => c.id === combatantId);
     if (idx === -1) return;
     const c = combat.combatants[idx];
     c.currentHp = Math.max(0, c.currentHp - amount);
+    pushLog(combat, {
+      kind: 'damage',
+      actorName: ctx.actorName,
+      actorType: ctx.actorType,
+      targetName: c.displayName,
+      targetType: c.type,
+      amount,
+      source: ctx.source,
+    });
     let downedOrKilled: KenkuEventId | null = null;
     if (c.currentHp === 0) {
       downedOrKilled = c.type === 'monster' ? 'monsterKilled' : 'pcDowned';
+      pushLog(combat, {
+        kind: c.type === 'monster' ? 'kill' : 'down',
+        targetName: c.displayName,
+        targetType: c.type,
+        source: ctx.source,
+      });
       if (c.type === 'monster') {
         combat.combatants.splice(idx, 1);
         if (combat.combatants.length === 0) {
@@ -292,29 +343,50 @@ export function createDemoApi(): Api {
     if (downedOrKilled) kenkuCombatEvent(downedOrKilled);
   }
 
-  function applyHeal(combatantId: string, amount: number): void {
+  function applyHeal(combatantId: string, amount: number, ctx: ActionCtx = DM_CTX): void {
     const combat = data.combat;
     if (!combat || amount <= 0) return;
     const c = combat.combatants.find((x) => x.id === combatantId);
     if (!c) return;
     c.currentHp = Math.min(c.maxHp, c.currentHp + amount);
     if (c.currentHp > 0) c.isDowned = false;
+    pushLog(combat, {
+      kind: 'heal',
+      actorName: ctx.actorName,
+      actorType: ctx.actorType,
+      targetName: c.displayName,
+      targetType: c.type,
+      amount,
+      source: ctx.source,
+    });
     save();
     kenkuCombatEvent('healApplied');
   }
 
-  function toggleCondition(combatantId: string, condition: Condition): void {
+  function toggleCondition(
+    combatantId: string,
+    condition: Condition,
+    ctx: ActionCtx = DM_CTX,
+  ): void {
     const combat = data.combat;
     if (!combat) return;
     const c = combat.combatants.find((x) => x.id === combatantId);
     if (!c) return;
-    c.conditions = c.conditions.includes(condition)
+    const removing = c.conditions.includes(condition);
+    c.conditions = removing
       ? c.conditions.filter((x) => x !== condition)
       : [...c.conditions, condition];
+    pushLog(combat, {
+      kind: removing ? 'conditionRemoved' : 'conditionAdded',
+      targetName: c.displayName,
+      targetType: c.type,
+      condition,
+      source: ctx.source,
+    });
     save();
   }
 
-  function nextTurn(): void {
+  function nextTurn(ctx: ActionCtx = DM_CTX): void {
     const combat = data.combat;
     if (!combat || combat.phase !== 'active' || combat.combatants.length === 0) return;
     combat.currentIndex += 1;
@@ -322,11 +394,12 @@ export function createDemoApi(): Api {
       combat.currentIndex = 0;
       combat.round += 1;
     }
+    logTurn(combat, ctx);
     save();
     kenkuCombatEvent('turnChange');
   }
 
-  function prevTurn(): void {
+  function prevTurn(ctx: ActionCtx = DM_CTX): void {
     const combat = data.combat;
     if (!combat || combat.phase !== 'active' || combat.combatants.length === 0) return;
     if (combat.currentIndex === 0) {
@@ -336,8 +409,52 @@ export function createDemoApi(): Api {
     } else {
       combat.currentIndex -= 1;
     }
+    logTurn(combat, ctx);
     save();
     kenkuCombatEvent('turnChange');
+  }
+
+  /** End combat, archiving the log like main/state.ts does. */
+  function endCombatShared(ctx: ActionCtx = DM_CTX): void {
+    const combat = data.combat;
+    if (combat) {
+      kenkuCombatEvent('combatEnd');
+      if (combat.phase === 'active') {
+        pushLog(combat, { kind: 'combatEnd', source: ctx.source });
+        const template = data.templates.find((t) => t.id === combat.sourceTemplateId);
+        data.archive.unshift({
+          id: combat.id,
+          templateName: template?.name ?? '?',
+          endedAt: Date.now(),
+          rounds: combat.round,
+          log: combat.log,
+        });
+      }
+    }
+    data.combat = null;
+    save();
+  }
+
+  /** Log an attack roll reported by the deck sim (verdict phases only). */
+  function logAttackRoll(cmd: BridgeCommand): void {
+    const combat = data.combat;
+    const roll = cmd.roll;
+    const outcome =
+      cmd.phase === 'attackCrit' ? 'crit' : cmd.phase === 'attackHit' ? 'hit' : cmd.phase === 'attackMiss' ? 'miss' : null;
+    if (!combat || !roll || !outcome) return;
+    pushLog(combat, {
+      kind: 'attackRoll',
+      actorName: roll.actorName,
+      actorType: roll.actorType as 'pc' | 'monster' | undefined,
+      targetName: roll.targetName,
+      targetType: roll.targetType as 'pc' | 'monster' | undefined,
+      attackName: roll.attackName,
+      die: roll.die,
+      total: roll.total,
+      outcome,
+      source: 'deck',
+    });
+    save();
   }
 
   // ---- SRD import -------------------------------------------------------------
@@ -369,13 +486,63 @@ export function createDemoApi(): Api {
     if (data.seeded) return;
     await importSrd();
 
+    // A compact MonsterAction factory for seeded PC attacks (same record
+    // shape the Party screen / phone editor produce via formToAction).
+    const pcAttack = (
+      name: string,
+      toHit: number | null,
+      save: { ability: string; dc: number } | null,
+      dice: string,
+      count: number,
+      die: number,
+      bonus: number,
+      average: number,
+      dmgType: string,
+    ): MonsterAction => ({
+      id: `manual.${uuid()}`,
+      name,
+      section: 'action',
+      type: toHit !== null ? 'attack' : 'save',
+      order: 0,
+      attack:
+        toHit !== null
+          ? { kind: 'melee', toHit, toHitNote: null, reach: 5, range: null, usage: null }
+          : null,
+      save,
+      onHit: {
+        damage: [{ average, dice, count, die, bonus, type: dmgType, condition: null }],
+        alternateDamage: null,
+        effects: [],
+      },
+      onHitOrMiss: null,
+      kenkuSound: null,
+      display: {
+        toHit: toHit !== null ? `+${toHit}` : null,
+        range: toHit !== null ? 'reach 5 ft.' : null,
+        damage: `${average} (${dice}) ${dmgType.charAt(0).toUpperCase()}${dmgType.slice(1)}`,
+        text: '',
+      },
+    });
+
     for (const p of [
-      { name: 'Aria Windwhisper', maxHp: 38, ac: 15, initMod: 3 },
-      { name: 'Thorin Oakenshield', maxHp: 52, ac: 18, initMod: 0 },
-      { name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2 },
-      { name: 'Seraphina Dawnbringer', maxHp: 45, ac: 17, initMod: 1 },
+      {
+        name: 'Aria Windwhisper', maxHp: 38, ac: 15, initMod: 3,
+        attacks: [
+          pcAttack('Rapier', 5, null, '1d8+3', 1, 8, 3, 7, 'piercing'),
+          pcAttack('Shortbow', 5, null, '1d6+3', 1, 6, 3, 6, 'piercing'),
+        ],
+      },
+      {
+        name: 'Thorin Oakenshield', maxHp: 52, ac: 18, initMod: 0,
+        attacks: [pcAttack('Warhammer', 6, null, '1d10+4', 1, 10, 4, 9, 'bludgeoning')],
+      },
+      { name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2, attacks: [] },
+      {
+        name: 'Seraphina Dawnbringer', maxHp: 45, ac: 17, initMod: 1,
+        attacks: [pcAttack('Sacred Flame', null, { ability: 'DEX', dc: 13 }, '1d8', 1, 8, 0, 4, 'radiant')],
+      },
     ]) {
-      data.pcs.push({ id: uuid(), ...p, attacks: [] });
+      data.pcs.push({ id: uuid(), ...p });
     }
 
     const byName = (n: string) => data.monsters.find((m) => m.name === n);
@@ -479,6 +646,75 @@ export function createDemoApi(): Api {
     const monsterIdx = combat.combatants.findIndex((c) => c.type === 'monster');
     if (monsterIdx >= 0) combat.currentIndex = monsterIdx;
 
+    // A short round-1 backstory so the log rail and the phone's log/ticker
+    // have something to tell from the first second.
+    const mName = (i: number) => monsters[i]?.displayName ?? 'Goblin Warrior 1';
+    const pName = (i: number) => pcs[i]?.displayName ?? 'Aria Windwhisper';
+    const entry = (e: Omit<LogEntry, 'id' | 'ts'>): LogEntry => ({
+      ...e,
+      id: uuid(),
+      ts: Date.now() - (10 - combat.log.length) * 45000,
+    });
+    combat.log.push(
+      entry({ kind: 'combatStart', source: 'dm', round: 1 }),
+      entry({ kind: 'turn', actorName: pName(0), actorType: 'pc', source: 'dm', round: 1 }),
+      entry({
+        kind: 'attackRoll', actorName: pName(0), actorType: 'pc', targetName: mName(0),
+        attackName: 'Rapier', die: 14, total: 19, outcome: 'hit', source: 'player', round: 1,
+      }),
+      entry({
+        kind: 'damage', actorName: pName(0), actorType: 'pc', targetName: mName(0),
+        amount: 7, source: 'player', round: 1,
+      }),
+      entry({ kind: 'turn', actorName: mName(0), actorType: 'monster', source: 'deck', round: 1 }),
+      entry({
+        kind: 'attackRoll', actorName: mName(0), actorType: 'monster', targetName: pName(0),
+        attackName: 'Scimitar', die: 17, total: 21, outcome: 'hit', source: 'deck', round: 1,
+      }),
+      entry({
+        kind: 'damage', actorName: mName(0), actorType: 'monster', targetName: pName(0),
+        amount: 6, source: 'deck', round: 1,
+      }),
+      entry({
+        kind: 'conditionAdded', targetName: mName(1), condition: 'Prone', source: 'dm', round: 1,
+      }),
+      entry({ kind: 'turn', actorName: mName(0), actorType: 'monster', source: 'dm', round: 2 }),
+    );
+
+    // One archived fight so the Archive tab and the phone's history browser
+    // aren't empty on first visit.
+    const archivedLog: LogEntry[] = [
+      { kind: 'combatStart', source: 'dm', round: 1 },
+      { kind: 'turn', actorName: 'Owlbear 1', actorType: 'monster', source: 'dm', round: 1 },
+      {
+        kind: 'attackRoll', actorName: 'Owlbear 1', actorType: 'monster',
+        targetName: 'Thorin Oakenshield', attackName: 'Rend', die: 18, total: 25,
+        outcome: 'hit', source: 'deck', round: 1,
+      },
+      {
+        kind: 'damage', actorName: 'Owlbear 1', actorType: 'monster',
+        targetName: 'Thorin Oakenshield', amount: 14, source: 'deck', round: 1,
+      },
+      {
+        kind: 'attackRoll', actorName: 'Thorin Oakenshield', actorType: 'pc',
+        targetName: 'Owlbear 1', attackName: 'Warhammer', die: 20, total: 26,
+        outcome: 'crit', source: 'player', round: 1,
+      },
+      {
+        kind: 'damage', actorName: 'Thorin Oakenshield', actorType: 'pc',
+        targetName: 'Owlbear 1', amount: 18, source: 'player', round: 2,
+      },
+      { kind: 'kill', targetName: 'Owlbear 1', source: 'player', round: 2 },
+      { kind: 'combatEnd', source: 'dm', round: 2 },
+    ].map((e, i) => ({ ...e, id: uuid(), ts: Date.now() - 86400000 + i * 60000 }) as LogEntry);
+    data.archive.push({
+      id: uuid(),
+      templateName: 'Owlbear Den',
+      endedAt: Date.now() - 86400000 + archivedLog.length * 60000,
+      rounds: 2,
+      log: archivedLog,
+    });
+
     data.seeded = true;
     save();
   }
@@ -510,6 +746,8 @@ export function createDemoApi(): Api {
       combatants: active
         ? combat.combatants.map((c, i) => ({
             id: c.id,
+            sourceId: c.sourceId,
+            type: c.type,
             displayName: monsterName(lang, c.displayName),
             currentHp: c.currentHp,
             maxHp: c.maxHp,
@@ -546,36 +784,451 @@ export function createDemoApi(): Api {
   function command(cmd: BridgeCommand): void {
     switch (cmd.type) {
       case 'nextTurn':
-        nextTurn();
+        nextTurn(DECK_CTX);
         break;
       case 'prevTurn':
-        prevTurn();
+        prevTurn(DECK_CTX);
         break;
       case 'endCombat':
-        if (data.combat) kenkuCombatEvent('combatEnd');
-        data.combat = null;
-        save();
+        endCombatShared(DECK_CTX);
         break;
       case 'attackEvent':
         kenkuAttackEvent(cmd as unknown as { sourceId?: string; attackId: string; phase: string });
+        logAttackRoll(cmd);
         break;
       case 'applyDamage':
-        if (cmd.actorId && typeof cmd.amount === 'number') applyDamage(cmd.actorId, cmd.amount);
+        if (cmd.actorId && typeof cmd.amount === 'number') applyDamage(cmd.actorId, cmd.amount, DECK_CTX);
         break;
       case 'applyHeal':
-        if (cmd.actorId && typeof cmd.amount === 'number') applyHeal(cmd.actorId, cmd.amount);
+        if (cmd.actorId && typeof cmd.amount === 'number') applyHeal(cmd.actorId, cmd.amount, DECK_CTX);
         break;
       case 'toggleCondition':
-        if (cmd.actorId && cmd.condition) toggleCondition(cmd.actorId, cmd.condition as Condition);
+        if (cmd.actorId && cmd.condition) toggleCondition(cmd.actorId, cmd.condition as Condition, DECK_CTX);
         break;
     }
     // A real deck press pulls the DM window to the Combat screen.
     for (const cb of focusListeners) cb();
   }
 
+  // ---- fake player server (demo) ---------------------------------------------
+  // Speaks the playerServer.ts protocol to the phone-sim iframe: same
+  // disclosure rules (monster HP/AC never sent, monster roll numbers stripped
+  // from the log), same commands, strict turn gating.
+
+  interface PlayerSession {
+    token: string | null;
+    pcId: string | null;
+    onMessage: (json: string) => void;
+  }
+
+  const playerSessions = new Set<PlayerSession>();
+  const playerClaims = new Map<string, { token: string; playerName: string | null }>();
+  const savePendingListeners = new Set<(pending: object) => void>();
+  interface PendingSave {
+    id: string;
+    pcId: string;
+    actorName: string;
+    attackId: string;
+    attackName: string;
+    damage: number;
+    targetIds: string[];
+    session: PlayerSession;
+  }
+  const pendingSaves = new Map<string, PendingSave>();
+
+  function tokenPcId(token: string | null): string | null {
+    if (!token) return null;
+    for (const [pcId, claim] of playerClaims) if (claim.token === token) return pcId;
+    return null;
+  }
+
+  function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
+    return log.map((e) =>
+      e.kind === 'attackRoll' && e.actorType === 'monster'
+        ? { ...e, die: undefined, total: undefined }
+        : e,
+    );
+  }
+
+  function playerStateMessage(session: PlayerSession): string {
+    const lang = data.settings.language;
+    const combat = data.combat;
+    const active = combat !== null && combat.phase === 'active';
+    const ownPc = session.pcId ? data.pcs.find((p) => p.id === session.pcId) ?? null : null;
+    const ownCombatant = active
+      ? combat.combatants.find((c) => c.type === 'pc' && c.sourceId === session.pcId) ?? null
+      : null;
+
+    const combatants = active
+      ? combat.combatants.map((c, i) => {
+          const base = {
+            id: c.id,
+            name: monsterName(lang, c.displayName),
+            type: c.type,
+            isCurrentTurn: i === combat.currentIndex,
+            isDowned: c.isDowned,
+            conditions: c.conditions,
+            isBloodied: c.type === 'monster' ? c.currentHp < c.maxHp * 0.5 : undefined,
+          };
+          if (c.type !== 'pc') return base;
+          const pcExtra = { currentHp: c.currentHp, maxHp: c.maxHp };
+          if (c.sourceId !== session.pcId) return { ...base, ...pcExtra };
+          return { ...base, ...pcExtra, ac: c.ac, initiative: c.initiative };
+        })
+      : [];
+
+    return JSON.stringify({
+      type: 'state',
+      language: lang,
+      gating: data.settings.playerWeb.gating,
+      combatActive: active,
+      round: active ? combat.round : 0,
+      currentIndex: active ? combat.currentIndex : 0,
+      myTurn: ownCombatant
+        ? combat!.combatants.indexOf(ownCombatant) === combat!.currentIndex
+        : false,
+      claims: data.pcs.map((p) => ({
+        pcId: p.id,
+        name: p.name,
+        taken: playerClaims.has(p.id),
+        mine: p.id === session.pcId,
+        playerName: playerClaims.get(p.id)?.playerName ?? null,
+      })),
+      you: ownPc
+        ? {
+            pcId: ownPc.id,
+            name: ownPc.name,
+            maxHp: ownPc.maxHp,
+            ac: ownPc.ac,
+            initMod: ownPc.initMod,
+            attacks: ownPc.attacks,
+            combatantId: ownCombatant?.id ?? null,
+          }
+        : null,
+      combatants,
+      log: active ? filterLogForPlayers(combat.log).slice(-200) : [],
+      archive: data.archive.map((a) => ({
+        id: a.id,
+        templateName: a.templateName,
+        endedAt: a.endedAt,
+        rounds: a.rounds,
+      })),
+    });
+  }
+
+  function playerBroadcast(): void {
+    for (const s of playerSessions) s.onMessage(playerStateMessage(s));
+  }
+  stateListeners.add(() => playerBroadcast());
+
+  function publishPlayerClients(): void {
+    notify();
+  }
+
+  function playerIsMyTurn(pcId: string): boolean {
+    const combat = data.combat;
+    if (!combat || combat.phase !== 'active') return false;
+    const own = combat.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+    return own !== undefined && combat.combatants.indexOf(own) === combat.currentIndex;
+  }
+
+  function playerGateAllows(pcId: string, targets: string[], kind: 'hpChange' | 'attack'): boolean {
+    if (playerIsMyTurn(pcId)) return true;
+    if (data.settings.playerWeb.gating !== 'relaxed' || kind !== 'hpChange') return false;
+    const own = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+    return own !== undefined && targets.length === 1 && targets[0] === own.id;
+  }
+
+  function rollActionDamage(action: MonsterAction): number {
+    let total = 0;
+    for (const d of action.onHit.damage) {
+      if (d.condition) continue;
+      if (d.count && d.die) {
+        for (let i = 0; i < d.count; i++) total += 1 + Math.floor(Math.random() * d.die);
+        total += d.bonus ?? 0;
+      } else {
+        total += d.average ?? 0;
+      }
+    }
+    return Math.max(0, total);
+  }
+
+  function playerCtx(pcId: string): ActionCtx {
+    const pc = data.pcs.find((p) => p.id === pcId);
+    return { source: 'player', actorName: pc?.name, actorType: 'pc' };
+  }
+
+  function handlePlayerCommand(session: PlayerSession, cmd: Record<string, unknown>): void {
+    const sendTo = (msg: object) => session.onMessage(JSON.stringify(msg));
+    const type = cmd.type as string;
+
+    if (type === 'hello') {
+      session.token = typeof cmd.token === 'string' ? cmd.token : null;
+      session.pcId = tokenPcId(session.token);
+      sendTo(JSON.parse(playerStateMessage(session)));
+      return;
+    }
+
+    if (type === 'claim') {
+      const pcId = cmd.pcId as string;
+      const token = cmd.token as string;
+      if (!data.pcs.some((p) => p.id === pcId)) {
+        sendTo({ type: 'claimResult', ok: false, reason: 'unknownPc' });
+        return;
+      }
+      const existing = playerClaims.get(pcId);
+      if (existing && existing.token !== token) {
+        sendTo({ type: 'claimResult', ok: false, reason: 'taken' });
+        return;
+      }
+      for (const [otherId, claim] of playerClaims) {
+        if (otherId !== pcId && claim.token === token) playerClaims.delete(otherId);
+      }
+      const name = typeof cmd.playerName === 'string' ? cmd.playerName.trim().slice(0, 40) : '';
+      playerClaims.set(pcId, { token, playerName: name || null });
+      session.token = token;
+      session.pcId = pcId;
+      sendTo({ type: 'claimResult', ok: true });
+      publishPlayerClients();
+      return;
+    }
+
+    if (type === 'release') {
+      if (session.pcId) playerClaims.delete(session.pcId);
+      session.pcId = null;
+      session.token = null;
+      publishPlayerClients();
+      return;
+    }
+
+    if (!session.pcId) return;
+    const pcId = session.pcId;
+
+    if (type === 'applyDamage' || type === 'applyHeal') {
+      const targets = (cmd.targets as string[]) ?? [];
+      const amount = cmd.amount as number;
+      if (!Number.isInteger(amount) || amount < 1 || amount > 999) return;
+      if (!playerGateAllows(pcId, targets, 'hpChange')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      const ctx = playerCtx(pcId);
+      for (const id of targets) {
+        if (type === 'applyDamage') applyDamage(id, amount, ctx);
+        else applyHeal(id, amount, ctx);
+      }
+      return;
+    }
+
+    if (type === 'attackDigital' || type === 'attackManual') {
+      const pc = data.pcs.find((p) => p.id === pcId);
+      const action = pc?.attacks.find((a) => a.id === cmd.attackId);
+      const targetIds = (cmd.targetIds as string[]) ?? [];
+      if (!pc || !action) {
+        sendTo({ type: 'error', code: 'badAttack' });
+        return;
+      }
+      if (!playerGateAllows(pcId, targetIds, 'attack')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      if (action.type === 'save' || action.save) {
+        const damage =
+          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0
+            ? (cmd.damage as number)
+            : rollActionDamage(action);
+        const pending: PendingSave = {
+          id: uuid(),
+          pcId,
+          actorName: pc.name,
+          attackId: action.id,
+          attackName: action.name,
+          damage,
+          targetIds,
+          session,
+        };
+        pendingSaves.set(pending.id, pending);
+        sendTo({ type: 'savePending', id: pending.id, damage });
+        for (const cb of savePendingListeners) {
+          cb({
+            id: pending.id,
+            actorName: pending.actorName,
+            attackName: pending.attackName,
+            ability: action.save?.ability ?? 'DEX',
+            dc: action.save?.dc ?? 10,
+            damage: pending.damage,
+            targetIds: pending.targetIds,
+          });
+        }
+        return;
+      }
+      const combat = data.combat;
+      const target = combat?.combatants.find((c) => c.id === targetIds[0]);
+      if (!combat || !target) {
+        sendTo({ type: 'error', code: 'badTarget' });
+        return;
+      }
+      let die: number | null = null;
+      let total: number;
+      let outcome: 'crit' | 'hit' | 'miss';
+      if (type === 'attackDigital') {
+        die = 1 + Math.floor(Math.random() * 20);
+        total = die + (action.attack?.toHit ?? 0);
+        outcome = die === 20 ? 'crit' : die === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
+      } else {
+        total = (cmd.d20Total as number) ?? 0;
+        const natural = cmd.natural as number | undefined;
+        die = natural === 20 ? 20 : natural === 1 ? 1 : null;
+        outcome = natural === 20 ? 'crit' : natural === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
+      }
+      const combatForLog = data.combat;
+      if (combatForLog) {
+        pushLog(combatForLog, {
+          kind: 'attackRoll',
+          actorName: pc.name,
+          actorType: 'pc',
+          targetName: target.displayName,
+          targetType: target.type,
+          attackName: action.name,
+          die: die ?? undefined,
+          total,
+          outcome,
+          source: 'player',
+        });
+      }
+      kenkuAttackEvent({
+        sourceId: pcId,
+        attackId: action.id,
+        phase: outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss',
+      });
+      let damage: number | null = null;
+      if (outcome !== 'miss') {
+        damage =
+          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0
+            ? (cmd.damage as number)
+            : rollActionDamage(action);
+        applyDamage(target.id, damage, playerCtx(pcId));
+      } else {
+        save();
+      }
+      sendTo({
+        type: 'attackResult',
+        targetId: target.id,
+        targetName: target.displayName,
+        die,
+        total,
+        outcome,
+        damage,
+      });
+      return;
+    }
+
+    if (type === 'saveAttack') {
+      const action = cmd.action as MonsterAction;
+      const pc = data.pcs.find((p) => p.id === pcId);
+      if (!pc || !action || typeof action.id !== 'string') return;
+      const idx = pc.attacks.findIndex((a) => a.id === action.id);
+      if (idx === -1) pc.attacks.push(action);
+      else pc.attacks[idx] = action;
+      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
+      save();
+      return;
+    }
+
+    if (type === 'deleteAttack') {
+      const pc = data.pcs.find((p) => p.id === pcId);
+      if (!pc) return;
+      pc.attacks = pc.attacks.filter((a) => a.id !== cmd.actionId);
+      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
+      save();
+      return;
+    }
+
+    if (type === 'getArchive') {
+      const found = data.archive.find((a) => a.id === cmd.archiveId);
+      if (!found) return;
+      sendTo({
+        type: 'archiveEntry',
+        id: found.id,
+        templateName: found.templateName,
+        endedAt: found.endedAt,
+        rounds: found.rounds,
+        log: filterLogForPlayers(found.log),
+      });
+      return;
+    }
+  }
+
+  function resolvePlayerSave(
+    id: string,
+    results: Array<{ targetId: string; saved: boolean; total?: number }>,
+  ): void {
+    const pending = pendingSaves.get(id);
+    if (!pending) return;
+    pendingSaves.delete(id);
+    const combat = data.combat;
+    const half = Math.floor(pending.damage / 2);
+    const applied: Array<{ targetId: string; targetName: string; saved: boolean; amount: number }> = [];
+    for (const r of results) {
+      const target = combat?.combatants.find((c) => c.id === r.targetId);
+      if (!target || !pending.targetIds.includes(r.targetId)) continue;
+      const amount = r.saved ? half : pending.damage;
+      if (combat) {
+        pushLog(combat, {
+          kind: 'save',
+          actorName: target.displayName,
+          actorType: target.type,
+          targetName: pending.actorName,
+          targetType: 'pc',
+          attackName: pending.attackName,
+          total: r.total,
+          outcome: r.saved ? 'saved' : 'failed',
+          source: 'dm',
+        });
+      }
+      if (amount > 0) {
+        applyDamage(r.targetId, amount, { source: 'player', actorName: pending.actorName, actorType: 'pc' });
+      }
+      applied.push({ targetId: r.targetId, targetName: target.displayName, saved: r.saved, amount });
+    }
+    save();
+    pending.session.onMessage(
+      JSON.stringify({ type: 'saveResolved', id, results: applied }),
+    );
+  }
+
+  function dismissPlayerSave(id: string): void {
+    const pending = pendingSaves.get(id);
+    if (!pending) return;
+    pendingSaves.delete(id);
+    pending.session.onMessage(
+      JSON.stringify({ type: 'saveResolved', id, cancelled: true, results: [] }),
+    );
+  }
+
   (window as unknown as { __demo?: object }).__demo = {
     bridgeState,
     command,
+    /** The phone-sim iframe attaches its fake WebSocket here. */
+    playerAttach: (onMessage: (json: string) => void) => {
+      const session: PlayerSession = { token: null, pcId: null, onMessage };
+      playerSessions.add(session);
+      onMessage(playerStateMessage(session));
+      return {
+        send: (json: string) => {
+          try {
+            handlePlayerCommand(session, JSON.parse(json) as Record<string, unknown>);
+          } catch {
+            /* malformed frames are dropped, like the real server */
+          }
+        },
+        close: () => {
+          playerSessions.delete(session);
+        },
+      };
+    },
     onState: (cb: () => void) => {
       const wrapped = () => cb();
       stateListeners.add(wrapped);
@@ -749,14 +1402,12 @@ export function createDemoApi(): Api {
       combat.phase = 'active';
       combat.currentIndex = 0;
       combat.round = 1;
+      pushLog(combat, { kind: 'combatStart', source: 'dm' });
+      logTurn(combat, DM_CTX);
       save();
       kenkuCombatEvent('combatStart');
     },
-    endCombat: async () => {
-      if (data.combat) kenkuCombatEvent('combatEnd');
-      data.combat = null;
-      save();
-    },
+    endCombat: async () => endCombatShared(),
     nextTurn: async () => nextTurn(),
     prevTurn: async () => prevTurn(),
     applyDamage: async (id, amount) => applyDamage(id, amount),
@@ -812,16 +1463,12 @@ export function createDemoApi(): Api {
 
     // Kenku in the demo: real Kenku Remote when reachable (its remote has no
     // CORS today, so usually not), otherwise the built-in synthesized board.
-    kenkuGetLibrary: async () => demoKenkuLibrary(kenkuSettings()),
-    kenkuPlaySound: async (id) => demoKenkuPlaySound(kenkuSettings(), id),
-    kenkuStopSound: async (id) => demoKenkuStopSound(kenkuSettings(), id),
-    kenkuStopAll: async () => demoKenkuStopAll(kenkuSettings()),
-    kenkuSoundPlayback: async () => demoKenkuPlayback(kenkuSettings()),
-    kenkuCheckConnection: async () => {
-      const r = await kenkuReachable(kenkuSettings());
-      if (r !== kenkuConnected) { kenkuConnected = r; notify(); }
-      return r;
-    },
+    kenkuGetLibrary: async () => demoKenkuLibrary(),
+    kenkuPlaySound: async (id) => demoKenkuPlaySound(id),
+    kenkuStopSound: async (id) => demoKenkuStopSound(id),
+    kenkuStopAll: async () => demoKenkuStopAll(),
+    kenkuSoundPlayback: async () => demoKenkuPlayback(),
+    kenkuCheckConnection: async () => true,
     kenkuAttackEvent: async (payload) => kenkuAttackEvent(payload),
 
     updateSettings: async (patch) => {
@@ -842,13 +1489,30 @@ export function createDemoApi(): Api {
       channel.postMessage('pv-fullscreen');
     },
 
-    // Player web + archive: inert in the browser demo (no LAN server here).
+    // Player web: backed by the in-page fake player server (phone-sim iframe).
     getPlayerWebQr: async () => ({ urls: [], port: 0, error: null, dataUrls: [] }),
-    kickPlayer: async () => {},
-    resolvePlayerSave: async () => {},
-    dismissPlayerSave: async () => {},
-    onPlayerSavePending: () => () => {},
-    listArchive: async () => [],
-    deleteArchivedCombat: async () => {},
+    kickPlayer: async (pcId) => {
+      playerClaims.delete(pcId);
+      for (const s of playerSessions) {
+        if (s.pcId === pcId) {
+          s.pcId = null;
+          s.token = null;
+          s.onMessage(JSON.stringify({ type: 'kicked' }));
+        }
+      }
+      publishPlayerClients();
+    },
+    resolvePlayerSave: async (id, results) => resolvePlayerSave(id, results),
+    dismissPlayerSave: async (id) => dismissPlayerSave(id),
+    onPlayerSavePending: (cb) => {
+      const wrapped = (pending: object) => cb(pending as Parameters<typeof cb>[0]);
+      savePendingListeners.add(wrapped);
+      return () => savePendingListeners.delete(wrapped);
+    },
+    listArchive: async () => data.archive,
+    deleteArchivedCombat: async (id) => {
+      data.archive = data.archive.filter((a) => a.id !== id);
+      save();
+    },
   } as Api;
 }

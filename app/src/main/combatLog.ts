@@ -11,6 +11,7 @@ export interface AttackRollDetails {
   actorName?: string;
   actorType?: CombatantType;
   targetName?: string;
+  targetType?: CombatantType;
   attackName?: string;
   /** Raw d20 (absent for manually entered totals without a die). */
   die?: number;
@@ -41,6 +42,7 @@ export function logAttackEvent(
     actorName: details.actorName,
     actorType: details.actorType,
     targetName: details.targetName,
+    targetType: details.targetType,
     attackName: details.attackName,
     die: details.die,
     total: details.total,

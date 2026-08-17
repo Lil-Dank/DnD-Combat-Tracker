@@ -528,6 +528,7 @@ export class AppStore {
       actorName: ctx.actorName,
       actorType: ctx.actorType,
       targetName: c.displayName,
+      targetType: c.type,
       amount,
       source: ctx.source,
     });
@@ -537,6 +538,7 @@ export class AppStore {
       this.pushLog(combat, {
         kind: c.type === 'monster' ? 'kill' : 'down',
         targetName: c.displayName,
+        targetType: c.type,
         source: ctx.source,
       });
       if (c.type === 'monster') {
@@ -572,6 +574,7 @@ export class AppStore {
       actorName: ctx.actorName,
       actorType: ctx.actorType,
       targetName: c.displayName,
+      targetType: c.type,
       amount,
       source: ctx.source,
     });
@@ -597,6 +600,7 @@ export class AppStore {
     this.pushLog(combat, {
       kind: removing ? 'conditionRemoved' : 'conditionAdded',
       targetName: c.displayName,
+      targetType: c.type,
       condition,
       source: ctx.source,
     });

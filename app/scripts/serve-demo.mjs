@@ -27,6 +27,7 @@ createServer(async (req, res) => {
     return;
   }
   if (url.pathname === '/' || url.pathname === '') file = join(root, 'index.html');
+  else if (url.pathname.endsWith('/')) file = join(file, 'index.html');
   try {
     const body = await readFile(file);
     res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });

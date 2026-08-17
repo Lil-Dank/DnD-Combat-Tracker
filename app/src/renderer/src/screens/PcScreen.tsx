@@ -93,7 +93,7 @@ export function PcScreen({ state }: { state: AppState }) {
 
       {form && (
         <div className="modal-backdrop" onClick={() => setForm(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal wide" onClick={(e) => e.stopPropagation()}>
             <h2>{t(form.id ? 'pcs.editPc' : 'pcs.addPc')}</h2>
             <label>
               {t('common.name')}

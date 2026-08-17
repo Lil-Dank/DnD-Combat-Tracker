@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LogEntry } from '../../shared/types';
-import { logEntryText, logSourceTag } from '../../shared/logText';
+import { logEntrySegments, logRollMath, logSourceTag } from '../../shared/logText';
 import { useI18n } from './i18n';
 
 const COLLAPSE_KEY = 'dct-log-collapsed';
 
 /**
- * The Combat screen's right-hand live log. Always recording, costs nothing
- * when unwanted: the panel collapses to a slim vertical toggle and remembers
- * that choice. Newest entries at the bottom, auto-scrolled.
+ * The Combat screen's right-hand log sidebar. Always recording, costs nothing
+ * when unwanted: the full-width button at the bottom collapses it to a slim
+ * strip (remembered in localStorage). Newest entries at the bottom,
+ * auto-scrolled.
  */
 export function CombatLogPanel({ log }: { log: LogEntry[] }) {
   const { t, lang } = useI18n();
@@ -30,9 +31,12 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
 
   if (collapsed) {
     return (
-      <button className="log-panel-collapsed" onClick={toggle} title={t('logPanel.title')}>
-        📜
-      </button>
+      <aside className="log-panel collapsed">
+        <div className="log-panel-vertical">📜 {t('logPanel.title')}</div>
+        <button className="log-panel-toggle" onClick={toggle} title={t('logPanel.expand')}>
+          «
+        </button>
+      </aside>
     );
   }
 
@@ -40,10 +44,7 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
   return (
     <aside className="log-panel">
       <header className="log-panel-header">
-        <h3>{t('logPanel.title')}</h3>
-        <button className="btn small" onClick={toggle} title={t('logPanel.collapse')}>
-          »
-        </button>
+        <h3>📜 {t('logPanel.title')}</h3>
       </header>
       <div className="log-panel-body">
         {log.length === 0 && <p className="muted">{t('logPanel.empty')}</p>}
@@ -53,18 +54,33 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
               <div className="log-round">{t('log.round', { round: e.round })}</div>
             ) : null;
           lastRound = e.round > 0 ? e.round : lastRound;
+          const math = logRollMath(e);
           return (
             <div key={e.id}>
               {header}
               <div className={`log-entry kind-${e.kind}`}>
-                {logEntryText(lang, e)}
-                <span className="log-src"> · {logSourceTag(lang, e)}</span>
+                <span className="log-text">
+                  {logEntrySegments(lang, e).map((seg, i) =>
+                    seg.cls ? (
+                      <span key={i} className={seg.cls}>
+                        {seg.text}
+                      </span>
+                    ) : (
+                      seg.text
+                    ),
+                  )}
+                </span>
+                <span className="log-src">{logSourceTag(lang, e)}</span>
               </div>
+              {math && <div className="log-roll tnum">{math}</div>}
             </div>
           );
         })}
         <div ref={endRef} />
       </div>
+      <button className="log-panel-toggle" onClick={toggle} title={t('logPanel.collapse')}>
+        {t('logPanel.collapse')} »
+      </button>
     </aside>
   );
 }

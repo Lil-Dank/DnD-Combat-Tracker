@@ -20,7 +20,11 @@
   --badge-bg: #4c1d95;
   --badge-border: #7c3aed;
   --badge-text: #e9d5ff;
-  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --warn: #f59e0b;
+  --current-border: var(--gold);
+  --current-tint: rgba(212, 169, 79, 0.12);
+  --current-shadow: rgba(212, 169, 79, 0.15);
 }
 
 /* PHB Style — parchment + dark-red headings, serif, like official 5e books. */
@@ -46,6 +50,10 @@
   --badge-border: #c9ad6a;
   --badge-text: #f9ecd9;
   --font-ui: 'Book Antiqua', 'Palatino Linotype', Palatino, Georgia, serif;
+  --warn: #8a5a12;
+  --current-border: var(--gold);
+  --current-tint: rgba(201, 173, 106, 0.2);
+  --current-shadow: rgba(121, 94, 45, 0.18);
 }
 
 /* Generic dark. */
@@ -70,7 +78,11 @@
   --badge-bg: #374151;
   --badge-border: #4b5563;
   --badge-text: #e5e7eb;
-  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --warn: #f59e0b;
+  --current-border: var(--accent);
+  --current-tint: rgba(96, 165, 250, 0.09);
+  --current-shadow: rgba(96, 165, 250, 0.12);
 }
 
 /* Generic light. */
@@ -95,7 +107,26 @@
   --badge-bg: #e0e7ff;
   --badge-border: #a5b4fc;
   --badge-text: #3730a3;
-  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --warn: #b45309;
+  --current-border: var(--accent);
+  --current-tint: rgba(37, 99, 235, 0.08);
+  --current-shadow: rgba(37, 99, 235, 0.12);
+}
+
+/* ---- Design tokens (theme-independent) ---- */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --control-h: 30px;
+  --control-h-sm: 26px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
 }
 
 * {
@@ -119,6 +150,66 @@ input, button, select, textarea {
   font: inherit;
 }
 
+/* ---- Form controls, app-wide (not just inside modals) ---- */
+
+input:not([type='checkbox']):not([type='radio']):not([type='color']),
+textarea,
+select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  padding: 4px 9px;
+  min-height: var(--control-h);
+}
+
+select {
+  appearance: none;
+  padding-right: 26px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent-dim);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+input[type='color'] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  padding: 2px;
+  height: var(--control-h);
+  cursor: pointer;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
 .loading {
   padding: 40px;
   color: var(--text-muted);
@@ -132,7 +223,7 @@ input, button, select, textarea {
 }
 
 .sidebar {
-  width: 200px;
+  width: 188px;
   flex-shrink: 0;
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
@@ -152,17 +243,22 @@ input, button, select, textarea {
   padding: 6px 10px 16px;
 }
 
-.app-title-icon {
-  font-size: 20px;
+.app-title-logo {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
 }
 
 .nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   text-align: left;
-  padding: 10px 12px;
+  padding: 9px 12px;
   background: transparent;
   color: var(--text);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 14px;
 }
@@ -182,9 +278,20 @@ input, button, select, textarea {
   padding: 8px 10px;
 }
 
+.nav-icon {
+  width: 20px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
 .bridge-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   color: var(--text-muted);
+  /* Same geometry as .nav-btn so the dot sits in the icon column. */
+  padding: 2px 12px;
 }
 
 .bridge-status.on {
@@ -196,14 +303,14 @@ input, button, select, textarea {
   overflow-y: auto;
   /* Reserve the scrollbar gutter so content doesn't shift when it appears. */
   scrollbar-gutter: stable;
-  padding: 24px 28px;
+  padding: 16px 12px 16px 20px;
 }
 
 .screen-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -223,8 +330,9 @@ input, button, select, textarea {
 /* ---- Buttons ---- */
 
 .btn {
-  padding: 8px 14px;
-  border-radius: 8px;
+  padding: 4px 14px;
+  min-height: var(--control-h);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-panel-2);
   color: var(--text);
@@ -260,9 +368,10 @@ input, button, select, textarea {
 }
 
 .btn.small {
-  padding: 4px 10px;
+  padding: 2px 10px;
+  min-height: var(--control-h-sm);
   font-size: 12.5px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .link-btn {
@@ -496,10 +605,10 @@ input, button, select, textarea {
 .settings-section {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px 18px;
-  margin-bottom: 16px;
-  max-width: 560px;
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  max-width: 640px;
 }
 
 .settings-section h2 {
@@ -517,6 +626,11 @@ input, button, select, textarea {
   align-items: center;
   gap: 12px;
   font-size: 13.5px;
+  min-height: calc(var(--control-h) + 4px);
+}
+
+.inline-label select {
+  min-width: 220px;
 }
 
 .dice-roll-btn {
@@ -677,10 +791,11 @@ input, button, select, textarea {
 }
 
 .pick-btn {
-  padding: 5px 10px;
-  border-radius: 14px;
+  padding: 4px 12px;
+  min-height: var(--control-h-sm);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--bg-panel-2);
   color: var(--text);
   cursor: pointer;
   font-size: 12.5px;
@@ -827,12 +942,12 @@ input, button, select, textarea {
 /* Sticky combat header: stays put while the initiative list scrolls. */
 .combat-sticky {
   position: sticky;
-  /* The sticky inset tracks the margin box: -24px pins the visible part
+  /* The sticky inset tracks the margin box: -16px pins the visible part
      flush with the scrollport while swallowing the container's top padding
      so rows never peek above the bar. */
-  top: -24px;
-  margin-top: -24px;
-  padding-top: 24px;
+  top: -16px;
+  margin-top: -16px;
+  padding-top: 16px;
   padding-bottom: 12px;
   margin-bottom: 6px;
   background: var(--bg);
@@ -849,7 +964,7 @@ input, button, select, textarea {
 
 .combat-row {
   /* Keep auto-scrolled rows clear of the sticky header. */
-  scroll-margin-top: 88px;
+  scroll-margin-top: 72px;
 }
 
 .combat-row {
@@ -857,6 +972,7 @@ input, button, select, textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 9px 14px;
+  overflow: clip;
 }
 
 .combat-row.pc {
@@ -868,27 +984,70 @@ input, button, select, textarea {
 }
 
 .combat-row.current {
-  border-color: var(--gold);
-  background: linear-gradient(90deg, rgba(212, 169, 79, 0.12), var(--bg-panel) 55%);
-  box-shadow: 0 0 12px rgba(212, 169, 79, 0.15);
+  border-color: var(--current-border);
+  background: linear-gradient(90deg, var(--current-tint), var(--bg-panel) 55%);
+  box-shadow: 0 0 12px var(--current-shadow);
 }
 
 .combat-row.downed {
   opacity: 0.75;
 }
 
+/* One shared template = columns align across every row and never shift.
+   init | name(+chips) | HP | AC | amount | Dmg | Heal | Conditions | Attacks */
+:root {
+  --combat-cols: 38px minmax(150px, 1fr) minmax(64px, 76px) minmax(40px, 48px) minmax(46px, 54px) minmax(56px, 70px) minmax(54px, 66px) minmax(78px, 96px) minmax(72px, 90px);
+}
+
 .combat-row-main {
-  display: flex;
-  /* Long German button labels wrap onto a second line in narrow windows
-     instead of pushing the row past the card edge. */
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: var(--combat-cols);
   align-items: center;
-  gap: 8px 12px;
+  gap: 6px 8px;
+}
+
+.actor-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.name-line .combat-name {
+  flex: 0 1 auto;
+}
+
+.cell-btn {
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell-empty {
+  width: 100%;
+}
+
+.roll-attack {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.blood-drop {
+  font-size: 11px;
+  margin-right: 2px;
 }
 
 .init-badge {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 30px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -900,10 +1059,12 @@ input, button, select, textarea {
 }
 
 .combat-name {
-  flex: 1;
   font-weight: 650;
   font-size: 15px;
-  min-width: 140px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .turn-arrow {
@@ -918,20 +1079,28 @@ input, button, select, textarea {
 
 .ac-badge {
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ac-label {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
 }
 
 .hp {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 15px;
-  min-width: 70px;
   text-align: right;
+  white-space: nowrap;
   color: var(--success);
 }
 
 .hp.low {
-  color: #f59e0b;
+  color: var(--warn);
 }
 
 /* ---- Kenku FM ---- */
@@ -1005,37 +1174,16 @@ input, button, select, textarea {
   cursor: default;
 }
 
-.bloodied-tag {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #c22f2f;
-  border: 1px solid rgba(194, 47, 47, 0.55);
-  border-radius: 999px;
-  padding: 1px 8px;
-  white-space: nowrap;
-}
-
-.hp-controls {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
 .amount-input {
-  width: 58px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 7px;
-  padding: 5px 8px;
+  width: 100%;
   text-align: center;
+  min-height: var(--control-h-sm);
+  padding: 3px 6px;
 }
 
-.amount-input:focus {
-  outline: none;
-  border-color: var(--accent);
+.amount-input::-webkit-outer-spin-button,
+.amount-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
 }
 
 .btn.heal {
@@ -1046,27 +1194,30 @@ input, button, select, textarea {
   border-color: var(--success);
 }
 
-.row-tools {
-  display: flex;
-  gap: 5px;
-}
-
-.condition-badges {
+/* Applied conditions: removable chips inside the name cell. */
+.row-conditions {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 8px;
-  padding-left: 46px;
+  gap: 4px;
 }
 
 .condition-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: var(--badge-bg);
   border: 1px solid var(--badge-border);
   color: var(--badge-text);
   font-size: 11.5px;
-  padding: 2px 9px;
-  border-radius: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
   cursor: pointer;
+  min-height: 0;
+}
+
+.condition-badge .chip-x {
+  font-size: 9px;
+  opacity: 0.55;
 }
 
 .condition-badge:hover {
@@ -1075,14 +1226,64 @@ input, button, select, textarea {
   color: #fff;
 }
 
-.condition-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 10px;
+.condition-badge:hover .chip-x {
+  opacity: 1;
+}
+
+/* The picker is a different animal: a checklist popover, not chips. */
+.cond-popover {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px;
+  margin-top: 8px;
   padding: 10px;
   background: var(--bg-panel-2);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.cond-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 13px;
+  padding: 5px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cond-toggle:hover {
+  background: var(--row-hover);
+  border-color: var(--border);
+}
+
+.cond-toggle .cond-check {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--accent);
+}
+
+.cond-toggle.on {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.cond-toggle.on .cond-check {
+  border-color: var(--accent-dim);
+  background: var(--accent-dim);
+  color: #fff;
 }
 
 .attack-panel {
@@ -1491,24 +1692,40 @@ input, button, select, textarea {
 }
 
 .log-panel {
-  width: 270px;
+  width: 264px;
   flex-shrink: 0;
   position: sticky;
-  top: 64px;
-  max-height: calc(100vh - 120px);
+  /* Pins below the sticky combat header; height keeps the bottom collapse
+     bar on-screen whether or not the list is scrolled. */
+  top: 40px;
+  height: calc(100vh - 108px);
   display: flex;
   flex-direction: column;
-  background: var(--panel-bg, rgba(0, 0, 0, 0.15));
-  border: 1px solid var(--border, rgba(128, 128, 128, 0.3));
-  border-radius: 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.log-panel.collapsed {
+  width: 34px;
+  align-items: stretch;
+}
+
+.log-panel-vertical {
+  flex: 1;
+  writing-mode: vertical-rl;
+  padding: 12px 0;
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 13px;
+  display: flex;
+  justify-content: flex-start;
+  align-self: center;
 }
 
 .log-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.3));
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .log-panel-header h3 {
@@ -1517,19 +1734,28 @@ input, button, select, textarea {
 }
 
 .log-panel-body {
+  flex: 1;
   overflow-y: auto;
   padding: 6px 10px 10px;
   font-size: 13px;
 }
 
-.log-panel-collapsed {
-  flex-shrink: 0;
-  position: sticky;
-  top: 64px;
-  writing-mode: vertical-rl;
-  padding: 12px 6px;
-  border-radius: 10px;
-  font-size: 16px;
+/* The collapse control: a full-width bar at the bottom of the sidebar. */
+.log-panel-toggle {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--bg-panel-2);
+  color: var(--text-muted);
+  padding: 8px 4px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+
+.log-panel-toggle:hover {
+  color: var(--text);
+  background: var(--row-hover);
 }
 
 .log-round {
@@ -1539,22 +1765,70 @@ input, button, select, textarea {
 }
 
 .log-entry {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   padding: 2px 0;
   border-bottom: 1px solid rgba(128, 128, 128, 0.12);
 }
 
-.log-entry.kind-kill,
-.log-entry.kind-down {
-  color: var(--danger, #c0392b);
+.log-entry .log-text {
+  min-width: 0;
 }
 
-.log-entry.kind-heal {
-  color: var(--success, #2e8b57);
+/* Dev-log-style highlighting: who and what pop out of the prose. */
+.seg-pc {
+  color: var(--pc-color);
+  font-weight: 600;
+}
+
+.seg-monster {
+  color: var(--monster-color);
+  font-weight: 600;
+}
+
+.seg-dmg {
+  color: var(--danger);
+  font-weight: 650;
+}
+
+.seg-heal {
+  color: var(--success);
+  font-weight: 650;
+}
+
+.seg-crit {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.seg-hit {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.seg-miss {
+  color: var(--text-muted);
+}
+
+.seg-cond {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* The dice math behind a roll: present but visually secondary. */
+.log-roll {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 0 3px 10px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.12);
 }
 
 .log-src {
   opacity: 0.55;
   font-size: 11px;
+  flex-shrink: 0;
 }
 
 .archive-log {

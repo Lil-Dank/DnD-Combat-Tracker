@@ -1,11 +1,13 @@
-// The simulated Stream Deck panel for the GitHub Pages demo.
+// The demo's right-hand simulator sidebar: a simulated player phone (the real
+// mobile bundle in an iframe, talking to the in-page fake player server) on
+// top, and the simulated Stream Deck below.
 //
-// This is not a mock-up: it bundles the plugin's REAL picker state machine,
-// bridge and key renderer (with '@elgato/streamdeck' and 'ws' stubbed), so
-// every flow behaves exactly like the hardware — actor select, numpad,
-// conditions, dice roller, monster attacks, end-combat confirm, timeouts and
-// all. Commands land in the demo engine the same way the desktop app would
-// receive them over the WebSocket.
+// The deck is not a mock-up: it bundles the plugin's REAL picker state
+// machine, bridge and key renderer (with '@elgato/streamdeck' and 'ws'
+// stubbed), so every flow behaves exactly like the hardware — actor select,
+// numpad, conditions, dice roller, monster attacks, end-combat confirm,
+// timeouts and all. Commands land in the demo engine the same way the desktop
+// app would receive them over the WebSocket.
 import { picker } from '../../../plugin/src/picker.ts';
 import { bridge } from '../../../plugin/src/bridge.ts';
 import { turnKeyImage, pickerKeyImage } from '../../../plugin/src/key-image.ts';
@@ -17,31 +19,53 @@ const COLS = 5;
 const ROWS = 3;
 const SLOTS = COLS * ROWS;
 const DEVICE = { id: 'demo-deck', size: { columns: COLS, rows: ROWS } };
+const SIDE_W = 348;
 
 // Same palettes the real plugin uses for its turn keys.
 const TURN_PURPLE = { from: '#3b1d63', to: '#7c3aed' };
 const TURN_GOLD = { from: '#4a3410', to: '#d4a94f' };
 
 const css = `
-#demo-deck { position: fixed; right: 16px; bottom: 16px; z-index: 9999;
-  width: 330px; background: #1c1c1e; border: 1px solid #3a3a3d; border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.55); font-family: 'Segoe UI', sans-serif;
+body.with-demo-side { padding-right: ${SIDE_W}px; }
+#demo-side { position: fixed; right: 0; top: 0; bottom: 0; z-index: 9999;
+  width: ${SIDE_W}px; display: flex; flex-direction: column; gap: 10px;
+  padding: 10px; overflow-y: auto; background: #131315;
+  border-left: 1px solid #303033; font-family: 'Inter', 'Segoe UI', sans-serif;
   user-select: none; }
-#demo-deck header { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-  color: #d8d8dc; font-size: 12.5px; border-bottom: 1px solid #303033; }
-#demo-deck header strong { flex: 1; font-weight: 600; }
-#demo-deck header button { background: #2c2c30; color: #cfcfd4; border: 1px solid #444;
-  border-radius: 6px; font-size: 11.5px; padding: 3px 8px; cursor: pointer; }
-#demo-deck header button:hover { background: #38383d; }
-#demo-deck .grid { display: grid; grid-template-columns: repeat(${COLS}, 1fr);
-  gap: 6px; padding: 10px; background: #111; border-radius: 0 0 12px 12px; }
-#demo-deck .key { aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+#demo-side .sim-panel { background: #1c1c1e; border: 1px solid #3a3a3d;
+  border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.55); flex-shrink: 0; }
+#demo-side .sim-panel > header { display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; color: #d8d8dc; font-size: 12.5px;
+  border-bottom: 1px solid #303033; }
+#demo-side .sim-panel > header strong { flex: 1; font-weight: 600; }
+#demo-side .sim-panel > header button { background: #2c2c30; color: #cfcfd4;
+  border: 1px solid #444; border-radius: 6px; font-size: 11.5px; padding: 3px 8px;
+  cursor: pointer; }
+#demo-side .sim-panel > header button:hover { background: #38383d; }
+#demo-side .sim-panel.collapsed > *:not(header) { display: none; }
+#demo-side .hint { padding: 6px 12px 8px; color: #8b8b92; font-size: 11px; }
+/* phone */
+#demo-phone .phone-frame { padding: 10px 10px 2px; display: flex; justify-content: center; }
+#demo-phone iframe { width: 305px; height: 540px; border: 6px solid #060607;
+  border-radius: 22px; background: #1a1423; display: block; }
+/* deck */
+#demo-deck-grid { display: grid; grid-template-columns: repeat(${COLS}, 1fr);
+  gap: 6px; padding: 10px; background: #111; }
+#demo-deck-grid .key { aspect-ratio: 1; border-radius: 8px; overflow: hidden;
   background: #060606; border: 1px solid #2b2b2b; padding: 0; cursor: pointer; }
-#demo-deck .key img { width: 100%; height: 100%; display: block; }
-#demo-deck .key:active { transform: scale(0.94); }
-#demo-deck.collapsed .grid { display: none; }
-#demo-deck .hint { padding: 6px 12px 8px; color: #8b8b92; font-size: 11px; }
-#demo-deck.collapsed .hint { display: none; }
+#demo-deck-grid .key img { width: 100%; height: 100%; display: block; }
+#demo-deck-grid .key:active { transform: scale(0.94); }
+/* narrow screens: sidebar becomes an overlay behind floating toggles */
+#demo-side-toggle { display: none; }
+@media (max-width: 1100px) {
+  body.with-demo-side { padding-right: 0; }
+  #demo-side { transform: translateX(100%); transition: transform .2s ease; }
+  #demo-side.open { transform: none; box-shadow: -12px 0 40px rgba(0,0,0,.6); }
+  #demo-side-toggle { display: block; position: fixed; right: 14px; bottom: 14px;
+    z-index: 10000; background: #2c2c30; color: #e8e8ec; border: 1px solid #4a4a50;
+    border-radius: 24px; padding: 10px 16px; font-size: 14px; cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+}
 `;
 
 function el(tag, attrs = {}, children = []) {
@@ -54,37 +78,58 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
-// The panel belongs on the DM view only; the Player View tab loads the same
+function collapsible(panel, btn) {
+  btn.addEventListener('click', () => {
+    panel.classList.toggle('collapsed');
+    btn.textContent = panel.classList.contains('collapsed') ? '▲' : '—';
+  });
+}
+
+// The sidebar belongs on the DM view only; the Player View tab loads the same
 // page and must stay clean for chroma keying.
 function boot() {
   const style = document.createElement('style');
   style.textContent = css;
   document.head.appendChild(style);
 
-  const grid = el('div', { class: 'grid' });
+  // ---- shell ------------------------------------------------------------------
+
   const resetBtn = el('button', { text: 'Reset demo' });
-  const collapseBtn = el('button', { text: '—' });
-  const panel = el('div', { id: 'demo-deck' }, [
-    el('header', {}, [
-      el('strong', { text: '🎛 Stream Deck (simulated)' }),
-      resetBtn,
-      collapseBtn,
-    ]),
+  const phoneCollapse = el('button', { text: '—' });
+  const deckCollapse = el('button', { text: '—' });
+
+  const phonePanel = el('div', { class: 'sim-panel', id: 'demo-phone' }, [
+    el('header', {}, [el('strong', { text: '📱 Player phone (simulated)' }), phoneCollapse]),
+    el('div', { class: 'phone-frame' }, [el('iframe', { src: './player/', title: 'Player phone demo' })]),
+    el('div', {
+      class: 'hint',
+      text: 'The real player web app. Claim a character and act on their turn.',
+    }),
+  ]);
+
+  const grid = el('div', { id: 'demo-deck-grid' });
+  const deckPanel = el('div', { class: 'sim-panel', id: 'demo-deck' }, [
+    el('header', {}, [el('strong', { text: '🎛 Stream Deck (simulated)' }), resetBtn, deckCollapse]),
     grid,
     el('div', {
       class: 'hint',
       text: 'The real plugin logic, running in your browser. Demo data stays local.',
     }),
   ]);
-  document.body.appendChild(panel);
 
+  const side = el('aside', { id: 'demo-side' }, [phonePanel, deckPanel]);
+  document.body.appendChild(side);
+  document.body.classList.add('with-demo-side');
+
+  const toggle = el('button', { id: 'demo-side-toggle', text: '📱🎛 Simulators' });
+  toggle.addEventListener('click', () => side.classList.toggle('open'));
+  document.body.appendChild(toggle);
+
+  collapsible(phonePanel, phoneCollapse);
+  collapsible(deckPanel, deckCollapse);
   resetBtn.addEventListener('click', () => {
     localStorage.clear();
     location.reload();
-  });
-  collapseBtn.addEventListener('click', () => {
-    panel.classList.toggle('collapsed');
-    collapseBtn.textContent = panel.classList.contains('collapsed') ? '▲' : '—';
   });
 
   // ---- keys -------------------------------------------------------------------

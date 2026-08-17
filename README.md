@@ -5,12 +5,14 @@
 # D&D Combat Tracker
 
 **A Windows desktop app for Dungeon Masters to run D&D combat — with a second-monitor
-Player View and an Elgato Stream Deck plugin for hardware turn, HP and condition control.**
+Player View, a phone companion for the players, and an Elgato Stream Deck plugin for
+hardware turn, HP and condition control.**
 
 Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 
 **[▶ Try the live demo](https://lil-dank.github.io/DnD-Combat-Tracker/)** — the full app
-in your browser, with a simulated Stream Deck and a combat already in progress.
+in your browser, with a simulated player phone, a simulated Stream Deck and a combat
+already in progress.
 
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Electron](https://img.shields.io/badge/Electron-37-47848F?logo=electron&logoColor=white)
@@ -32,9 +34,10 @@ in your browser, with a simulated Stream Deck and a combat already in progress.
 
 <div align="center">
 
-![The DM window mid-combat: initiative order, the current monster's stat block expanded, conditions and HP on every row](docs/images/combat.png)
+![The DM window mid-combat: an aligned combat table with initiative, names, HP and AC in fixed columns, condition chips, the current monster's quick reference and the live combat log](docs/images/combat.png)
 
-<i>The DM window mid-combat — the current monster's quick reference opens automatically.</i>
+<i>The DM window mid-combat — every column lines up, HP and AC sit right beside the
+name, and the combat log keeps the story on the right.</i>
 
 </div>
 
@@ -45,13 +48,15 @@ in your browser, with a simulated Stream Deck and a combat already in progress.
 - [What it does](#what-it-does)
 - [Live demo](#live-demo)
 - [Install](#install)
-- [How it fits together](#how-it-fits-together)
 - [Using the app](#using-the-app)
-  - [Language](#language)
-  - [Kenku FM audio](#kenku-fm-audio)
-  - [Player web companion](#player-web-companion)
+  - [Party](#party) · [Monsters](#monsters) · [Encounters](#encounters) · [Combat](#combat) · [Player View](#player-view--and-the-chroma-key-setup)
   - [Combat log & archive](#combat-log--archive)
-- [Stream Deck plugin](#stream-deck-plugin)
+  - [Themes](#themes) · [Language](#language)
+- [Player phone companion](#player-phone-companion)
+- [Integrations](#integrations)
+  - [Stream Deck](#stream-deck)
+  - [Kenku FM audio](#kenku-fm-audio)
+- [How it fits together](#how-it-fits-together)
 - [Build from source](#build-from-source)
 - [Releasing](#releasing)
 - [Monster data & license](#monster-data--license)
@@ -63,15 +68,15 @@ in your browser, with a simulated Stream Deck and a combat already in progress.
 
 |  | |
 | --- | --- |
-| 🧙 **Party & monster libraries** | PCs with HP/AC/initiative; 331 SRD 5.2.1 monsters importable in one click, with ability scores and fully structured attacks. Add your own too. |
+| 🧙 **Party & monster libraries** | PCs with HP/AC/initiative and their own attacks; 331 SRD 5.2.1 monsters importable in one click, with ability scores and fully structured attacks. Add your own too. |
 | 📋 **Encounter templates** | Reusable monster + quantity sets (4× Goblin Warrior, 1× Bugbear). Start combat straight from a card. |
-| ⚔️ **Combat engine** | Initiative rolling (all, or monsters-only), drag-to-settle ties, live HP and conditions, mid-combat monster adds, attack resolution vs AC with crits and save-for-half. |
+| ⚔️ **Combat engine** | Initiative rolling (all, or monsters-only), drag-to-settle ties, live HP and conditions in an aligned table, mid-combat monster adds, attack resolution vs AC with crits and save-for-half. |
 | 📺 **Player View** | Display-only second-monitor window. Monsters show no numbers — just a progressive "bloodied" reddening. Auto-fits any actor count. **Styled for chroma keying.** |
+| 📱 **Player phone companion** | [Opt-in LAN webpage](#player-phone-companion) for players' phones: claim your character via QR code, follow initiative, deal damage/heal, roll your attacks — gated to your turn. No app installs. |
 | 🎛️ **Stream Deck plugin** | Turn control, damage/heal numpad, multi-actor conditions, monster attack rolls, and a dice roller — all on hardware keys that render their own labels. |
-| 🎨 **Themes** | PHB Style (default), Default Electron, Dark, Light. |
-| 🔊 **Kenku FM audio** | [Sound effects and battle playlists](#kenku-fm-audio) via Kenku FM's remote API: event sounds, per-attack sounds with trigger points, encounter playlists, a soundboard panel. |
-| 📱 **Player web companion** | [Opt-in LAN webpage](#player-web-companion) for players' phones: claim your character via QR code, follow initiative, deal damage/heal, roll your attacks — gated to your turn. No app installs. |
 | 📜 **Combat log & archive** | [Every action logged](#combat-log--archive) with who-did-what-to-whom from every surface (DM window, deck, phones); ended combats archive with their full log. |
+| 🔊 **Kenku FM audio** | [Sound effects and battle playlists](#kenku-fm-audio) via Kenku FM's remote API: event sounds, per-attack sounds with trigger points, encounter playlists, a soundboard panel. |
+| 🎨 **Themes** | Dark (default), PHB Style, Default Electron, Light. |
 | 🗣 **English & German** | [Full UI localization](#language) across both windows *and* the deck. Game terms follow the SRD 5.2.1 in each language. |
 | 💾 **Local-only storage** | Plain JSON in `%APPDATA%`, written atomically. Your data never leaves the machine. |
 
@@ -80,30 +85,16 @@ in your browser, with a simulated Stream Deck and a combat already in progress.
 ## Live demo
 
 **https://lil-dank.github.io/DnD-Combat-Tracker/** — the real renderer built for the
-browser, seeded with sample characters, encounter templates, the full SRD library and
-a round-2 combat mid-fight.
+browser, seeded with characters, encounters, the full SRD library and a combat
+mid-fight. The sidebar carries two simulators that are not mock-ups: the **player
+phone** is the real mobile app, and the **Stream Deck** runs the plugin's actual picker
+state machine and key renderer — claim a character on the phone, roll from the deck,
+and watch the DM window and combat log react.
 
-The floating **Stream Deck panel** is not a mock-up: it runs the plugin's actual picker
-state machine, bridge protocol and key renderer, so damage, healing, conditions, the
-dice roller, monster attacks and end-combat behave exactly like the hardware —
-including the on-key rendering and the idle timeouts. **Open Player View** opens the
-players' screen as a second tab, and the language selector switches everything to
-German just like the desktop app.
-
-The [Kenku FM audio](#kenku-fm-audio) features are live too, backed by a built-in
-**Fantasy Soundboard** of synthesized sample sounds (sword clash, dragon roar, battle
-horn…) and drum-loop battle playlists — the seeded config plays them on combat start,
-crits, kills, heals and specific monster attacks, from both the DM window and the
-simulated deck. If a future Kenku FM build allows cross-origin requests, the demo will
-use your real local Kenku library automatically; today its Remote API blocks browser
-pages, so the samples stand in.
-
-Demo data lives entirely in your browser (localStorage); the **Reset demo** button on
-the deck panel starts it over. The site also hosts the
-**[bridge protocol documentation](https://lil-dank.github.io/DnD-Combat-Tracker/bridge/)** —
-the WebSocket API the Stream Deck plugin uses, documented for anyone who wants to
-integrate their own hardware or overlays. What the demo cannot show: the real installer, the
-actual Stream Deck hardware, and the second-monitor/chroma workflow.
+Demo data lives entirely in your browser (localStorage; **Reset demo** starts over).
+The Kenku FM configuration UI is live with a sample soundboard but deliberately silent.
+The site also hosts the **[bridge protocol documentation](https://lil-dank.github.io/DnD-Combat-Tracker/bridge/)**
+for anyone integrating their own hardware or overlays.
 
 ---
 
@@ -135,198 +126,24 @@ The app works standalone; the plugin needs the app running to do anything.
 
 ---
 
-## How it fits together
-
-```mermaid
-flowchart LR
-    subgraph host["Your PC — nothing leaves it"]
-        direction LR
-        DM["🖥️ DM Window"]
-        PV["📺 Player View<br/><i>second monitor</i>"]
-        MAIN["⚙️ Electron main process<br/><b>canonical state</b>"]
-        JSON[("📁 JSON files<br/>%APPDATA%")]
-        SD["🎛️ Stream Deck app<br/>+ our plugin"]
-
-        DM <-->|IPC| MAIN
-        PV <-->|IPC| MAIN
-        MAIN --> JSON
-        MAIN <-->|"WebSocket<br/>127.0.0.1:57321"| SD
-    end
-```
-
-The main process owns the only copy of the truth. Both windows and the plugin are
-views onto it, and every change is written to disk atomically (temp file + rename)
-as it happens.
-
-### Repository layout
-
-| Path | What it is |
-| --- | --- |
-| `app/` | Electron + TypeScript + React app (DM Window + Player View) |
-| `app/src/mobile/` | The player web companion (own Vite bundle, served from the app over the LAN) |
-| `plugin/` | Stream Deck plugin (Elgato SDK v2, TypeScript) |
-| `app/srd-source/` | Open5e dataset fixtures the monster importer compiles from |
-| `app/resources/srd/` | Generated `monsters.json` + `monsters.de.json`, bundled into the installer |
-| `scripts/publish.mjs` | Tags and publishes a GitHub release with both artifacts |
-| `docs/bridge/` | The WebSocket bridge protocol documentation, served at `/bridge/` |
-
-Build outputs (`node_modules`, `app/out`, `app/release`, `plugin/dist`,
-`plugin/…sdPlugin/bin`) are gitignored. Shippable artifacts are published as
-[release assets](../../releases), not committed.
-
----
-
 ## Using the app
 
-### Language
+### Party
 
-**Settings → Appearance → Sprache/Language** switches between **English** and
-**Deutsch**. One setting moves all three surfaces at once — the DM window, the Player
-View, and the Stream Deck plugin, which relabels its keys live because the app sends the
-chosen language over the bridge. No restart.
+Add your PCs — name, max HP, AC, initiative modifier. Each PC can also carry
+**attacks** (attack rolls or save-based actions with dice, damage types and range),
+built in the same editor language as monster actions — so the DM's attack modal, the
+Stream Deck and the [player phones](#player-phone-companion) can all roll them.
+Players can add their own from their phone; everything is editable here. Persists
+between sessions.
 
 <div align="center">
 
-![The DM window running in German: Kampf, Zustände, RK, and a monster quick reference with STÄ/GES/KON/INT/WEI/CHA](docs/images/combat-de.png)
-
-<i>The same combat screen in German — including the imported monster's stat block:
-Goblinkrieger's Krummsäbel with German rules text, grid squares (1 Feld / 16⁄64 Felder),
-and SRD conditions. The language selector sits under Settings → Darstellung.</i>
+![The Party screen with a PC being edited: HP/AC/initiative fields plus the attack list with a structured attack editor](docs/images/party.png)
 
 </div>
 
-Game terminology is lifted from the **German SRD 5.2.1** rather than translated loosely,
-so the app agrees with what a German-speaking table reads in the rules:
-
-| | English | Deutsch |
-| --- | --- | --- |
-| Conditions | Poisoned, Incapacitated, Prone | **Vergiftet**, **Kampfunfähig**, **Liegend** |
-| Abilities | STR / DEX / CON / INT / WIS / CHA | **STÄ / GES / KON / INT / WEI / CHA** |
-| Armour Class | AC | **RK** |
-| Monsters | Owlbear, Ettercap, Bulette | **Eulenbär**, **Atterkopp**, **Landhai** |
-
-<details>
-<summary><b>The settings screen in German</b></summary>
-
-![Settings in German showing the Sprache selector set to Deutsch, plus theme, player view, bridge and credits sections](docs/images/settings-de.png)
-
-</details>
-
-Condition keys on the deck show the German label but still send the canonical English
-value back to the app, so your saved data never depends on which language you were using.
-
-
-
-**Imported monsters carry localization fields.** Importing the SRD attaches an `l10n`
-block to each monster — its German name plus, per action, the German action name and the
-full German rules text from the German SRD 5.2.1. The quick references, the attack
-modal and the Stream Deck's attack picker all read from it, so an Eulenbär's stat block
-shows *Mehrfachangriff* and *"Zerfetzen: Nahkampfangriffswurf: +7 … 14 (2W8+5)
-Hiebschaden"* rather than the English sentences. Libraries imported before this feature
-are backfilled automatically at startup, and the library search matches German names
-too. Manually created monsters never get the field: switching language changes only
-the UI around them, exactly as you'd expect for your own homebrew.
-
-> [!NOTE]
-> **Coverage and honesty.** 327 of the 331 SRD monsters are matched to their German
-> stat blocks (by AC, HP and ability-score signatures — never by translating words),
-> and 854 individual actions carry German text. Anything the matcher could not pair
-> with confidence stays English rather than being guessed at, and the German prose can
-> carry small extraction artifacts from the two-column PDF (an occasional missing
-> hyphen). Stored data is always language-neutral: the German layer is display-only.
-
-Every user-visible string in the interface goes through the lookup in
-`app/src/shared/i18n.ts`. That is enforced empirically rather than by eye — see
-[Checking localization coverage](#checking-localization-coverage).
-
-### Kenku FM audio
-
-If you run [Kenku FM](https://www.kenku.fm/) for table audio, the tracker can drive it
-through **Kenku Remote** (enable it in Kenku FM's settings, default `127.0.0.1:3333`,
-then flip on **Settings → Kenku FM** in the tracker). Sounds always play through
-Kenku FM itself — the audio output device is chosen there, not here.
-
-- **Event sounds** — map any app event to a Kenku soundboard sound, each with an
-  optional delay: combat starts/ends, turn change, damage or healing applied, a PC
-  goes down, a monster dies, an attack crits/hits/misses. Delayed sounds are cancelled
-  if combat ends first, so a slow-fuse kill sting can't land in the post-combat quiet.
-- **Per-attack sounds** — in the monster editor, any action can carry its own sound
-  with a trigger point (**attack roll / hit / damage roll / damage applied**) and a
-  delay. Fires identically from the DM window's attack modal and the Stream Deck's
-  attack flow.
-- **Encounter playlists** — pick a Kenku playlist per encounter template (🎵 on the
-  card). It starts at **Begin Combat** and pauses at **End Combat** — only if that
-  combat started it, so your own Kenku playback is never touched.
-- **Soundboard panel** — a sidebar button opens every Kenku sound as click-to-play
-  buttons, with Stop All.
-
-Everything is fail-soft: Kenku being closed or unreachable never blocks or delays the
-combat flow — the tracker simply stays quiet. Pickers show your live Kenku library;
-while Kenku is offline they keep the configured titles read-only. The
-[browser demo](#live-demo) ships the whole feature with a built-in sample soundboard,
-so you can hear it without installing anything.
-
-### Player web companion
-
-Everything is optional here too — the app is fully functional without it. Flip on
-**Settings → Player Web (phones)** and the tracker hosts a **mobile webpage on your
-Wi-Fi** (default port 57322, all bound interfaces). A QR code — inline in Settings and
-behind the sidebar **📱 Player Access** button — gets players in with one scan; no
-Android/iOS apps, no accounts.
-
-- **Claim once** — a player taps their character (optionally typing their name) and
-  the phone remembers it across sessions; a claimed PC shows as taken to others. The
-  DM sees who claimed what, with online status, and can kick a claim free.
-- **Initiative view** — turn order with conditions, a turn banner, and PC HP.
-  Disclosure matches the Player View: **monster HP and AC never leave the machine** —
-  phones only see names, conditions and the bloodied state (attack rolls still resolve
-  against AC internally).
-- **Damage & heal** — the Stream Deck picker's flow on glass: pick target(s), enter an
-  amount, apply.
-- **Attacks** — each PC carries attack/save actions (same schema as monsters, so the
-  DM's attack modal and the Stream Deck roll them too). Players roll from the phone in
-  either mode: **App rolls** (digital d20 + damage dice) or **I roll my dice** (type
-  the total; nat-20/nat-1 buttons; the app compares against AC without revealing it).
-  Save-based actions pop an adjudication modal on the DM window — roll each target's
-  save digitally or type table rolls; targets that save take half.
-- **Players build their own attacks** on the phone; they save straight onto the PC
-  record, and the DM can edit everything in the Party screen.
-- **Turn gating, enforced server-side** — by default players can only act on their
-  own turn (viewing is always live). A Settings toggle relaxes it so self-targeted
-  damage/heal works anytime; everything else stays turn-locked. No chaos.
-
-Windows asks for a firewall permission the first time the server starts. Phones must
-be on the same network — guest Wi-Fi networks with client isolation will block them.
-
-### Combat log & archive
-
-Every action lands in a **combat log** — damage, healing, attack rolls with their d20
-results, saving throws, conditions, downs, kills, turn and round changes — tagged with
-where it came from (DM window, Stream Deck, or a player's phone). The Combat screen
-shows it in a collapsible right-hand sidebar; phones get a one-line ticker that pulls
-up into the full log. The player-facing log hides monster attack-roll numbers (players
-see *"Goblin 2: Scimitar vs Aria — hit"*, not the to-hit math). Log lines are stored
-structurally and rendered through the localization layer, so switching language
-re-renders history too.
-
-When a combat ends, its log moves to the **Combat Archive** (📜 in the sidebar):
-every past fight with template name, date, rounds and the full log, kept until you
-delete it. Players can browse the archive from their phones as well.
-
-**Themes** live under Settings → Appearance: **PHB Style (Default)** (parchment and
-dark-red headings, styled after official 5e books / Homebrewery), **Default Electron**
-(the original dark-purple look), **Dark**, and **Light**. Preset-only by design — the
-Player View keeps its own styling and background-colour setting.
-
-<details open>
-<summary><b>1 · Party</b></summary>
-
-Add your PCs — name, max HP, AC, initiative modifier. Persists between sessions.
-
-</details>
-
-<details>
-<summary><b>2 · Monsters</b></summary>
+### Monsters
 
 Click **Import SRD Monsters** for 331 SRD 5.2.1 monsters with ability scores and
 attacks, or add your own. The six ability scores are optional (modifiers derive
@@ -339,37 +156,49 @@ annotated with its size in **battle-grid squares** for play on a 1-inch tabletop
 `reach 10 ft. (2 sq)`, `Reichweite 3 m (2 Felder)` — one square being the standard
 5 ft / 1,5 m.
 
-![The monster library with the Aboleth's stat block expanded, showing its ability table, structured attacks and save DCs](docs/images/monsters.png)
+<div align="center">
 
-</details>
+![The monster library with a stat block expanded, showing its ability table, structured attacks and save DCs](docs/images/monsters.png)
 
-<details>
-<summary><b>3 · Encounters</b></summary>
+</div>
+
+### Encounters
 
 Build reusable templates of monsters and quantities (e.g. 4× Goblin Warrior,
 1× Bugbear Warrior). Create, edit, duplicate, delete — or hit **⚔ Start Combat** on a
-card to jump straight into the combat wizard with that template preselected.
+card to jump straight into the combat wizard with that template preselected. A 🎵 on a
+card marks an attached [Kenku FM playlist](#kenku-fm-audio).
 
-</details>
+<div align="center">
 
-<details>
-<summary><b>4 · Combat</b></summary>
+![The Encounters screen with template cards listing their monsters and Start Combat buttons](docs/images/encounters.png)
+
+</div>
+
+### Combat
 
 Pick a template, tick the PCs joining, and choose **Roll for all** or **Roll for
 monsters only** (you type the players' rolls). Order sorts by initiative, ties broken
 by modifier; drag rows to settle what's left. **Begin Combat** starts round 1.
 
+The combat list is a **fixed-column table** — initiative, name, HP, AC, the amount
+field and the action buttons occupy the same column in every row, so nothing shifts as
+turns change and your eye can run straight down a column. HP and AC sit right beside
+the name; PCs carry a blue edge, monsters an amber one.
+
 - **Damage / heal** from each row — type an amount, `Enter` damages, `Shift+Enter`
   heals. Healing caps at max HP, damage floors at 0.
 - **At 0 HP** monsters leave the order (and the Player View, and the deck); PCs stay,
-  marked **downed**, and healing revives them.
-- The current-turn monster's card shows a **🎲 Attack** button running the same
-  workflow as the Stream Deck's Monster Attack: pick the attack → pick target(s)
-  (multi-select for save-based AoE) → roll attack vs the target's AC (HIT/MISS,
-  CRIT/NAT 1) and/or damage → for save actions choose who succeeded (they take half,
-  rounded down) → apply.
-- **Conditions** toggles the SRD conditions (plus exhaustion) on any combatant; badges
-  appear on both the DM and Player views.
+  marked **downed**, and healing revives them. Below half HP a monster's row tints
+  red and its HP cell carries a 🩸 — the same "bloodied" cue the players see.
+- On the current monster's turn its last column becomes a **🎲 Attack** button running
+  the same workflow as the Stream Deck's Monster Attack: pick the attack → pick
+  target(s) (multi-select for save-based AoE) → roll attack vs the target's AC
+  (HIT/MISS, CRIT/NAT 1) and/or damage → for save actions choose who succeeded (they
+  take half, rounded down) → apply.
+- **Conditions** opens a checklist popover; applied conditions appear as removable
+  chips (✕) under the name — two clearly different controls, so what's *applied* never
+  looks like what's *pickable*. Badges appear on both the DM and Player views.
 - **Attacks** — or simply clicking a monster's row — shows its full action list:
   attack rolls plus Multiattack, breath and save-based ability text. DM-only; this
   never reaches the Player View.
@@ -377,12 +206,10 @@ by modifier; drag rows to settle what's left. **Begin Combat** starts round 1.
   Initiative is auto-rolled, they slot into the order at their roll, and instance
   numbering continues (Goblin Warrior 4, 5, …).
 
-The highlighted current-turn row stays sticky as you scroll.
+The highlighted current-turn row stays sticky as you scroll, and the
+[combat log](#combat-log--archive) rides in a collapsible sidebar on the right.
 
-</details>
-
-<details>
-<summary><b>5 · Player View — and the chroma-key setup</b></summary>
+### Player View — and the chroma-key setup
 
 The sidebar button opens the display-only window; drag it to the players' monitor and
 use the **Fullscreen** toggle. It remembers its position across restarts, falling back
@@ -427,11 +254,137 @@ view is styled for it:
 - That's why PC HP is white — amber below half, red when downed — rather than the
   usual green.
 
+### Combat log & archive
+
+Every action lands in a **combat log** — damage, healing, attack rolls with their d20
+results, saving throws, conditions, downs, kills, turn and round changes — tagged with
+where it came from (DM window, Stream Deck, or a player's phone). The Combat screen
+shows it in a collapsible right-hand sidebar; phones get a one-line ticker that pulls
+up into the full log. The player-facing log hides monster attack-roll numbers (players
+see *"Goblin 2: Scimitar vs Aria — hit"*, not the to-hit math). Log lines are stored
+structurally and rendered through the localization layer, so switching language
+re-renders history too.
+
+When a combat ends, its log moves to the **Combat Archive** (📜 in the sidebar):
+every past fight with template name, date, rounds and the full log, kept until you
+delete it. Players can browse the archive from their phones as well.
+
+### Themes
+
+**Settings → Appearance** offers four presets — **Dark (default)**, **PHB Style**
+(parchment and dark-red headings, styled after official 5e books / Homebrewery),
+**Default Electron** (the original dark-purple look), and **Light**. Preset-only by
+design — the Player View keeps its own styling and background-colour setting. The UI
+ships with the [Inter](https://rsms.me/inter/) typeface, tuned for small-size
+legibility with tabular numerals in every HP/AC column.
+
+<div align="center">
+
+![The settings screen in the dark theme: appearance, combat screen, player view, bridge, player web and Kenku FM sections](docs/images/settings.png)
+
+</div>
+
+### Language
+
+**Settings → Appearance → Sprache/Language** switches between **English** and
+**Deutsch**. One setting moves all three surfaces at once — the DM window, the Player
+View, and the Stream Deck plugin, which relabels its keys live because the app sends the
+chosen language over the bridge. No restart.
+
+Game terminology is lifted from the **German SRD 5.2.1** rather than translated loosely,
+so the app agrees with what a German-speaking table reads in the rules:
+
+| | English | Deutsch |
+| --- | --- | --- |
+| Conditions | Poisoned, Incapacitated, Prone | **Vergiftet**, **Kampfunfähig**, **Liegend** |
+| Abilities | STR / DEX / CON / INT / WIS / CHA | **STÄ / GES / KON / INT / WEI / CHA** |
+| Armour Class | AC | **RK** |
+| Monsters | Owlbear, Ettercap, Bulette | **Eulenbär**, **Atterkopp**, **Landhai** |
+
+<details>
+<summary><b>The combat and settings screens in German</b></summary>
+
+![The DM window running in German: Kampf, Zustände, RK, and a monster quick reference with STÄ/GES/KON/INT/WEI/CHA](docs/images/combat-de.png)
+
+![Settings in German showing the Sprache selector set to Deutsch](docs/images/settings-de.png)
+
 </details>
+
+Condition keys on the deck show the German label but still send the canonical English
+value back to the app, so your saved data never depends on which language you were using.
+
+**Imported monsters carry localization fields.** Importing the SRD attaches an `l10n`
+block to each monster — its German name plus, per action, the German action name and the
+full German rules text from the German SRD 5.2.1. The quick references, the attack
+modal and the Stream Deck's attack picker all read from it, so an Eulenbär's stat block
+shows *Mehrfachangriff* and *"Zerfetzen: Nahkampfangriffswurf: +7 … 14 (2W8+5)
+Hiebschaden"* rather than the English sentences. Libraries imported before this feature
+are backfilled automatically at startup, and the library search matches German names
+too. Manually created monsters never get the field: switching language changes only
+the UI around them, exactly as you'd expect for your own homebrew.
+
+> [!NOTE]
+> **Coverage and honesty.** 327 of the 331 SRD monsters are matched to their German
+> stat blocks (by AC, HP and ability-score signatures — never by translating words),
+> and 854 individual actions carry German text. Anything the matcher could not pair
+> with confidence stays English rather than being guessed at, and the German prose can
+> carry small extraction artifacts from the two-column PDF (an occasional missing
+> hyphen). Stored data is always language-neutral: the German layer is display-only.
+
+Every user-visible string in the interface goes through the lookup in
+`app/src/shared/i18n.ts`. That is enforced empirically rather than by eye — see
+[Checking localization coverage](#checking-localization-coverage).
 
 ---
 
-## Stream Deck plugin
+## Player phone companion
+
+Everything here is optional — the app is fully functional without it. Flip on
+**Settings → Player Web (phones)** and the tracker hosts a **mobile webpage on your
+Wi-Fi** (default port 57322). A QR code — inline in Settings and behind the sidebar
+**📱 Player Access** button — gets players in with one scan; no Android/iOS apps, no
+accounts.
+
+<div align="center">
+
+| | | |
+| --- | --- | --- |
+| ![The phone claim screen listing the party's characters](docs/images/phone-claim.png) | ![The phone initiative view: your-turn banner, PC and monster rows with color edges, conditions and the log ticker](docs/images/phone-home.png) | ![The phone attack flow with the attack chosen and color-coded targets](docs/images/phone-attack.png) |
+| **Claim your character** | **Follow the fight** | **Roll your attacks** |
+
+</div>
+
+- **Claim once** — a player taps their character (optionally typing their name) and
+  the phone remembers it across sessions; a claimed PC shows as taken to others. The
+  DM sees who claimed what, with online status, and can kick a claim free.
+- **Initiative view** — turn order with conditions, a turn banner, and PC HP. PCs are
+  edged blue, monsters amber — the same color language as the deck and the DM table.
+  Disclosure matches the Player View: **monster HP and AC never leave the machine** —
+  phones only see names, conditions and the bloodied state (attack rolls still resolve
+  against AC internally).
+- **Damage & heal** — the Stream Deck picker's flow on glass: pick target(s), enter an
+  amount, apply.
+- **Attacks** — each PC carries attack/save actions (same schema as monsters, so the
+  DM's attack modal and the Stream Deck roll them too). Players roll from the phone in
+  either mode: **App rolls** (digital d20 + damage dice) or **I roll my dice** (type
+  the total; nat-20/nat-1 buttons; the app compares against AC without revealing it).
+  Save-based actions pop an adjudication modal on the DM window — roll each target's
+  save digitally or type table rolls; targets that save take half.
+- **Players build their own attacks** on the phone with structured pickers — a die
+  selector, a +/− count stepper and a damage-type dropdown — saved straight onto the
+  PC record, editable by the DM in the Party screen.
+- **Turn gating, enforced server-side** — by default players can only act on their
+  own turn (viewing is always live). A Settings toggle relaxes it so self-targeted
+  damage/heal works anytime; everything else stays turn-locked. No chaos.
+
+Windows asks for a firewall permission the first time the server starts. Phones must
+be on the same network — guest Wi-Fi networks with client isolation will block them.
+
+---
+
+## Integrations
+
+### Stream Deck
 
 Drag these actions onto any keys of your main profile.
 
@@ -458,88 +411,72 @@ Those first three keys draw themselves as images rather than using plain titles,
 the name renders at the largest size that still fits inside a margin — shrinking only
 as the name needs more lines — with a heavy outline for readability at a glance.
 
-<details>
-<summary><b>Damage / Heal — full flow</b></summary>
+#### Damage / Heal flow
 
-The deck switches to a multi-actor select (toggle any combatants; current-turn ▶ and
-downed 💀 are marked, paginated if needed) → **✓ Next** opens the numpad (digits,
-`C` clear, `✓ Enter`) → Enter applies the amount to **every selected actor** and
-returns to the profile you started from.
+```mermaid
+flowchart LR
+    A["🟣 Actor select<br/>multi-toggle, ▶ current, 💀 downed"] -->|"✓ Next"| N["🔢 Numpad<br/>digits · C clear"]
+    N -->|"✓ Enter"| Y["Amount applied to<br/><b>every selected actor</b>"]
+    N -->|"← Back<br/>selection kept"| A
+    Y --> X["Back to your profile"]
+    A -->|"✕ Cancel"| X
+    N -->|"✕ Cancel"| X
+```
 
-The numpad's Back key returns to actor-select with the selection kept; Cancel returns
-straight to your profile.
+#### Condition flow
 
-</details>
+```mermaid
+flowchart LR
+    A["🟣 Actor select<br/>multi-toggle"] -->|"✓ Next"| C["☰ Condition grid<br/>✓ all have it · ~ only some"]
+    C -->|"press a condition:<br/>toggles it for the whole selection"| C
+    C -->|"← Back<br/>selection kept"| A
+    C -->|"✓ Done"| X["Back to your profile"]
+```
 
-<details>
-<summary><b>Condition — full flow</b></summary>
+#### Monster Attack flow
 
-Multi-actor select (toggle combatants, **✓ Next**) → a condition grid applying to the
-whole selection: **✓** = all selected have it, **~** = only some. Pressing a condition
-toggles it uniformly — on for everyone if anyone lacks it, off for everyone once all
-have it.
+```mermaid
+flowchart TD
+    P["🟣 Pick an attack<br/>of the current monster"] --> T["🎯 Pick target(s)<br/>attack roll: one · save/AoE: many"]
+    T --> R["Roll screen<br/>read-outs: attack + target AC"]
+    R -->|"🎲 Attack"| V["d20 + to-hit vs AC<br/>✔ HIT / ✘ MISS · CRIT! / NAT 1"]
+    V --> R
+    R -->|"🎲 Damage"| D["Damage dice rolled<br/>multi-part summed"]
+    D -->|"save-based action"| S["Who saved?<br/>✓½ marked targets take half"]
+    D -->|"attack roll"| CD["⏳ 5 s countdown"]
+    S -->|"⚔ Apply"| CD
+    CD -->|"auto-apply"| X["Damage applied →<br/>back to your profile"]
+    CD -->|"← Back cancels<br/>(re-roll safely)"| R
+```
 
-**✓ Done** (bottom-right) returns to your profile; **← Back** (top-left) returns to
-actor select with the selection kept.
+#### Dice Roller flow
 
-</details>
-
-<details>
-<summary><b>Monster Attack — full flow</b></summary>
-
-Lists the current-turn monster's rollable actions (attack rolls, plus save actions
-that deal damage — DC shown). Pick one, then pick the **target**: attack rolls take a
-single target, while save-based actions (breath weapons and the like) are treated as
-AoE — toggle several targets and press **✓ Done**.
-
-The roll screen shows the target's name and **AC** (or the target count for AoE), and
-offers:
-
-- **🎲 Attack** — d20 + to-hit, compared against the target's AC, showing
-  **✔ HIT / ✘ MISS**. Nat 20 always hits with CRIT!, nat 1 always misses.
-- **🎲 Damage** — rolls the actual dice (`2d8+2`, `12d8`, multi-part damage summed with
-  a breakdown). Flat-damage attacks use their fixed value; conditional damage such as
-  *"if the attack roll had Advantage"* is rolled but shown separately.
-
-A rolled damage total is **applied to the target(s) automatically after a 5 s
-countdown**, then the deck returns to the profile you pressed from. Pressing Back
-during the countdown cancels the pending apply, so re-rolling is safe.
-
-**Saving throws.** Rolling damage for a save-based action inserts a *"who saved?"* step
-before the countdown: toggle the targets that succeeded (marked ✓½), press Apply, and
-they take **half damage, rounded down**, while everyone else takes full.
-
-</details>
-
-<details>
-<summary><b>Dice Roller — full flow</b></summary>
-
-Custom rolls with no SRD data involved: enter the number of dice on a numpad → pick the
-die (d4/d6/d8/d10/d12/d20/d100) → enter a modifier (± key for negative) → **"more
-dice?"** asks whether to add extra dice of a different kind. *Yes* loops back through
-amount → die and asks again, so pools like `2d8+1 +1d4 +2d6` build up; *No* proceeds.
-
-The summary screen shows the full pool with **🎲 Roll** (re-roll as often as you like),
-a **＋ Dice** key to add more parts, plus **⚔ Damage** and **✚ Heal**. Either of those
-opens a multi-actor select — toggle combatants, then **Apply** sends the rolled total
-to all of them and returns to your profile.
+```mermaid
+flowchart LR
+    N1["🔢 How many dice"] --> D1["🎲 Which die<br/>d4 … d100"]
+    D1 --> M["± Modifier"]
+    M --> Q{"More dice?"}
+    Q -->|"Yes — build pools<br/>like 2d8+1 +1d4"| N1
+    Q -->|No| S["Summary<br/>🎲 Roll, repeat freely"]
+    S -->|"⚔ Damage / ✚ Heal"| A["🟣 Actor select → Apply"]
+    S -->|"✕ Cancel"| X["Back to your profile"]
+    A --> X
+```
 
 Rolling works even without the app connected; applying needs it. The same roller lives
 in the DM window's sidebar (**🎲 Dice Roller**) with add/remove dice rows, a per-part
 breakdown, combatant picking and Damage/Heal.
 
-</details>
-
-### The picker screens
+#### The picker screens
 
 When you press one of those actions the deck switches to a picker profile that the
 plugin relabels at runtime. On a 5×3 MK.2 they look like this:
 
 | | |
 | --- | --- |
-| ![Actor select: downed actors marked with a skull, the current turn with a triangle, picked actors highlighted green](docs/images/streamdeck-actor-select.png) | ![The numpad with digits, a clear key, a dashed read-out key showing the operation and target count, and a green Enter](docs/images/streamdeck-numpad.png) |
-| **Actor select** — 💀 downed, ▶ current turn, ✓ picked. `✓ Next (2)` carries the count. | **Numpad** — the dashed key is a read-out: operation and how many targets it will hit. |
-| ![The conditions grid with the SRD conditions across the keys, a paging key and a green Done](docs/images/streamdeck-conditions.png) | ![The dice roller summary showing the pool 2d6+3 with Roll, add-dice, Damage and Heal keys](docs/images/streamdeck-dice-roll.png) |
+| ![Actor select: player characters on blue keys, monsters on purple, downed actors marked with a skull, the current turn with a triangle, picked actors highlighted green](docs/images/streamdeck-actor-select.png) | ![The numpad with digits, a clear key, a dashed read-out key showing the operation and target count, and a green Enter](docs/images/streamdeck-numpad.png) |
+| **Actor select** — 🔵 player characters, 🟣 monsters, 💀 downed, ▶ current turn, ✓ picked. | **Numpad** — the dashed key is a read-out: operation and how many targets it will hit. |
+| ![The conditions grid with the SRD conditions across the keys, a paging key and a green Done](docs/images/streamdeck-conditions.png) | ![The dice roller summary showing the pool with Roll, add-dice, Damage and Heal keys](docs/images/streamdeck-dice-roll.png) |
 | **Conditions** — applied across the whole selection, with `▶ More` paging the list. | **Dice roller** — the pool so far, re-rollable, then sent as damage or healing. |
 
 ![The monster attack roll screen showing the chosen attack, the target with its AC, and green Attack and Damage keys](docs/images/streamdeck-attack-roll.png)
@@ -553,7 +490,7 @@ plugin relabels at runtime. On a 5×3 MK.2 they look like this:
 > going stale. The Stream Deck app's window can't be screenshotted for this: it shows
 > the profile selected in its editor, not the one the plugin pushes to the hardware.
 
-### Key colours and layout
+#### Key colours and layout
 
 Picker keys are drawn by the plugin, so every key's text is auto-sized to the largest
 that fits inside a margin and carries a heavy outline. The background colour tells you
@@ -562,10 +499,11 @@ what a key *is*:
 | Colour | Meaning |
 | --- | --- |
 | 🟣 Purple | A pressable choice |
+| 🔵 Navy blue | A **player character** in an actor list |
 | 🟢 Green | Confirms — Next / Done / Apply / Enter / Roll |
 | 🔴 Red | Cancels |
 | ⬜ Slate | Back or Clear |
-| 🔵 Blue | Paging |
+| 💠 Bright blue | Paging |
 | 💚 Bright green | Something you've picked |
 | ⬛ Dark, dashed border | A read-out that does nothing |
 | ⚫ Near-black | Unused key |
@@ -607,6 +545,83 @@ The "Picker Slot" action appears in the Stream Deck actions list — a requireme
 Stream Deck app for profile keys — but never needs to be placed manually.
 
 </details>
+
+### Kenku FM audio
+
+If you run [Kenku FM](https://www.kenku.fm/) for table audio, the tracker can drive it
+through **Kenku Remote** (enable it in Kenku FM's settings, default `127.0.0.1:3333`,
+then flip on **Settings → Kenku FM** in the tracker). Sounds always play through
+Kenku FM itself — the audio output device is chosen there, not here.
+
+- **Event sounds** — map any app event to a Kenku soundboard sound, each with an
+  optional delay: combat starts/ends, turn change, damage or healing applied, a PC
+  goes down, a monster dies, an attack crits/hits/misses. Delayed sounds are cancelled
+  if combat ends first, so a slow-fuse kill sting can't land in the post-combat quiet.
+- **Per-attack sounds** — in the monster editor (and the Party screen's attack editor),
+  any action can carry its own sound with a trigger point (**attack roll / hit /
+  damage roll / damage applied**) and a delay. Fires identically from the DM window's
+  attack modal, the Stream Deck's attack flow, and the player phones.
+- **Encounter playlists** — pick a Kenku playlist per encounter template (🎵 on the
+  card). It starts at **Begin Combat** and pauses at **End Combat** — only if that
+  combat started it, so your own Kenku playback is never touched.
+- **Soundboard panel** — a sidebar button opens every Kenku sound as click-to-play
+  buttons, with Stop All.
+
+Everything is fail-soft: Kenku being closed or unreachable never blocks or delays the
+combat flow — the tracker simply stays quiet. Pickers show your live Kenku library;
+while Kenku is offline they keep the configured titles read-only. The
+[browser demo](#live-demo) shows the whole configuration surface against a sample
+soundboard (silent by design — no one wants a website that plays sounds uninvited).
+
+---
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    subgraph host["Your PC — nothing leaves the table"]
+        direction LR
+        DM["🖥️ DM Window"]
+        PV["📺 Player View<br/><i>second monitor</i>"]
+        MAIN["⚙️ Electron main process<br/><b>canonical state</b>"]
+        JSON[("📁 JSON files<br/>%APPDATA%")]
+        SD["🎛️ Stream Deck app<br/>+ our plugin"]
+        KENKU["🔊 Kenku FM<br/><i>optional</i>"]
+
+        DM <-->|IPC| MAIN
+        PV <-->|IPC| MAIN
+        MAIN --> JSON
+        MAIN <-->|"WebSocket<br/>127.0.0.1:57321"| SD
+        MAIN -.->|"Kenku Remote<br/>127.0.0.1:3333"| KENKU
+    end
+
+    subgraph wifi["Same Wi-Fi — opt-in"]
+        PHONES["📱 Player phones<br/><i>claim · act · follow</i>"]
+    end
+
+    MAIN <-->|"HTTP + WebSocket<br/>port 57322"| PHONES
+```
+
+The main process owns the only copy of the truth. Both windows, the plugin and the
+phones are views onto it, and every change is written to disk atomically (temp file +
+rename) as it happens. Kenku FM and the phone server are optional side-channels: the
+app never depends on either being there.
+
+### Repository layout
+
+| Path | What it is |
+| --- | --- |
+| `app/` | Electron + TypeScript + React app (DM Window + Player View) |
+| `app/src/mobile/` | The player web companion (own Vite bundle, served from the app over the LAN) |
+| `plugin/` | Stream Deck plugin (Elgato SDK v2, TypeScript) |
+| `app/srd-source/` | Open5e dataset fixtures the monster importer compiles from |
+| `app/resources/srd/` | Generated `monsters.json` + `monsters.de.json`, bundled into the installer |
+| `scripts/publish.mjs` | Tags and publishes a GitHub release with both artifacts |
+| `docs/bridge/` | The WebSocket bridge protocol documentation, served at `/bridge/` |
+
+Build outputs (`node_modules`, `app/out`, `app/release`, `plugin/dist`,
+`plugin/…sdPlugin/bin`) are gitignored. Shippable artifacts are published as
+[release assets](../../releases), not committed.
 
 ---
 
@@ -656,7 +671,7 @@ condition key still reports the canonical English value.
 
 A regex sweep for untranslated strings misses too much — bare JSX text nodes, labels split
 over lines, emoji-prefixed buttons. So coverage is measured against the running app
-instead: `app/scripts/check-i18n.mjs` walks all 13 screens and modals in English, then in
+instead: `app/scripts/check-i18n.mjs` walks all screens and modals in English, then in
 German, and prints every visible line that **did not change**.
 
 ```bash
@@ -756,6 +771,9 @@ currently qualify; anything ambiguous stays English rather than being guessed at
 
 The same attribution is shown in-app under **Settings → About / Credits**.
 
+The UI typeface is [Inter](https://rsms.me/inter/), bundled under the
+[SIL Open Font License 1.1](app/src/assets/fonts/LICENSE-Inter.txt).
+
 Project code is MIT-licensed (see `app/package.json`).
 
 ---
@@ -782,7 +800,8 @@ Project code is MIT-licensed (see `app/package.json`).
 - **In-progress combat persists across restarts:** the live combat is saved on every
   change and restored on launch.
 - **Location:** `%APPDATA%/dnd-combat-tracker/data/*.json` — one file per store (PCs,
-  monsters, templates, settings, active combat), loaded into id-indexed maps in the main
-  process and written back atomically (temp file + rename) on every change.
+  monsters, templates, settings, active combat, combat archive, player claims), loaded
+  into id-indexed maps in the main process and written back atomically (temp file +
+  rename) on every change.
 
 </details>

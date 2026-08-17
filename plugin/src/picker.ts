@@ -273,6 +273,7 @@ class Picker {
               actorName: this.actorName,
               actorType: this.attackerType,
               targetName: target?.displayName,
+              targetType: target?.type,
               attackName: this.selectedAttack.name,
               die: roll.die,
               total: roll.total,
@@ -609,7 +610,7 @@ class Picker {
       const picked = this.targets.includes(c.id);
       return K(
         `${picked ? '✓\n' : ''}${this.actorLabel(c, picked ? 2 : 3)}`,
-        picked ? 'selected' : 'item',
+        picked ? 'selected' : c.type === 'pc' ? 'itemPc' : 'item',
       );
     }
 
@@ -667,7 +668,7 @@ class Picker {
       const picked = this.targets.includes(c.id);
       return K(
         `${picked ? '✓\n' : ''}${this.targetName(c, picked ? 2 : 3)}`,
-        picked ? 'selected' : 'item',
+        picked ? 'selected' : c.type === 'pc' ? 'itemPc' : 'item',
       );
     }
 
@@ -720,7 +721,7 @@ class Picker {
       const saved = this.savedTargets.includes(c.id);
       return K(
         `${saved ? '✓½\n' : ''}${this.targetName(c, saved ? 2 : 3)}`,
-        saved ? 'selected' : 'item',
+        saved ? 'selected' : c.type === 'pc' ? 'itemPc' : 'item',
       );
     }
 
@@ -806,7 +807,7 @@ class Picker {
       const picked = this.targets.includes(c.id);
       return K(
         `${picked ? '✓\n' : ''}${this.targetName(c, picked ? 2 : 3)}`,
-        picked ? 'selected' : 'item',
+        picked ? 'selected' : c.type === 'pc' ? 'itemPc' : 'item',
       );
     }
 

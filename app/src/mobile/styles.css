@@ -44,6 +44,10 @@
 html,
 body {
   height: 100%;
+  /* Mobile browsers must not inflate text ("font boosting") - it breaks
+     vertical centering in flex rows like the log-peek bar. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -355,9 +359,10 @@ h3 {
   border-top: 2px solid var(--gold);
   background: var(--panel-2);
   font-size: 13px;
+  line-height: 1.2;
   color: var(--muted);
   text-align: left;
-  padding: 9px 14px;
+  padding: 6px 10px 6px 14px;
   z-index: 20;
 }
 
@@ -375,7 +380,9 @@ h3 {
   text-overflow: ellipsis;
 }
 
-/* The expand affordance reads as a button, not a stray glyph. */
+/* The expand affordance reads as a button, not a stray glyph. Plain
+   in-row geometry (no negative margins) keeps the text dead-centered
+   against it on every browser. */
 .log-peek .peek-chevron {
   flex-shrink: 0;
   display: flex;
@@ -383,7 +390,6 @@ h3 {
   justify-content: center;
   width: 30px;
   height: 30px;
-  margin: -5px -7px -5px 0;
   border-radius: 9px;
   background: var(--gold);
   color: #1a1423;

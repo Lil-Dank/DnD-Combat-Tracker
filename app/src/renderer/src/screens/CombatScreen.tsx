@@ -462,7 +462,11 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                     {t('combat.attacks')}
                   </button>
                 ) : (
-                  <span className="cell-empty" />
+                  /* Ghost button keeps the column shape readable and signals
+                     that attacks could live here (add them in Party/Monsters). */
+                  <button className="btn small cell-btn ghost" disabled>
+                    {t('combat.attacks')}
+                  </button>
                 )}
               </div>
 

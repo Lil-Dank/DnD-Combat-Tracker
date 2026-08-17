@@ -16,6 +16,7 @@
   --pc-tint: rgba(59, 130, 246, 0.14);
   --monster-color: #d97706;
   --monster-tint: rgba(217, 119, 6, 0.1);
+  --miss: #a03d3d;
 }
 
 * {
@@ -567,12 +568,13 @@ h3 {
 }
 
 .seg-hit {
-  color: var(--good);
+  color: var(--bad);
   font-weight: 600;
 }
 
 .seg-miss {
-  color: var(--muted);
+  color: var(--miss);
+  font-weight: 600;
 }
 
 .seg-cond {

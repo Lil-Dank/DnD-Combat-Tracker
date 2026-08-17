@@ -22,6 +22,7 @@
   --badge-text: #e9d5ff;
   --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --warn: #f59e0b;
+  --miss: #9f3535;
   --current-border: var(--gold);
   --current-tint: rgba(212, 169, 79, 0.12);
   --current-shadow: rgba(212, 169, 79, 0.15);
@@ -51,6 +52,7 @@
   --badge-text: #f9ecd9;
   --font-ui: 'Book Antiqua', 'Palatino Linotype', Palatino, Georgia, serif;
   --warn: #8a5a12;
+  --miss: #7a2c20;
   --current-border: var(--gold);
   --current-tint: rgba(201, 173, 106, 0.2);
   --current-shadow: rgba(121, 94, 45, 0.18);
@@ -80,6 +82,7 @@
   --badge-text: #e5e7eb;
   --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --warn: #f59e0b;
+  --miss: #a03d3d;
   --current-border: var(--accent);
   --current-tint: rgba(96, 165, 250, 0.09);
   --current-shadow: rgba(96, 165, 250, 0.12);
@@ -109,6 +112,7 @@
   --badge-text: #3730a3;
   --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --warn: #b45309;
+  --miss: #8f2f2f;
   --current-border: var(--accent);
   --current-tint: rgba(37, 99, 235, 0.08);
   --current-shadow: rgba(37, 99, 235, 0.12);
@@ -535,6 +539,23 @@ textarea::placeholder {
   min-width: 0;
 }
 
+/* The shorthand above resets padding; selects still need chevron room. */
+.modal select {
+  padding-right: 26px;
+}
+
+/* Number inputs inside modals drop the native spinner (cramped columns). */
+.modal input[type='number']::-webkit-outer-spin-button,
+.modal input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+/* Extra-dice remove key lines up with the inputs beside it. */
+.form-row .attack-remove {
+  min-height: var(--control-h);
+  margin-bottom: 10px;
+}
+
 .modal input:focus, .search-box:focus {
   outline: none;
   border-color: var(--accent);
@@ -635,7 +656,9 @@ textarea::placeholder {
 
 .dice-roll-btn {
   margin-bottom: 10px;
-  white-space: nowrap;
+  white-space: normal;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .dice-result {
@@ -1033,6 +1056,10 @@ textarea::placeholder {
 
 .cell-empty {
   width: 100%;
+}
+
+.btn.ghost:disabled {
+  opacity: 0.28;
 }
 
 .roll-attack {
@@ -1804,12 +1831,13 @@ textarea::placeholder {
 }
 
 .seg-hit {
-  color: var(--success);
+  color: var(--danger);
   font-weight: 600;
 }
 
 .seg-miss {
-  color: var(--text-muted);
+  color: var(--miss);
+  font-weight: 600;
 }
 
 .seg-cond {

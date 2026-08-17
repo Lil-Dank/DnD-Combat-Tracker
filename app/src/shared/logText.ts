@@ -191,7 +191,19 @@ export function logRollSegments(lang: Lang, e: LogEntry): LogSegment[] | null {
   if (e.die === undefined) return [{ text: `= ${e.total}` }];
   const mod = e.total - e.die;
   const modStr = mod === 0 ? '' : ` ${mod > 0 ? '+' : '−'} ${Math.abs(mod)}`;
-  const out: LogSegment[] = [{ text: d20, cls: 'lr-dice' }, { text: ' ' }];
+  const out: LogSegment[] = [];
+  if (e.dice && e.dice.length > 1) {
+    // Name the roll mode explicitly (derivable: kept the higher = advantage,
+    // the lower = disadvantage; equal dice are indistinguishable).
+    const max = Math.max(...e.dice);
+    const min = Math.min(...e.dice);
+    const mode = max === min ? null : e.die === max ? 'adv' : 'dis';
+    if (mode) {
+      out.push({ text: translate(lang, `log.${mode}`), cls: `lr-${mode}` });
+      out.push({ text: ' ' });
+    }
+  }
+  out.push({ text: d20, cls: 'lr-dice' }, { text: ' ' });
   if (e.dice && e.dice.length > 1) {
     // Adv/dis: both d20s, the discarded one struck through.
     let keptShown = false;

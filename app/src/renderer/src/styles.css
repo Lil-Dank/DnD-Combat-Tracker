@@ -1987,6 +1987,17 @@ textarea::placeholder {
   opacity: 0.55;
 }
 
+/* Explicit roll-mode tags so nobody has to deduce from the dropped die. */
+.log-roll .lr-adv {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.log-roll .lr-dis {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 /* Advantage / normal / disadvantage selector in the attack modal. */
 .adv-toggle-row {
   display: flex;

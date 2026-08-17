@@ -1045,16 +1045,19 @@ textarea::placeholder {
 .combat-screen {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 32px);
+  /* Content padding around the combat screen: 16px top + 6px bottom. */
+  height: calc(100vh - 22px);
   min-height: 0;
 }
 
 /* The combat screen never scrolls at the content level, so the reserved
-   scrollbar gutter is dead space - reclaim it and slim the side padding. */
+   scrollbar gutter is dead space - reclaim it and slim the side padding.
+   Bottom matches the right so the log frames evenly. */
 .content:has(.combat-screen) {
   scrollbar-gutter: auto;
   padding-left: 14px;
   padding-right: 6px;
+  padding-bottom: 6px;
 }
 
 .combat-header {
@@ -1822,7 +1825,7 @@ textarea::placeholder {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 14px;
+  gap: 6px;
   align-items: stretch;
 }
 
@@ -1833,7 +1836,7 @@ textarea::placeholder {
   min-width: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding-right: 4px;
+  padding-right: 2px;
 }
 
 .log-panel {

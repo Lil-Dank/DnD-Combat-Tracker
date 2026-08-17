@@ -940,7 +940,7 @@ textarea::placeholder {
 
 .combat-row {
   /* Keep auto-scrolled rows clear of the sticky header. */
-  scroll-margin-top: 88px;
+  scroll-margin-top: 72px;
 }
 
 .combat-row {
@@ -968,18 +968,61 @@ textarea::placeholder {
   opacity: 0.75;
 }
 
+/* One shared template = columns align across every row and never shift.
+   init | name(+chips) | HP | AC | amount | Dmg | Heal | Conditions | Attacks */
+:root {
+  --combat-cols: 38px minmax(170px, 1fr) 76px 48px 54px 70px 66px 96px 90px;
+}
+
 .combat-row-main {
-  display: flex;
-  /* Long German button labels wrap onto a second line in narrow windows
-     instead of pushing the row past the card edge. */
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: var(--combat-cols);
   align-items: center;
-  gap: 8px 12px;
+  gap: 6px 8px;
+}
+
+.name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.name-line .combat-name {
+  flex: 0 1 auto;
+}
+
+.cell-btn {
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell-empty {
+  width: 100%;
+}
+
+.roll-attack {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.blood-drop {
+  font-size: 11px;
+  margin-right: 2px;
 }
 
 .init-badge {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 30px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -991,10 +1034,12 @@ textarea::placeholder {
 }
 
 .combat-name {
-  flex: 1;
   font-weight: 650;
   font-size: 15px;
-  min-width: 140px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .turn-arrow {
@@ -1009,15 +1054,23 @@ textarea::placeholder {
 
 .ac-badge {
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ac-label {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
 }
 
 .hp {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 15px;
-  min-width: 70px;
   text-align: right;
+  white-space: nowrap;
   color: var(--success);
 }
 
@@ -1096,37 +1149,16 @@ textarea::placeholder {
   cursor: default;
 }
 
-.bloodied-tag {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--danger);
-  border: 1px solid rgba(194, 47, 47, 0.55);
-  border-radius: 999px;
-  padding: 1px 8px;
-  white-space: nowrap;
-}
-
-.hp-controls {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
 .amount-input {
-  width: 58px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 7px;
-  padding: 5px 8px;
+  width: 100%;
   text-align: center;
+  min-height: var(--control-h-sm);
+  padding: 3px 6px;
 }
 
-.amount-input:focus {
-  outline: none;
-  border-color: var(--accent);
+.amount-input::-webkit-outer-spin-button,
+.amount-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
 }
 
 .btn.heal {
@@ -1137,27 +1169,30 @@ textarea::placeholder {
   border-color: var(--success);
 }
 
-.row-tools {
-  display: flex;
-  gap: 5px;
-}
-
-.condition-badges {
+/* Applied conditions: removable chips inside the name cell. */
+.row-conditions {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 8px;
-  padding-left: 46px;
+  gap: 4px;
 }
 
 .condition-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: var(--badge-bg);
   border: 1px solid var(--badge-border);
   color: var(--badge-text);
   font-size: 11.5px;
-  padding: 2px 9px;
-  border-radius: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
   cursor: pointer;
+  min-height: 0;
+}
+
+.condition-badge .chip-x {
+  font-size: 9px;
+  opacity: 0.55;
 }
 
 .condition-badge:hover {
@@ -1166,14 +1201,64 @@ textarea::placeholder {
   color: #fff;
 }
 
-.condition-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 10px;
+.condition-badge:hover .chip-x {
+  opacity: 1;
+}
+
+/* The picker is a different animal: a checklist popover, not chips. */
+.cond-popover {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px;
+  margin-top: 8px;
   padding: 10px;
   background: var(--bg-panel-2);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.cond-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 13px;
+  padding: 5px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cond-toggle:hover {
+  background: var(--row-hover);
+  border-color: var(--border);
+}
+
+.cond-toggle .cond-check {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--accent);
+}
+
+.cond-toggle.on {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.cond-toggle.on .cond-check {
+  border-color: var(--accent-dim);
+  background: var(--accent-dim);
+  color: #fff;
 }
 
 .attack-panel {

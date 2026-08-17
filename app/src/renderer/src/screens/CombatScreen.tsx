@@ -362,104 +362,124 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                   }
                 }}
               >
-                <span className="init-badge">{c.initiative}</span>
-                <span className="combat-name">
-                  {isCurrent && <span className="turn-arrow">▶ </span>}
-                  {mon(c.displayName)}
-                  {c.isDowned && <span className="downed-tag"> ✝ {t('combat.downed')}</span>}
+                <span className="init-badge tnum">{c.initiative}</span>
+                <span className="name-cell">
+                  <span className="name-line">
+                    <span className="combat-name">
+                      {isCurrent && <span className="turn-arrow">▶ </span>}
+                      {mon(c.displayName)}
+                      {c.isDowned && <span className="downed-tag"> ✝ {t('combat.downed')}</span>}
+                    </span>
+                  </span>
+                  {c.conditions.length > 0 && (
+                    <span className="row-conditions">
+                      {c.conditions.map((cond) => (
+                        <button
+                          key={cond}
+                          className="condition-badge"
+                          title={t('combat.clickToRemove')}
+                          onClick={() => void api.toggleCondition(c.id, cond)}
+                        >
+                          {cond2(cond)}
+                          <span className="chip-x">✕</span>
+                        </button>
+                      ))}
+                    </span>
+                  )}
                 </span>
-                <span className="ac-badge" title={t('combat.armorClass')}>{t('common.ac')} {c.ac}</span>
-                <span className={`hp ${c.currentHp <= c.maxHp / 2 ? 'low' : ''}`}>
+                {/* Fixed columns: HP and AC sit right beside the name so the
+                    eye lands on name → numbers without hunting; every row
+                    shares the same grid, so nothing ever shifts. */}
+                <span
+                  className={`hp tnum ${c.currentHp <= c.maxHp / 2 ? 'low' : ''}`}
+                  title={bloodied ? t('pv.bloodied') : undefined}
+                >
+                  {bloodied && <span className="blood-drop">🩸</span>}
                   {c.currentHp}/{c.maxHp}
                 </span>
-                {bloodied && <span className="bloodied-tag">{t('pv.bloodied')}</span>}
-                <span className="hp-controls">
-                  <input
-                    type="number"
-                    min={1}
-                    placeholder="0"
-                    className="amount-input"
-                    value={amounts[c.id] ?? ''}
-                    onChange={(e) => setAmounts({ ...amounts, [c.id]: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') applyAmount(c.id, e.shiftKey ? 'heal' : 'damage');
-                    }}
-                  />
-                  <button
-                    className="btn small danger"
-                    disabled={amountFor(c.id) === null}
-                    onClick={() => applyAmount(c.id, 'damage')}
-                    title={t('combat.applyDamage')}
-                  >
-                    {t('combat.dmgBtn')}
-                  </button>
-                  <button
-                    className="btn small heal"
-                    disabled={amountFor(c.id) === null}
-                    onClick={() => applyAmount(c.id, 'heal')}
-                    title={t('combat.applyHealing')}
-                  >
-                    {t('combat.healBtn')}
-                  </button>
+                <span className="ac-badge tnum" title={t('combat.armorClass')}>
+                  <span className="ac-label">{t('common.ac')}</span> {c.ac}
                 </span>
-                <span className="row-tools">
-                  {c.type === 'monster' && isCurrent && hasRollableAttacks(c) && (
-                    <button
-                      className="btn small primary"
-                      title={t('combat.rollMonsterAttack')}
-                      onClick={() => setAttackModalFor(c.id)}
-                    >
-                      {t('combat.attack')}
-                    </button>
-                  )}
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="0"
+                  className="amount-input tnum"
+                  value={amounts[c.id] ?? ''}
+                  onChange={(e) => setAmounts({ ...amounts, [c.id]: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applyAmount(c.id, e.shiftKey ? 'heal' : 'damage');
+                  }}
+                />
+                <button
+                  className="btn small danger cell-btn"
+                  disabled={amountFor(c.id) === null}
+                  onClick={() => applyAmount(c.id, 'damage')}
+                  title={t('combat.applyDamage')}
+                >
+                  {t('combat.dmgBtn')}
+                </button>
+                <button
+                  className="btn small heal cell-btn"
+                  disabled={amountFor(c.id) === null}
+                  onClick={() => applyAmount(c.id, 'heal')}
+                  title={t('combat.applyHealing')}
+                >
+                  {t('combat.healBtn')}
+                </button>
+                <button
+                  className={`btn small cell-btn ${conditionsFor === c.id ? 'primary' : ''}`}
+                  onClick={() => {
+                    const closing = conditionsFor === c.id;
+                    setConditionsFor(closing ? null : c.id);
+                    // Closing conditions hands the row back to the
+                    // auto-opened quick reference, if there is one.
+                    setAttacksFor(closing ? autoReferenceId : null);
+                  }}
+                >
+                  {t('combat.conditions')}
+                </button>
+                {c.type === 'monster' && isCurrent && hasRollableAttacks(c) ? (
+                  /* On the active monster's turn, this column becomes the roll
+                     button — the quick reference auto-opens, and the row click
+                     still toggles it, so the panel toggle isn't missed. */
                   <button
-                    className={`btn small ${conditionsFor === c.id ? 'primary' : ''}`}
+                    className="btn small primary cell-btn"
+                    title={t('combat.rollMonsterAttack')}
+                    onClick={() => setAttackModalFor(c.id)}
+                  >
+                    {t('combat.attack')}
+                  </button>
+                ) : c.type === 'monster' && c.attacks.length > 0 ? (
+                  <button
+                    className={`btn small cell-btn ${attacksFor === c.id ? 'primary' : ''}`}
                     onClick={() => {
-                      const closing = conditionsFor === c.id;
-                      setConditionsFor(closing ? null : c.id);
-                      // Closing conditions hands the row back to the
-                      // auto-opened quick reference, if there is one.
-                      setAttacksFor(closing ? autoReferenceId : null);
+                      setAttacksFor(attacksFor === c.id ? null : c.id);
+                      setConditionsFor(null);
                     }}
                   >
-                    {t('combat.conditions')}
+                    {t('combat.attacks')}
                   </button>
-                  {c.type === 'monster' && c.attacks.length > 0 && (
-                    <button
-                      className={`btn small ${attacksFor === c.id ? 'primary' : ''}`}
-                      onClick={() => {
-                        setAttacksFor(attacksFor === c.id ? null : c.id);
-                        setConditionsFor(null);
-                      }}
-                    >
-                      {t('combat.attacks')}
-                    </button>
-                  )}
-                </span>
+                ) : (
+                  <span className="cell-empty" />
+                )}
               </div>
 
-              {c.conditions.length > 0 && (
-                <div className="condition-badges">
-                  {c.conditions.map((cond) => (
-                    <span key={cond} className="condition-badge" title={t('combat.clickToRemove')}
-                      onClick={() => void api.toggleCondition(c.id, cond)}>
-                      {cond2(cond)}
-                    </span>
-                  ))}
-                </div>
-              )}
-
               {conditionsFor === c.id && (
-                <div className="condition-picker">
-                  {CONDITIONS.map((cond) => (
-                    <button
-                      key={cond}
-                      className={`pick-btn ${c.conditions.includes(cond) ? 'picked' : ''}`}
-                      onClick={() => void api.toggleCondition(c.id, cond)}
-                    >
-                      {cond2(cond)}
-                    </button>
-                  ))}
+                <div className="cond-popover">
+                  {CONDITIONS.map((cond) => {
+                    const on = c.conditions.includes(cond);
+                    return (
+                      <button
+                        key={cond}
+                        className={`cond-toggle ${on ? 'on' : ''}`}
+                        onClick={() => void api.toggleCondition(c.id, cond)}
+                      >
+                        <span className="cond-check">{on ? '✓' : ''}</span>
+                        {cond2(cond)}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 

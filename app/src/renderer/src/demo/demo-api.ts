@@ -18,8 +18,12 @@ import type {
   Combat,
   Combatant,
   Condition,
+  ArchivedCombat,
   EncounterTemplate,
   KenkuEventId,
+  LogEntry,
+  LogSource,
+  MonsterAction,
   MonsterTemplate,
   PC,
   Settings,
@@ -40,12 +44,11 @@ import {
   demoKenkuPlaySound,
   demoKenkuStopAll,
   demoKenkuStopSound,
-  kenkuReachable,
 } from './demo-kenku';
 
-// v2: reseeds visitors who stored a pre-Kenku demo state, so the sample
-// sound configuration shows up for everyone.
-const LS_KEY = 'dnd-combat-tracker-demo-v2';
+// v3: reseeds visitors so PC attacks, the combat log and the archive from
+// the UI overhaul show up for everyone.
+const LS_KEY = 'dnd-combat-tracker-demo-v3';
 const uuid = () => crypto.randomUUID();
 const d20 = () => 1 + Math.floor(Math.random() * 20);
 
@@ -55,14 +58,34 @@ interface DemoData {
   templates: EncounterTemplate[];
   settings: Settings;
   combat: Combat | null;
+  archive: ArchivedCombat[];
   seeded: boolean;
 }
+
+/** Who performed a mutation, for the demo combat log. */
+interface ActionCtx {
+  source: LogSource;
+  actorName?: string;
+  actorType?: 'pc' | 'monster';
+}
+
+const DM_CTX: ActionCtx = { source: 'dm' };
+const DECK_CTX: ActionCtx = { source: 'deck' };
 
 interface BridgeCommand {
   type: string;
   actorId?: string;
   amount?: number;
   condition?: string;
+  phase?: string;
+  roll?: {
+    actorName?: string;
+    actorType?: string;
+    targetName?: string;
+    attackName?: string;
+    die?: number;
+    total?: number;
+  };
 }
 
 export function createDemoApi(): Api {
@@ -72,6 +95,7 @@ export function createDemoApi(): Api {
     templates: [],
     settings: { ...DEFAULT_SETTINGS },
     combat: null,
+    archive: [],
     seeded: false,
   };
 
@@ -86,6 +110,8 @@ export function createDemoApi(): Api {
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return null;
       const stored = JSON.parse(raw) as DemoData;
+      if (!Array.isArray(stored.archive)) stored.archive = [];
+      if (stored.combat && !Array.isArray(stored.combat.log)) stored.combat.log = [];
       // Same deep-merge as main/state.ts: settings gain new sections over time.
       stored.settings = {
         ...DEFAULT_SETTINGS,
@@ -142,34 +168,23 @@ export function createDemoApi(): Api {
   });
 
   // ---- Kenku (demo): trigger engine mirroring main/kenku.ts -------------------
-  // Real Kenku is used when reachable (its remote has no CORS as of 1.x, so a
-  // hosted page usually cannot reach it); otherwise sounds synthesize locally.
+  // The demo simulates a connected Kenku: the full configuration UI works and
+  // "playing" states light up, but everything is silent by design.
 
-  let kenkuConnected = false;
+  const kenkuConnected = true;
   const kenkuPending = new Set<ReturnType<typeof setTimeout>>();
 
   const kenkuSettings = () => data.settings.kenku;
 
-  setInterval(() => {
-    const k = kenkuSettings();
-    if (!k.enabled) {
-      if (kenkuConnected) { kenkuConnected = false; notify(); }
-      return;
-    }
-    void kenkuReachable(k).then((r) => {
-      if (r !== kenkuConnected) { kenkuConnected = r; notify(); }
-    });
-  }, 5000);
-
   function kenkuFire(ref: { soundId: string; delayMs?: number }): void {
     const delay = ref.delayMs ?? 0;
     if (delay <= 0) {
-      void demoKenkuPlaySound(kenkuSettings(), ref.soundId);
+      void demoKenkuPlaySound(ref.soundId);
       return;
     }
     const timer = setTimeout(() => {
       kenkuPending.delete(timer);
-      void demoKenkuPlaySound(kenkuSettings(), ref.soundId);
+      void demoKenkuPlaySound(ref.soundId);
     }, delay);
     kenkuPending.add(timer);
   }
@@ -187,7 +202,7 @@ export function createDemoApi(): Api {
       kenkuEvent(event);
       if (!k.enabled) return;
       const tpl = data.templates.find((t) => t.id === data.combat?.sourceTemplateId);
-      if (tpl?.kenkuPlaylistId) void demoKenkuPlayPlaylist(k, tpl.kenkuPlaylistId);
+      if (tpl?.kenkuPlaylistId) void demoKenkuPlayPlaylist(tpl.kenkuPlaylistId);
       return;
     }
     if (event === 'combatEnd') {
@@ -196,7 +211,7 @@ export function createDemoApi(): Api {
       kenkuEvent(event);
       if (!k.enabled) return;
       const tpl = data.templates.find((t) => t.id === data.combat?.sourceTemplateId);
-      if (tpl?.kenkuPlaylistId) void demoKenkuPausePlayback(k);
+      if (tpl?.kenkuPlaylistId) void demoKenkuPausePlayback();
       return;
     }
     kenkuEvent(event);
@@ -245,6 +260,22 @@ export function createDemoApi(): Api {
     });
   }
 
+  /** Mirror of main/state.ts pushLog: structured entries, rendered via i18n. */
+  function pushLog(combat: Combat, entry: Omit<LogEntry, 'id' | 'ts' | 'round'>): void {
+    combat.log.push({ ...entry, id: uuid(), ts: Date.now(), round: combat.round });
+  }
+
+  function logTurn(combat: Combat, ctx: ActionCtx): void {
+    const current = combat.combatants[combat.currentIndex];
+    if (!current) return;
+    pushLog(combat, {
+      kind: 'turn',
+      actorName: current.displayName,
+      actorType: current.type,
+      source: ctx.source,
+    });
+  }
+
   function combatantFrom(m: MonsterTemplate, displayName: string): Combatant {
     return {
       id: uuid(),
@@ -263,16 +294,29 @@ export function createDemoApi(): Api {
     };
   }
 
-  function applyDamage(combatantId: string, amount: number): void {
+  function applyDamage(combatantId: string, amount: number, ctx: ActionCtx = DM_CTX): void {
     const combat = data.combat;
     if (!combat || amount <= 0) return;
     const idx = combat.combatants.findIndex((c) => c.id === combatantId);
     if (idx === -1) return;
     const c = combat.combatants[idx];
     c.currentHp = Math.max(0, c.currentHp - amount);
+    pushLog(combat, {
+      kind: 'damage',
+      actorName: ctx.actorName,
+      actorType: ctx.actorType,
+      targetName: c.displayName,
+      amount,
+      source: ctx.source,
+    });
     let downedOrKilled: KenkuEventId | null = null;
     if (c.currentHp === 0) {
       downedOrKilled = c.type === 'monster' ? 'monsterKilled' : 'pcDowned';
+      pushLog(combat, {
+        kind: c.type === 'monster' ? 'kill' : 'down',
+        targetName: c.displayName,
+        source: ctx.source,
+      });
       if (c.type === 'monster') {
         combat.combatants.splice(idx, 1);
         if (combat.combatants.length === 0) {
@@ -292,29 +336,48 @@ export function createDemoApi(): Api {
     if (downedOrKilled) kenkuCombatEvent(downedOrKilled);
   }
 
-  function applyHeal(combatantId: string, amount: number): void {
+  function applyHeal(combatantId: string, amount: number, ctx: ActionCtx = DM_CTX): void {
     const combat = data.combat;
     if (!combat || amount <= 0) return;
     const c = combat.combatants.find((x) => x.id === combatantId);
     if (!c) return;
     c.currentHp = Math.min(c.maxHp, c.currentHp + amount);
     if (c.currentHp > 0) c.isDowned = false;
+    pushLog(combat, {
+      kind: 'heal',
+      actorName: ctx.actorName,
+      actorType: ctx.actorType,
+      targetName: c.displayName,
+      amount,
+      source: ctx.source,
+    });
     save();
     kenkuCombatEvent('healApplied');
   }
 
-  function toggleCondition(combatantId: string, condition: Condition): void {
+  function toggleCondition(
+    combatantId: string,
+    condition: Condition,
+    ctx: ActionCtx = DM_CTX,
+  ): void {
     const combat = data.combat;
     if (!combat) return;
     const c = combat.combatants.find((x) => x.id === combatantId);
     if (!c) return;
-    c.conditions = c.conditions.includes(condition)
+    const removing = c.conditions.includes(condition);
+    c.conditions = removing
       ? c.conditions.filter((x) => x !== condition)
       : [...c.conditions, condition];
+    pushLog(combat, {
+      kind: removing ? 'conditionRemoved' : 'conditionAdded',
+      targetName: c.displayName,
+      condition,
+      source: ctx.source,
+    });
     save();
   }
 
-  function nextTurn(): void {
+  function nextTurn(ctx: ActionCtx = DM_CTX): void {
     const combat = data.combat;
     if (!combat || combat.phase !== 'active' || combat.combatants.length === 0) return;
     combat.currentIndex += 1;
@@ -322,11 +385,12 @@ export function createDemoApi(): Api {
       combat.currentIndex = 0;
       combat.round += 1;
     }
+    logTurn(combat, ctx);
     save();
     kenkuCombatEvent('turnChange');
   }
 
-  function prevTurn(): void {
+  function prevTurn(ctx: ActionCtx = DM_CTX): void {
     const combat = data.combat;
     if (!combat || combat.phase !== 'active' || combat.combatants.length === 0) return;
     if (combat.currentIndex === 0) {
@@ -336,8 +400,51 @@ export function createDemoApi(): Api {
     } else {
       combat.currentIndex -= 1;
     }
+    logTurn(combat, ctx);
     save();
     kenkuCombatEvent('turnChange');
+  }
+
+  /** End combat, archiving the log like main/state.ts does. */
+  function endCombatShared(ctx: ActionCtx = DM_CTX): void {
+    const combat = data.combat;
+    if (combat) {
+      kenkuCombatEvent('combatEnd');
+      if (combat.phase === 'active') {
+        pushLog(combat, { kind: 'combatEnd', source: ctx.source });
+        const template = data.templates.find((t) => t.id === combat.sourceTemplateId);
+        data.archive.unshift({
+          id: combat.id,
+          templateName: template?.name ?? '?',
+          endedAt: Date.now(),
+          rounds: combat.round,
+          log: combat.log,
+        });
+      }
+    }
+    data.combat = null;
+    save();
+  }
+
+  /** Log an attack roll reported by the deck sim (verdict phases only). */
+  function logAttackRoll(cmd: BridgeCommand): void {
+    const combat = data.combat;
+    const roll = cmd.roll;
+    const outcome =
+      cmd.phase === 'attackCrit' ? 'crit' : cmd.phase === 'attackHit' ? 'hit' : cmd.phase === 'attackMiss' ? 'miss' : null;
+    if (!combat || !roll || !outcome) return;
+    pushLog(combat, {
+      kind: 'attackRoll',
+      actorName: roll.actorName,
+      actorType: roll.actorType as 'pc' | 'monster' | undefined,
+      targetName: roll.targetName,
+      attackName: roll.attackName,
+      die: roll.die,
+      total: roll.total,
+      outcome,
+      source: 'deck',
+    });
+    save();
   }
 
   // ---- SRD import -------------------------------------------------------------
@@ -369,13 +476,63 @@ export function createDemoApi(): Api {
     if (data.seeded) return;
     await importSrd();
 
+    // A compact MonsterAction factory for seeded PC attacks (same record
+    // shape the Party screen / phone editor produce via formToAction).
+    const pcAttack = (
+      name: string,
+      toHit: number | null,
+      save: { ability: string; dc: number } | null,
+      dice: string,
+      count: number,
+      die: number,
+      bonus: number,
+      average: number,
+      dmgType: string,
+    ): MonsterAction => ({
+      id: `manual.${uuid()}`,
+      name,
+      section: 'action',
+      type: toHit !== null ? 'attack' : 'save',
+      order: 0,
+      attack:
+        toHit !== null
+          ? { kind: 'melee', toHit, toHitNote: null, reach: 5, range: null, usage: null }
+          : null,
+      save,
+      onHit: {
+        damage: [{ average, dice, count, die, bonus, type: dmgType, condition: null }],
+        alternateDamage: null,
+        effects: [],
+      },
+      onHitOrMiss: null,
+      kenkuSound: null,
+      display: {
+        toHit: toHit !== null ? `+${toHit}` : null,
+        range: toHit !== null ? 'reach 5 ft.' : null,
+        damage: `${average} (${dice}) ${dmgType.charAt(0).toUpperCase()}${dmgType.slice(1)}`,
+        text: '',
+      },
+    });
+
     for (const p of [
-      { name: 'Aria Windwhisper', maxHp: 38, ac: 15, initMod: 3 },
-      { name: 'Thorin Oakenshield', maxHp: 52, ac: 18, initMod: 0 },
-      { name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2 },
-      { name: 'Seraphina Dawnbringer', maxHp: 45, ac: 17, initMod: 1 },
+      {
+        name: 'Aria Windwhisper', maxHp: 38, ac: 15, initMod: 3,
+        attacks: [
+          pcAttack('Rapier', 5, null, '1d8+3', 1, 8, 3, 7, 'piercing'),
+          pcAttack('Shortbow', 5, null, '1d6+3', 1, 6, 3, 6, 'piercing'),
+        ],
+      },
+      {
+        name: 'Thorin Oakenshield', maxHp: 52, ac: 18, initMod: 0,
+        attacks: [pcAttack('Warhammer', 6, null, '1d10+4', 1, 10, 4, 9, 'bludgeoning')],
+      },
+      { name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2, attacks: [] },
+      {
+        name: 'Seraphina Dawnbringer', maxHp: 45, ac: 17, initMod: 1,
+        attacks: [pcAttack('Sacred Flame', null, { ability: 'DEX', dc: 13 }, '1d8', 1, 8, 0, 4, 'radiant')],
+      },
     ]) {
-      data.pcs.push({ id: uuid(), ...p, attacks: [] });
+      data.pcs.push({ id: uuid(), ...p });
     }
 
     const byName = (n: string) => data.monsters.find((m) => m.name === n);
@@ -479,6 +636,75 @@ export function createDemoApi(): Api {
     const monsterIdx = combat.combatants.findIndex((c) => c.type === 'monster');
     if (monsterIdx >= 0) combat.currentIndex = monsterIdx;
 
+    // A short round-1 backstory so the log rail and the phone's log/ticker
+    // have something to tell from the first second.
+    const mName = (i: number) => monsters[i]?.displayName ?? 'Goblin Warrior 1';
+    const pName = (i: number) => pcs[i]?.displayName ?? 'Aria Windwhisper';
+    const entry = (e: Omit<LogEntry, 'id' | 'ts'>): LogEntry => ({
+      ...e,
+      id: uuid(),
+      ts: Date.now() - (10 - combat.log.length) * 45000,
+    });
+    combat.log.push(
+      entry({ kind: 'combatStart', source: 'dm', round: 1 }),
+      entry({ kind: 'turn', actorName: pName(0), actorType: 'pc', source: 'dm', round: 1 }),
+      entry({
+        kind: 'attackRoll', actorName: pName(0), actorType: 'pc', targetName: mName(0),
+        attackName: 'Rapier', die: 14, total: 19, outcome: 'hit', source: 'player', round: 1,
+      }),
+      entry({
+        kind: 'damage', actorName: pName(0), actorType: 'pc', targetName: mName(0),
+        amount: 7, source: 'player', round: 1,
+      }),
+      entry({ kind: 'turn', actorName: mName(0), actorType: 'monster', source: 'deck', round: 1 }),
+      entry({
+        kind: 'attackRoll', actorName: mName(0), actorType: 'monster', targetName: pName(0),
+        attackName: 'Scimitar', die: 17, total: 21, outcome: 'hit', source: 'deck', round: 1,
+      }),
+      entry({
+        kind: 'damage', actorName: mName(0), actorType: 'monster', targetName: pName(0),
+        amount: 6, source: 'deck', round: 1,
+      }),
+      entry({
+        kind: 'conditionAdded', targetName: mName(1), condition: 'Prone', source: 'dm', round: 1,
+      }),
+      entry({ kind: 'turn', actorName: mName(0), actorType: 'monster', source: 'dm', round: 2 }),
+    );
+
+    // One archived fight so the Archive tab and the phone's history browser
+    // aren't empty on first visit.
+    const archivedLog: LogEntry[] = [
+      { kind: 'combatStart', source: 'dm', round: 1 },
+      { kind: 'turn', actorName: 'Owlbear 1', actorType: 'monster', source: 'dm', round: 1 },
+      {
+        kind: 'attackRoll', actorName: 'Owlbear 1', actorType: 'monster',
+        targetName: 'Thorin Oakenshield', attackName: 'Rend', die: 18, total: 25,
+        outcome: 'hit', source: 'deck', round: 1,
+      },
+      {
+        kind: 'damage', actorName: 'Owlbear 1', actorType: 'monster',
+        targetName: 'Thorin Oakenshield', amount: 14, source: 'deck', round: 1,
+      },
+      {
+        kind: 'attackRoll', actorName: 'Thorin Oakenshield', actorType: 'pc',
+        targetName: 'Owlbear 1', attackName: 'Warhammer', die: 20, total: 26,
+        outcome: 'crit', source: 'player', round: 1,
+      },
+      {
+        kind: 'damage', actorName: 'Thorin Oakenshield', actorType: 'pc',
+        targetName: 'Owlbear 1', amount: 18, source: 'player', round: 2,
+      },
+      { kind: 'kill', targetName: 'Owlbear 1', source: 'player', round: 2 },
+      { kind: 'combatEnd', source: 'dm', round: 2 },
+    ].map((e, i) => ({ ...e, id: uuid(), ts: Date.now() - 86400000 + i * 60000 }) as LogEntry);
+    data.archive.push({
+      id: uuid(),
+      templateName: 'Owlbear Den',
+      endedAt: Date.now() - 86400000 + archivedLog.length * 60000,
+      rounds: 2,
+      log: archivedLog,
+    });
+
     data.seeded = true;
     save();
   }
@@ -548,27 +774,26 @@ export function createDemoApi(): Api {
   function command(cmd: BridgeCommand): void {
     switch (cmd.type) {
       case 'nextTurn':
-        nextTurn();
+        nextTurn(DECK_CTX);
         break;
       case 'prevTurn':
-        prevTurn();
+        prevTurn(DECK_CTX);
         break;
       case 'endCombat':
-        if (data.combat) kenkuCombatEvent('combatEnd');
-        data.combat = null;
-        save();
+        endCombatShared(DECK_CTX);
         break;
       case 'attackEvent':
         kenkuAttackEvent(cmd as unknown as { sourceId?: string; attackId: string; phase: string });
+        logAttackRoll(cmd);
         break;
       case 'applyDamage':
-        if (cmd.actorId && typeof cmd.amount === 'number') applyDamage(cmd.actorId, cmd.amount);
+        if (cmd.actorId && typeof cmd.amount === 'number') applyDamage(cmd.actorId, cmd.amount, DECK_CTX);
         break;
       case 'applyHeal':
-        if (cmd.actorId && typeof cmd.amount === 'number') applyHeal(cmd.actorId, cmd.amount);
+        if (cmd.actorId && typeof cmd.amount === 'number') applyHeal(cmd.actorId, cmd.amount, DECK_CTX);
         break;
       case 'toggleCondition':
-        if (cmd.actorId && cmd.condition) toggleCondition(cmd.actorId, cmd.condition as Condition);
+        if (cmd.actorId && cmd.condition) toggleCondition(cmd.actorId, cmd.condition as Condition, DECK_CTX);
         break;
     }
     // A real deck press pulls the DM window to the Combat screen.
@@ -751,14 +976,12 @@ export function createDemoApi(): Api {
       combat.phase = 'active';
       combat.currentIndex = 0;
       combat.round = 1;
+      pushLog(combat, { kind: 'combatStart', source: 'dm' });
+      logTurn(combat, DM_CTX);
       save();
       kenkuCombatEvent('combatStart');
     },
-    endCombat: async () => {
-      if (data.combat) kenkuCombatEvent('combatEnd');
-      data.combat = null;
-      save();
-    },
+    endCombat: async () => endCombatShared(),
     nextTurn: async () => nextTurn(),
     prevTurn: async () => prevTurn(),
     applyDamage: async (id, amount) => applyDamage(id, amount),
@@ -814,16 +1037,12 @@ export function createDemoApi(): Api {
 
     // Kenku in the demo: real Kenku Remote when reachable (its remote has no
     // CORS today, so usually not), otherwise the built-in synthesized board.
-    kenkuGetLibrary: async () => demoKenkuLibrary(kenkuSettings()),
-    kenkuPlaySound: async (id) => demoKenkuPlaySound(kenkuSettings(), id),
-    kenkuStopSound: async (id) => demoKenkuStopSound(kenkuSettings(), id),
-    kenkuStopAll: async () => demoKenkuStopAll(kenkuSettings()),
-    kenkuSoundPlayback: async () => demoKenkuPlayback(kenkuSettings()),
-    kenkuCheckConnection: async () => {
-      const r = await kenkuReachable(kenkuSettings());
-      if (r !== kenkuConnected) { kenkuConnected = r; notify(); }
-      return r;
-    },
+    kenkuGetLibrary: async () => demoKenkuLibrary(),
+    kenkuPlaySound: async (id) => demoKenkuPlaySound(id),
+    kenkuStopSound: async (id) => demoKenkuStopSound(id),
+    kenkuStopAll: async () => demoKenkuStopAll(),
+    kenkuSoundPlayback: async () => demoKenkuPlayback(),
+    kenkuCheckConnection: async () => true,
     kenkuAttackEvent: async (payload) => kenkuAttackEvent(payload),
 
     updateSettings: async (patch) => {
@@ -850,7 +1069,10 @@ export function createDemoApi(): Api {
     resolvePlayerSave: async () => {},
     dismissPlayerSave: async () => {},
     onPlayerSavePending: () => () => {},
-    listArchive: async () => [],
-    deleteArchivedCombat: async () => {},
+    listArchive: async () => data.archive,
+    deleteArchivedCombat: async (id) => {
+      data.archive = data.archive.filter((a) => a.id !== id);
+      save();
+    },
   } as Api;
 }

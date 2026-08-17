@@ -351,19 +351,19 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
               style={bloodStyle}
             >
               <div
-                className={`combat-row-main ${c.type === 'monster' && c.attacks.length > 0 ? 'clickable' : ''}`}
+                className={`combat-row-main ${c.attacks.length > 0 ? 'clickable' : ''}`}
                 onClick={(e) => {
-                  // Clicking a monster row toggles its attack preview; leave
-                  // buttons and inputs to do their own thing.
+                  // Clicking a row toggles its attack preview; leave buttons
+                  // and inputs to do their own thing.
                   if ((e.target as HTMLElement).closest('button, input')) return;
-                  if (c.type === 'monster' && c.attacks.length > 0) {
+                  if (c.attacks.length > 0) {
                     setAttacksFor(attacksFor === c.id ? null : c.id);
                     setConditionsFor(null);
                   }
                 }}
               >
                 <span className="init-badge tnum">{c.initiative}</span>
-                <span className="name-cell">
+                <span className="actor-cell">
                   <span className="name-line">
                     <span className="combat-name">
                       {isCurrent && <span className="turn-arrow">▶ </span>}
@@ -439,10 +439,11 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                 >
                   {t('combat.conditions')}
                 </button>
-                {c.type === 'monster' && isCurrent && hasRollableAttacks(c) ? (
-                  /* On the active monster's turn, this column becomes the roll
-                     button — the quick reference auto-opens, and the row click
-                     still toggles it, so the panel toggle isn't missed. */
+                {isCurrent && hasRollableAttacks(c) ? (
+                  /* On the active combatant's turn, this column becomes the
+                     roll button — monsters and PCs alike, so the DM can roll
+                     for a player without their phone. The row click still
+                     toggles the action panel. */
                   <button
                     className="btn small primary cell-btn"
                     title={t('combat.rollMonsterAttack')}
@@ -450,7 +451,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                   >
                     {t('combat.attack')}
                   </button>
-                ) : c.type === 'monster' && c.attacks.length > 0 ? (
+                ) : c.attacks.length > 0 ? (
                   <button
                     className={`btn small cell-btn ${attacksFor === c.id ? 'primary' : ''}`}
                     onClick={() => {

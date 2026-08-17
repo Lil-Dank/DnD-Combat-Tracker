@@ -6,9 +6,10 @@ import { useI18n } from './i18n';
 const COLLAPSE_KEY = 'dct-log-collapsed';
 
 /**
- * The Combat screen's right-hand live log. Always recording, costs nothing
- * when unwanted: the panel collapses to a slim vertical toggle and remembers
- * that choice. Newest entries at the bottom, auto-scrolled.
+ * The Combat screen's right-hand log sidebar. Always recording, costs nothing
+ * when unwanted: the full-width button at the bottom collapses it to a slim
+ * strip (remembered in localStorage). Newest entries at the bottom,
+ * auto-scrolled.
  */
 export function CombatLogPanel({ log }: { log: LogEntry[] }) {
   const { t, lang } = useI18n();
@@ -30,9 +31,12 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
 
   if (collapsed) {
     return (
-      <button className="log-panel-collapsed" onClick={toggle} title={t('logPanel.title')}>
-        📜
-      </button>
+      <aside className="log-panel collapsed">
+        <div className="log-panel-vertical">📜 {t('logPanel.title')}</div>
+        <button className="log-panel-toggle" onClick={toggle} title={t('logPanel.expand')}>
+          «
+        </button>
+      </aside>
     );
   }
 
@@ -40,10 +44,7 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
   return (
     <aside className="log-panel">
       <header className="log-panel-header">
-        <h3>{t('logPanel.title')}</h3>
-        <button className="btn small" onClick={toggle} title={t('logPanel.collapse')}>
-          »
-        </button>
+        <h3>📜 {t('logPanel.title')}</h3>
       </header>
       <div className="log-panel-body">
         {log.length === 0 && <p className="muted">{t('logPanel.empty')}</p>}
@@ -65,6 +66,9 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
         })}
         <div ref={endRef} />
       </div>
+      <button className="log-panel-toggle" onClick={toggle} title={t('logPanel.collapse')}>
+        {t('logPanel.collapse')} »
+      </button>
     </aside>
   );
 }

@@ -15,6 +15,7 @@ import { PlayerWebQrModal } from './PlayerWebQrModal';
 import { PlayerSaveModal } from './PlayerSaveModal';
 import type { PlayerSavePendingInfo } from '../../preload/index';
 import { translate } from '../../shared/i18n';
+import logoUrl from '../../../resources/icon.png';
 
 type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'archive' | 'settings';
 
@@ -96,40 +97,46 @@ export function App() {
     <div className="app">
       <nav className="sidebar">
         <div className="app-title">
-          <span className="app-title-icon">🎲</span>
+          <img className="app-title-logo" src={logoUrl} alt="" />
           <span>{translate(lang, 'app.title')}</span>
         </div>
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={`nav-btn ${tab === t.id ? 'active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            {translate(lang, t.key)}
-          </button>
-        ))}
+        {TABS.map((t) => {
+          const [icon, ...words] = translate(lang, t.key).split(' ');
+          return (
+            <button
+              key={t.id}
+              className={`nav-btn ${tab === t.id ? 'active' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              <span className="nav-icon">{icon}</span>
+              <span>{words.join(' ')}</span>
+            </button>
+          );
+        })}
         <div className="sidebar-footer">
           {state.settings.kenku.enabled && (
             <button className="nav-btn" onClick={() => setShowSoundboard(true)}>
-              {'🎵 '}
-              {translate(lang, 'kenku.soundboard')}
+              <span className="nav-icon">🎵</span>
+              <span>{translate(lang, 'kenku.soundboard')}</span>
             </button>
           )}
           {state.settings.playerWeb.enabled && (
             <button className="nav-btn" onClick={() => setShowQr(true)}>
-              {'📱 '}
-              {translate(lang, 'pw.qrButton')}
+              <span className="nav-icon">📱</span>
+              <span>{translate(lang, 'pw.qrButton')}</span>
             </button>
           )}
           <button
             className={`nav-btn pv-toggle ${playerViewOpen ? 'active' : ''}`}
             onClick={() => void api.togglePlayerView()}
           >
-            🖥 {translate(lang, playerViewOpen ? 'nav.closePlayerView' : 'nav.openPlayerView')}
+            <span className="nav-icon">🖥</span>
+            <span>{translate(lang, playerViewOpen ? 'nav.closePlayerView' : 'nav.openPlayerView')}</span>
           </button>
           {playerViewOpen && (
             <button className="nav-btn" onClick={() => void api.togglePlayerFullscreen()}>
-              {translate(lang, 'nav.fullscreen')}
+              <span className="nav-icon">⛶</span>
+              <span>{translate(lang, 'nav.fullscreen')}</span>
             </button>
           )}
           <div className={`bridge-status ${state.bridgeClientCount > 0 ? 'on' : ''}`}>

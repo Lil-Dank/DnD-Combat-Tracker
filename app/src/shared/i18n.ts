@@ -280,6 +280,7 @@ const en: Dict = {
   'archive.deleteConfirm': 'Delete this combat log permanently?',
   'logPanel.title': 'Combat log',
   'logPanel.collapse': 'Collapse',
+  'logPanel.expand': 'Expand',
   'logPanel.empty': 'Actions will appear here as they happen.',
 
   'pcs.attacks': 'Attacks',
@@ -684,6 +685,7 @@ const de: Dict = {
   'archive.deleteConfirm': 'Dieses Kampflog endgültig löschen?',
   'logPanel.title': 'Kampflog',
   'logPanel.collapse': 'Einklappen',
+  'logPanel.expand': 'Ausklappen',
   'logPanel.empty': 'Aktionen erscheinen hier, sobald sie passieren.',
 
   'pcs.attacks': 'Angriffe',

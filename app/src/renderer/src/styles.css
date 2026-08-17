@@ -1049,6 +1049,14 @@ textarea::placeholder {
   min-height: 0;
 }
 
+/* The combat screen never scrolls at the content level, so the reserved
+   scrollbar gutter is dead space - reclaim it and slim the side padding. */
+.content:has(.combat-screen) {
+  scrollbar-gutter: auto;
+  padding-left: 14px;
+  padding-right: 6px;
+}
+
 .combat-header {
   flex-shrink: 0;
   padding-bottom: 12px;

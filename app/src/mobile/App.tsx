@@ -13,6 +13,7 @@ import type {
   WireCombatant,
 } from './protocol';
 import { PlayerSocket, deviceToken } from './ws';
+import { DamageEditor } from '../components/DamageEditor';
 
 type View =
   | { id: 'home' }
@@ -798,10 +799,24 @@ function MyAttacks({
           <DamageEditor
             t={t}
             lang={state.language}
-            dice={form.damage[0]?.dice ?? ''}
-            type={form.damage[0]?.type ?? ''}
-            onChange={(dice, type) =>
-              patch({ damage: [{ dice, flat: '', type, condition: '' }] })
+            value={{
+              dice: form.damage[0]?.dice ?? '',
+              flat: form.damage[0]?.flat ?? '',
+              type: form.damage[0]?.type ?? '',
+              condition: form.damage[0]?.condition ?? '',
+            }}
+            onChange={(p) =>
+              patch({
+                damage: [
+                  {
+                    dice: form.damage[0]?.dice ?? '',
+                    flat: form.damage[0]?.flat ?? '',
+                    type: form.damage[0]?.type ?? '',
+                    condition: form.damage[0]?.condition ?? '',
+                    ...p,
+                  },
+                ],
+              })
             }
           />
           <div className="form-pair">
@@ -815,135 +830,6 @@ function MyAttacks({
         </div>
       )}
     </Sheet>
-  );
-}
-
-// ---- damage editor ----------------------------------------------------------
-
-const DICE = [4, 6, 8, 10, 12, 20, 100];
-
-/**
- * Structured damage entry: die picker + count stepper + bonus, and a damage
- * type select with an "Other…" manual escape hatch. Round-trips through the
- * same NdM+B string the rest of the app stores; a hand-typed value the parser
- * doesn't understand falls back to a plain text field so nothing is lost.
- */
-function DamageEditor({
-  t,
-  lang,
-  dice,
-  type,
-  onChange,
-}: {
-  t: (k: string, p?: Record<string, string | number>) => string;
-  lang: Lang;
-  dice: string;
-  type: string;
-  onChange: (dice: string, type: string) => void;
-}) {
-  const parsed = dice.trim() === '' ? { count: 0, die: 8, bonus: 0 } : parseDice(dice);
-  const manual = parsed === null;
-  const cur = parsed ?? { count: 0, die: 8, bonus: 0 };
-
-  const knownTypes = Object.keys(DAMAGE_TYPE_DE);
-  const typeKnown = type === '' || knownTypes.includes(type.toLowerCase());
-  const [otherType, setOtherType] = useState(!typeKnown);
-
-  const emit = (count: number, die: number, bonus: number) => {
-    onChange(count <= 0 ? '' : formatDice(count, die, bonus), type);
-  };
-
-  return (
-    <>
-      <span className="field-label">{t('monsters.f.damageDice')}</span>
-      {manual ? (
-        <div className="form-pair">
-          <label>
-            <input value={dice} onChange={(e) => onChange(e.target.value, type)} />
-          </label>
-          <button className="linkish" onClick={() => onChange('1d8', type)}>
-            {t('mob.usePicker')}
-          </button>
-        </div>
-      ) : (
-        <div className="dice-picker">
-          <div className="stepper">
-            <button
-              aria-label="−"
-              onClick={() => emit(Math.max(0, cur.count - 1), cur.die, cur.bonus)}
-            >
-              −
-            </button>
-            <span className="stepper-value tnum">{cur.count}</span>
-            <button
-              aria-label="+"
-              onClick={() => emit(Math.min(20, cur.count + 1), cur.die, cur.bonus)}
-            >
-              +
-            </button>
-          </div>
-          <select
-            value={cur.die}
-            disabled={cur.count === 0}
-            onChange={(e) => emit(Math.max(1, cur.count), parseInt(e.target.value, 10), cur.bonus)}
-          >
-            {DICE.map((d) => (
-              <option key={d} value={d}>
-                {displayDice(lang, `d${d}`)}
-              </option>
-            ))}
-          </select>
-          <label className="bonus-label">
-            {t('mob.bonus')}
-            <input
-              type="number"
-              inputMode="numeric"
-              disabled={cur.count === 0}
-              value={cur.count === 0 ? '' : cur.bonus}
-              onChange={(e) => emit(cur.count, cur.die, parseInt(e.target.value, 10) || 0)}
-            />
-          </label>
-        </div>
-      )}
-      {!manual && cur.count > 0 && (
-        <p className="muted dice-preview">
-          {displayDice(lang, formatDice(cur.count, cur.die, cur.bonus))}
-        </p>
-      )}
-
-      <label>
-        {t('mob.dmgType')}
-        <select
-          value={otherType ? '__other' : type.toLowerCase()}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === '__other') {
-              setOtherType(true);
-            } else {
-              setOtherType(false);
-              onChange(dice, v);
-            }
-          }}
-        >
-          <option value="">{t('mob.typeNone')}</option>
-          {knownTypes.map((k) => (
-            <option key={k} value={k}>
-              {damageTypeLabel(lang, k)}
-            </option>
-          ))}
-          <option value="__other">{t('mob.typeOther')}</option>
-        </select>
-      </label>
-      {otherType && (
-        <label>
-          <input
-            placeholder={t('mob.typeCustom')}
-            value={type}
-            onChange={(e) => onChange(dice, e.target.value)}
-          />
-        </label>
-      )}
-    </>
   );
 }
 

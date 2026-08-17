@@ -19,6 +19,7 @@ import { AbilityTable } from '../AbilityTable';
 import { useI18n } from '../i18n';
 import { useKenkuLibrary } from '../useKenkuLibrary';
 import { abilitiesToForm, emptyAbilities, formToAbilities } from '../abilitiesForm';
+import { DamageEditor } from '../../../components/DamageEditor';
 import {
   ABILITIES,
   actionToForm,
@@ -50,7 +51,7 @@ const SECTIONS: { id: ActionSection; label: string }[] = [
 ];
 
 export function MonsterScreen({ state }: { state: AppState }) {
-  const { t, mon, abilityCode, locAction, fmtRange } = useI18n();
+  const { t, lang, mon, abilityCode, locAction, fmtRange } = useI18n();
   const [form, setForm] = useState<MonsterFormData | null>(null);
   const kenkuOn = state.settings.kenku.enabled;
   const { library: kenkuLibrary } = useKenkuLibrary(form !== null && kenkuOn);
@@ -415,56 +416,18 @@ export function MonsterScreen({ state }: { state: AppState }) {
                 {a.type !== 'other' && (
                   <>
                     {a.damage.map((d, j) => (
-                      <div key={j} className="form-row">
-                        <label>
-                          {t('monsters.f.damageDice')}
-                          <input
-                            placeholder="2d8+2 (or leave empty)"
-                            value={d.dice}
-                            onChange={(e) => {
-                              const damage = [...a.damage];
-                              damage[j] = { ...d, dice: e.target.value };
-                              patchAction(i, { damage });
-                            }}
-                          />
-                        </label>
-                        <label>
-                          {t('monsters.f.flatDamage')}
-                          <input
-                            type="number"
-                            placeholder="if no dice"
-                            value={d.flat}
-                            onChange={(e) => {
-                              const damage = [...a.damage];
-                              damage[j] = { ...d, flat: e.target.value };
-                              patchAction(i, { damage });
-                            }}
-                          />
-                        </label>
-                        <label>
-                          {t('common.type')}
-                          <input
-                            placeholder="slashing"
-                            value={d.type}
-                            onChange={(e) => {
-                              const damage = [...a.damage];
-                              damage[j] = { ...d, type: e.target.value };
-                              patchAction(i, { damage });
-                            }}
-                          />
-                        </label>
-                        <label>
-                          {t('monsters.f.onlyIf')}
-                          <input
-                            placeholder="optional condition"
-                            value={d.condition}
-                            onChange={(e) => {
-                              const damage = [...a.damage];
-                              damage[j] = { ...d, condition: e.target.value };
-                              patchAction(i, { damage });
-                            }}
-                          />
-                        </label>
+                      <div key={j} className="dmg-row">
+                        <DamageEditor
+                          t={t}
+                          lang={lang}
+                          value={d}
+                          showCondition
+                          onChange={(p) => {
+                            const damage = [...a.damage];
+                            damage[j] = { ...d, ...p };
+                            patchAction(i, { damage });
+                          }}
+                        />
                         <button
                           className="btn small danger attack-remove"
                           onClick={() =>

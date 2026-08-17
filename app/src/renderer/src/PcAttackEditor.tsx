@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ActionKind, AttackKind, KenkuAttackTrigger, PC } from '../../shared/types';
 import { api } from './api';
 import { useI18n } from './i18n';
+import { DamageEditor } from '../../components/DamageEditor';
 import { useKenkuLibrary } from './useKenkuLibrary';
 import {
   ABILITIES,
@@ -19,7 +20,7 @@ import {
  * of the surrounding PC form.
  */
 export function PcAttackEditor({ pc, kenkuOn }: { pc: PC; kenkuOn: boolean }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [form, setForm] = useState<ActionForm | null>(null);
   const { library: kenkuLibrary } = useKenkuLibrary(form !== null && kenkuOn);
 
@@ -169,43 +170,17 @@ export function PcAttackEditor({ pc, kenkuOn }: { pc: PC; kenkuOn: boolean }) {
           )}
 
           {form.damage.map((d, j) => (
-            <div key={j} className="form-row">
-              <label>
-                {t('monsters.f.damageDice')}
-                <input
-                  placeholder="1d8+3"
-                  value={d.dice}
-                  onChange={(e) => {
-                    const damage = [...form.damage];
-                    damage[j] = { ...d, dice: e.target.value };
-                    patch({ damage });
-                  }}
-                />
-              </label>
-              <label>
-                {t('monsters.f.flatDamage')}
-                <input
-                  type="number"
-                  value={d.flat}
-                  onChange={(e) => {
-                    const damage = [...form.damage];
-                    damage[j] = { ...d, flat: e.target.value };
-                    patch({ damage });
-                  }}
-                />
-              </label>
-              <label>
-                {t('common.type')}
-                <input
-                  placeholder="slashing"
-                  value={d.type}
-                  onChange={(e) => {
-                    const damage = [...form.damage];
-                    damage[j] = { ...d, type: e.target.value };
-                    patch({ damage });
-                  }}
-                />
-              </label>
+            <div key={j} className="dmg-row">
+              <DamageEditor
+                t={t}
+                lang={lang}
+                value={d}
+                onChange={(p) => {
+                  const damage = [...form.damage];
+                  damage[j] = { ...d, ...p };
+                  patch({ damage });
+                }}
+              />
               <button
                 className="btn small danger attack-remove"
                 onClick={() => patch({ damage: form.damage.filter((_, k) => k !== j) })}

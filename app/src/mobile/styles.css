@@ -733,3 +733,24 @@ h3 {
   color: var(--muted);
   font-style: italic;
 }
+
+/* shared damage editor wrappers (phone) */
+
+.dmg-type-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dmg-type-row label {
+  display: block;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.dice-manual {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

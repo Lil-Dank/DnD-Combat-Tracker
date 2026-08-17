@@ -286,6 +286,8 @@ const en: Dict = {
   'logPanel.expand': 'Expand',
   'logPanel.empty': 'Actions will appear here as they happen.',
 
+  'pcs.notes': 'Notes',
+  'pcs.notesNote': '(class, level, passive perception — shown on the player’s phone)',
   'pcs.attacks': 'Attacks',
   'pcs.attacksNote': '(rollable from the phone, the DM attack modal and the Stream Deck)',
   'pcs.noAttacks': 'No attacks yet — players can also add their own from their phone.',
@@ -694,6 +696,8 @@ const de: Dict = {
   'logPanel.expand': 'Ausklappen',
   'logPanel.empty': 'Aktionen erscheinen hier, sobald sie passieren.',
 
+  'pcs.notes': 'Notizen',
+  'pcs.notesNote': '(Klasse, Stufe, passive Wahrnehmung — auf dem Spieler-Handy sichtbar)',
   'pcs.attacks': 'Angriffe',
   'pcs.attacksNote': '(würfelbar vom Handy, im Angriffsfenster und am Stream Deck)',
   'pcs.noAttacks': 'Noch keine Angriffe — Spieler können eigene auch am Handy anlegen.',

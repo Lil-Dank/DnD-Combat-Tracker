@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { AppState, PC } from '../../../shared/types';
+import { ABILITY_KEYS } from '../../../shared/types';
+import { abilitiesToForm, formToAbilities, type AbilitiesForm } from '../abilitiesForm';
 import { api } from '../api';
 import { useConfirm } from '../Confirm';
 import { useI18n } from '../i18n';
@@ -11,9 +13,18 @@ interface PcFormData {
   maxHp: string;
   ac: string;
   initMod: string;
+  abilities: AbilitiesForm;
+  notes: string;
 }
 
-const emptyForm: PcFormData = { name: '', maxHp: '10', ac: '10', initMod: '0' };
+const emptyForm = (): PcFormData => ({
+  name: '',
+  maxHp: '10',
+  ac: '10',
+  initMod: '0',
+  abilities: abilitiesToForm(null),
+  notes: '',
+});
 
 export function PcScreen({ state }: { state: AppState }) {
   const { t } = useI18n();
@@ -27,6 +38,8 @@ export function PcScreen({ state }: { state: AppState }) {
       maxHp: String(pc.maxHp),
       ac: String(pc.ac),
       initMod: String(pc.initMod),
+      abilities: abilitiesToForm(pc.abilities),
+      notes: pc.notes ?? '',
     });
 
   const submit = async () => {
@@ -38,6 +51,8 @@ export function PcScreen({ state }: { state: AppState }) {
       maxHp: Math.max(1, parseInt(form.maxHp, 10) || 1),
       ac: parseInt(form.ac, 10) || 10,
       initMod: parseInt(form.initMod, 10) || 0,
+      abilities: formToAbilities(form.abilities),
+      notes: form.notes.trim() || undefined,
       attacks: existing?.attacks ?? [],
     });
     setForm(null);
@@ -47,7 +62,7 @@ export function PcScreen({ state }: { state: AppState }) {
     <div className="screen">
       <header className="screen-header">
         <h1>{t('pcs.titleFull')}</h1>
-        <button className="btn primary" onClick={() => setForm({ ...emptyForm })}>
+        <button className="btn primary" onClick={() => setForm(emptyForm())}>
           {t('pcs.add')}
         </button>
       </header>
@@ -131,6 +146,34 @@ export function PcScreen({ state }: { state: AppState }) {
                 />
               </label>
             </div>
+            <h3>
+              {t('monsters.abilities')} <span className="muted">{t('monsters.abilitiesNote')}</span>
+            </h3>
+            <div className="form-row">
+              {ABILITY_KEYS.map((k) => (
+                <label key={k}>
+                  {k.toUpperCase()}
+                  <input
+                    type="number"
+                    placeholder="10"
+                    value={form.abilities[k]}
+                    onChange={(e) =>
+                      setForm({ ...form, abilities: { ...form.abilities, [k]: e.target.value } })
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+
+            <label>
+              {t('pcs.notes')} <span className="muted">{t('pcs.notesNote')}</span>
+              <textarea
+                rows={2}
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              />
+            </label>
+
             {(() => {
               const savedPc = form.id ? state.pcs.find((p) => p.id === form.id) : undefined;
               return savedPc ? (

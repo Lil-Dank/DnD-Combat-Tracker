@@ -364,7 +364,7 @@ export class AppStore {
         currentHp: pc.maxHp,
         ac: pc.ac,
         initMod: pc.initMod,
-        abilities: null,
+        abilities: pc.abilities ?? null,
         attacks: pc.attacks.map((a) => ({ ...a })),
         conditions: [],
         initiative: rollMode === 'all' ? d20() + pc.initMod : null,

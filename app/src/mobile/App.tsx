@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { abilityCodeLabel, conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
+import { abilityCodeLabel, abilityLabels, conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
 import { displayDice, formatDice, parseDice } from '../shared/dice';
 import { logEntrySegments, logEntryText } from '../shared/logText';
 import type { LogEntry, MonsterAction } from '../shared/types';
+import { ABILITY_KEYS, abilityMod } from '../shared/types';
 import { formToAction, actionToForm, emptyAction, ABILITIES, type ActionForm } from '../renderer/src/actionForm';
 import type {
   ArchiveEntryMsg,
@@ -359,6 +360,22 @@ function InitiativeList({
                 </span>
               ))}
             </div>
+          )}
+          {c.id === state.you?.combatantId && state.you.abilities && (
+            <div className="you-stats">
+              {ABILITY_KEYS.map((k) => {
+                const score = state.you!.abilities![k];
+                const mod = abilityMod(score);
+                return (
+                  <span key={k} className="you-stat tnum">
+                    <b>{abilityLabels(lang)[k]}</b> {score} ({mod >= 0 ? `+${mod}` : mod})
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {c.id === state.you?.combatantId && state.you.notes && (
+            <div className="you-notes">{state.you.notes}</div>
           )}
         </li>
       ))}

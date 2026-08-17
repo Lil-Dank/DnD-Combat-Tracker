@@ -527,6 +527,8 @@ export function createDemoApi(): Api {
     for (const p of [
       {
         name: 'Aria Windwhisper', maxHp: 38, ac: 15, initMod: 3,
+        abilities: { str: 10, dex: 17, con: 12, int: 13, wis: 14, cha: 11 },
+        notes: 'Elf rogue 5 · passive Perception 14 · speed 35 ft',
         attacks: [
           pcAttack('Rapier', 5, null, '1d8+3', 1, 8, 3, 7, 'piercing'),
           pcAttack('Shortbow', 5, null, '1d6+3', 1, 6, 3, 6, 'piercing'),
@@ -534,6 +536,8 @@ export function createDemoApi(): Api {
       },
       {
         name: 'Thorin Oakenshield', maxHp: 52, ac: 18, initMod: 0,
+        abilities: { str: 18, dex: 10, con: 16, int: 9, wis: 12, cha: 10 },
+        notes: 'Dwarf fighter 5 · speed 25 ft',
         attacks: [pcAttack('Warhammer', 6, null, '1d10+4', 1, 10, 4, 9, 'bludgeoning')],
       },
       { name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2, attacks: [] },
@@ -614,7 +618,7 @@ export function createDemoApi(): Api {
         currentHp: pc.maxHp,
         ac: pc.ac,
         initMod: pc.initMod,
-        abilities: null,
+        abilities: pc.abilities ?? null,
         attacks: pc.attacks.map((a) => ({ ...a })),
         conditions: [],
         initiative: d20() + pc.initMod,
@@ -901,6 +905,8 @@ export function createDemoApi(): Api {
             maxHp: ownPc.maxHp,
             ac: ownPc.ac,
             initMod: ownPc.initMod,
+            abilities: ownPc.abilities ?? null,
+            notes: ownPc.notes ?? '',
             attacks: ownPc.attacks,
             combatantId: ownCombatant?.id ?? null,
           }

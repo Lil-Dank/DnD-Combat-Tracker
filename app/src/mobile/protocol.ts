@@ -1,4 +1,10 @@
-import type { Condition, LogEntry, MonsterAction, PlayerWebGating } from '../shared/types';
+import type {
+  AbilityScores,
+  Condition,
+  LogEntry,
+  MonsterAction,
+  PlayerWebGating,
+} from '../shared/types';
 import type { Lang } from '../shared/i18n';
 
 /** Wire shapes of the player server's WebSocket protocol (server → client). */
@@ -34,6 +40,8 @@ export interface WireYou {
   maxHp: number;
   ac: number;
   initMod: number;
+  abilities: AbilityScores | null;
+  notes: string;
   attacks: MonsterAction[];
   combatantId: string | null;
 }

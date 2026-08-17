@@ -253,6 +253,8 @@ function playerStateMessage(state: AppState, info: SocketInfo): string {
           maxHp: ownPc.maxHp,
           ac: ownPc.ac,
           initMod: ownPc.initMod,
+          abilities: ownPc.abilities ?? null,
+          notes: ownPc.notes ?? '',
           attacks: ownPc.attacks,
           combatantId: ownCombatant?.id ?? null,
         }

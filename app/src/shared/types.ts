@@ -110,6 +110,10 @@ export interface PC {
    * player web app.
    */
   attacks: MonsterAction[];
+  /** Optional stat block: six scores (modifiers derive) like manual monsters. */
+  abilities?: AbilityScores | null;
+  /** Free-text notes (class/level, passive perception, whatever the table wants). */
+  notes?: string;
 }
 
 export type MonsterSource = 'manual' | 'srd';

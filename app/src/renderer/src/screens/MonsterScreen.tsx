@@ -18,6 +18,7 @@ import { AttackText } from '../AttackText';
 import { AbilityTable } from '../AbilityTable';
 import { useI18n } from '../i18n';
 import { useKenkuLibrary } from '../useKenkuLibrary';
+import { abilitiesToForm, emptyAbilities, formToAbilities } from '../abilitiesForm';
 import {
   ABILITIES,
   actionToForm,
@@ -38,30 +39,7 @@ interface MonsterFormData {
   actions: ActionForm[];
 }
 
-const emptyAbilities = (): MonsterFormData['abilities'] => ({
-  str: '', dex: '', con: '', int: '', wis: '', cha: '',
-});
 
-function abilitiesToForm(a: AbilityScores | null | undefined): MonsterFormData['abilities'] {
-  if (!a) return emptyAbilities();
-  return {
-    str: String(a.str), dex: String(a.dex), con: String(a.con),
-    int: String(a.int), wis: String(a.wis), cha: String(a.cha),
-  };
-}
-
-/** All blank → null; otherwise blanks default to 10. */
-function formToAbilities(f: MonsterFormData['abilities']): AbilityScores | null {
-  if (ABILITY_KEYS.every((k) => f[k].trim() === '')) return null;
-  const parse = (s: string) => {
-    const n = parseInt(s, 10);
-    return Number.isFinite(n) ? n : 10;
-  };
-  return {
-    str: parse(f.str), dex: parse(f.dex), con: parse(f.con),
-    int: parse(f.int), wis: parse(f.wis), cha: parse(f.cha),
-  };
-}
 
 const SECTIONS: { id: ActionSection; label: string }[] = [
   { id: 'action', label: 'Action' },

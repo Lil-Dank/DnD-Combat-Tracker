@@ -1241,8 +1241,7 @@ textarea::placeholder {
 }
 
 .kenku-address-row .inline-label-text,
-.kenku-address-row .btn,
-.kenku-address-row .bridge-status {
+.kenku-address-row .btn {
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -1250,6 +1249,17 @@ textarea::placeholder {
 .kenku-address-row input[type='text'] {
   flex: 1 1 140px;
   min-width: 140px;
+}
+
+/* Connection state sits right under the Test button, where the eye lands. */
+.kenku-status-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 2px 0 14px;
+}
+
+.kenku-status-row .bridge-status {
+  padding: 0;
 }
 
 .kenku-action-sound {
@@ -1818,9 +1828,12 @@ textarea::placeholder {
   /* Pins below the sticky combat header; the height runs the panel down to
      the bottom of the window in its natural (unscrolled) position, where
      the panel sits ~65px from the top — no dead space under the collapse
-     bar, and only a slim margin once it pins at 40px while scrolled. */
+     bar, and only a slim margin once it pins at 40px while scrolled. The
+     negative bottom margin cancels the content's trailing padding so the
+     panel alone never forces the window into scrolling. */
   top: 40px;
   height: calc(100vh - 66px);
+  margin-bottom: -16px;
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);

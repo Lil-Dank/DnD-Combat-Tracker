@@ -200,12 +200,14 @@ function KenkuSection({ state }: { state: AppState }) {
             >
               {t('kenku.test')}
             </button>
+          </label>
+          <div className="kenku-status-row">
             <span className={`bridge-status ${state.kenkuConnected ? 'on' : ''}`}>
               {(testResult ?? state.kenkuConnected)
                 ? `● ${t('kenku.statusConnected')}`
                 : `○ ${t('kenku.statusOffline')}`}
             </span>
-          </label>
+          </div>
 
           <h3>{t('kenku.events')}</h3>
           <p className="muted">{t('kenku.eventsNote')}</p>

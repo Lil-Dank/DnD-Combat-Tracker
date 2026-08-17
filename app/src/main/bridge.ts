@@ -32,6 +32,8 @@ interface BridgeCommand {
   actorName?: string;
   actorType?: string;
   math?: string;
+  /** Damage type per bracket group of `math` (v3.1+ plugins). */
+  mathTypes?: (string | null)[];
   /** Optional attackEvent roll details for the combat log (v1.4+ plugins). */
   roll?: AttackRollDetails;
 }
@@ -110,6 +112,9 @@ async function handleCommand(cmd: BridgeCommand): Promise<void> {
     actorName: cmd.actorName,
     actorType,
     math: cmd.math,
+    mathTypes: Array.isArray(cmd.mathTypes)
+      ? cmd.mathTypes.map((t) => (typeof t === 'string' ? t : null))
+      : undefined,
   };
   switch (cmd.type) {
     case 'nextTurn':

@@ -63,6 +63,8 @@ export type BridgeCommand =
       actorName?: string;
       actorType?: string;
       math?: string;
+      /** Damage type per bracket group of `math`, for log tinting. */
+      mathTypes?: (string | null)[];
     }
   | { type: 'applyHeal'; actorId: string; amount: number }
   | { type: 'toggleCondition'; actorId: string; condition: string }

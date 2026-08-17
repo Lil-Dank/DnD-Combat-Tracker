@@ -55,6 +55,7 @@ interface PendingSave {
   damage: number;
   /** Dice composition of the rolled damage, for the log (digital rolls). */
   math?: string;
+  mathTypes?: (string | null)[];
   socket: WebSocket;
   /** Log attribution captured when the save was started. */
   sourceName?: string;
@@ -205,7 +206,13 @@ function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
   // damage math stay DM-side (save totals remain - they're table-announced).
   return log.map((e) =>
     e.kind === 'attackRoll' || e.math !== undefined
-      ? { ...e, die: undefined, total: e.kind === 'attackRoll' ? undefined : e.total, math: undefined }
+      ? {
+          ...e,
+          die: undefined,
+          total: e.kind === 'attackRoll' ? undefined : e.total,
+          math: undefined,
+          mathTypes: undefined,
+        }
       : e,
   );
 }
@@ -353,9 +360,16 @@ function validAmount(n: unknown): n is number {
 // ---- attack resolution -------------------------------------------------------
 
 /** Same convention as the DM attack modal: sum non-conditional damage rows. */
-function rollActionDamage(action: MonsterAction): { total: number; math: string } {
+function rollActionDamage(action: MonsterAction): {
+  total: number;
+  math: string;
+  mathTypes: (string | null)[];
+} {
   let total = 0;
   const mathParts: string[] = [];
+  // One entry per bracket group in the math, so the log can tint the rolled
+  // numbers with their damage type.
+  const mathTypes: (string | null)[] = [];
   for (const d of action.onHit.damage) {
     if (d.condition) continue;
     if (d.dice && d.count && d.die) {
@@ -364,13 +378,14 @@ function rollActionDamage(action: MonsterAction): { total: number; math: string 
       const bonus = d.bonus ?? 0;
       const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
       mathParts.push(`${d.dice} [${roll.perPart[0].join('+')}]${bonusStr}`);
+      mathTypes.push(d.type ?? null);
     } else {
       const value = d.average ?? 0;
       total += value;
       mathParts.push(`${value}`);
     }
   }
-  return { total, math: `${mathParts.join(' + ')} = ${total}` };
+  return { total, math: `${mathParts.join(' + ')} = ${total}`, mathTypes };
 }
 
 interface AttackContext {
@@ -460,6 +475,7 @@ async function resolveAttackRoll(
       actorName: ctx.pc.name,
       actorType: 'pc',
       math: rolled.math,
+      mathTypes: rolled.mathTypes,
       sourceName,
     });
     handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageApplied' });
@@ -551,6 +567,7 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
   const manual = cmd.mode === 'manual' && validAmount(cmd.damage);
   const damage = manual ? (cmd.damage as number) : rolled.total;
   const damageMath = manual ? undefined : rolled.math;
+  const damageMathTypes = manual ? undefined : rolled.mathTypes;
   handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageRoll' });
 
   const pending: PendingSave = {
@@ -564,6 +581,7 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
     targetIds,
     damage,
     math: damageMath,
+    mathTypes: damageMathTypes,
     socket,
     sourceName: sourceNameOf(sockets.get(socket)),
   };
@@ -616,6 +634,7 @@ export async function resolvePendingSave(
             ? `${pending.math} → ½ ${amount}`
             : pending.math
           : undefined,
+        mathTypes: pending.mathTypes,
         sourceName: pending.sourceName,
       });
     }

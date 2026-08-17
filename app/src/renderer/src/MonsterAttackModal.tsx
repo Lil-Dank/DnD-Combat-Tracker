@@ -32,6 +32,8 @@ interface DmgRoll {
   parts: string[];
   conditional: string[];
   math: string;
+  /** Damage type per bracket group of `math`, for the log's tinting. */
+  mathTypes: (string | null)[];
 }
 
 export function MonsterAttackModal({
@@ -123,6 +125,7 @@ export function MonsterAttackModal({
     const parts: string[] = [];
     const conditional: string[] = [];
     const mathParts: string[] = [];
+    const mathTypes: (string | null)[] = [];
     for (const d of attack.onHit.damage) {
       let value: number;
       if (d.dice && d.count && d.die) {
@@ -132,6 +135,7 @@ export function MonsterAttackModal({
           const bonus = d.bonus ?? 0;
           const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
           mathParts.push(`${d.dice} [${roll.perPart[0].join('+')}]${bonusStr}`);
+          mathTypes.push(d.type ?? null);
         }
       } else {
         value = d.average ?? 0;
@@ -144,7 +148,7 @@ export function MonsterAttackModal({
         parts.push(`${value} ${dmg(d.type)}`);
       }
     }
-    setDmgRoll({ total, parts, conditional, math: `${mathParts.join(' + ')} = ${total}` });
+    setDmgRoll({ total, parts, conditional, math: `${mathParts.join(' + ')} = ${total}`, mathTypes });
     setSaved(new Set());
     if (attacker) {
       void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'damageRoll' });
@@ -160,6 +164,7 @@ export function MonsterAttackModal({
         actorName: mon(attacker.displayName),
         actorType: attacker.type,
         math: halved ? `${dmgRoll.math} → ½ ${half}` : dmgRoll.math,
+        mathTypes: dmgRoll.mathTypes,
       });
     }
     if (attacker && attack) {

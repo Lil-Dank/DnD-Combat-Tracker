@@ -211,11 +211,17 @@
  "amount":7,
  "actorName":"Goblin 2",
  "actorType":"monster",
- "math":"1d6 [4] +2 = 6"}</code></td>
+ "math":"1d6 [4] +2 = 6",
+ "mathTypes":["slashing"]}</code></td>
         <td>Damage floors at 0 HP; monsters die and leave the order, PCs go
-          down. The last three fields are optional (v2.2+): they attribute the
+          down. The trailing fields are optional: <code>actorName</code> /
+          <code>actorType</code> / <code>math</code> (v2.2+) attribute the
           combat-log entry to an attacker and record the dice composition
-          (DM-side only &mdash; player phones never receive it).</td>
+          (DM-side only &mdash; player phones never receive it);
+          <code>mathTypes</code> (v3.1+) names the canonical damage type of
+          each <code>[…]</code> bracket group in <code>math</code>, in order
+          (<code>null</code> for unknown), so the log tints the rolled
+          numbers.</td>
       </tr>
       <tr>
         <td><code>applyHeal</code></td>

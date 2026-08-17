@@ -167,6 +167,8 @@ class Picker {
   private attackerType: string | undefined;
   /** Composition of the last damage roll, sent with the apply for the log. */
   private lastDamageMath = '';
+  /** Damage type per bracket group of lastDamageMath (log tinting). */
+  private lastDamageMathTypes: (string | null)[] = [];
   private selectedAttack: BridgeAttack | null = null;
   private lastRoll = '';
   /** Selected target ids (one for attack rolls, several for AoE saves). */
@@ -1024,6 +1026,7 @@ class Picker {
       let total = 0;
       const lines: string[] = [];
       const mathParts: string[] = [];
+      const mathTypes: (string | null)[] = [];
       for (const d of atk.damage) {
         // Diceless entries use their flat/average value.
         const roll = d.dice ? rollDice(d.dice) : null;
@@ -1038,6 +1041,7 @@ class Picker {
             const bonusStr =
               roll.bonus === 0 ? '' : roll.bonus > 0 ? ` +${roll.bonus}` : ` ${roll.bonus}`;
             mathParts.push(`${d.dice} [${roll.rolls.join('+')}]${bonusStr}`);
+            mathTypes.push(d.type ?? null);
           } else {
             mathParts.push(`${value}`);
           }
@@ -1047,6 +1051,7 @@ class Picker {
         }
       }
       this.lastDamageMath = `${mathParts.join(' + ')} = ${total}`;
+      this.lastDamageMathTypes = mathTypes;
       this.sendAttackEvent('damageRoll');
       const summary = [`DMG ${total}`, ...lines.slice(0, 1)];
       if (atk.save) {
@@ -1096,6 +1101,7 @@ class Picker {
           actorName: this.actorName,
           actorType: this.attackerType,
           math,
+          mathTypes: math ? this.lastDamageMathTypes : undefined,
         });
       }
       this.sendAttackEvent('damageApplied');

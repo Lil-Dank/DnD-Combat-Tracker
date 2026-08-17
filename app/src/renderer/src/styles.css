@@ -1039,19 +1039,20 @@ textarea::placeholder {
   vertical-align: middle;
 }
 
-/* Sticky combat header: stays put while the initiative list scrolls. */
-.combat-sticky {
-  position: sticky;
-  /* The sticky inset tracks the margin box: -16px pins the visible part
-     flush with the scrollport while swallowing the container's top padding
-     so rows never peek above the bar. */
-  top: -16px;
-  margin-top: -16px;
-  padding-top: 16px;
+/* The active combat screen owns the viewport: header on top, then the
+   initiative list scrolling in its own column (scrollbar right beside it,
+   left of the log) - the header never has rows sliding underneath it. */
+.combat-screen {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 32px);
+  min-height: 0;
+}
+
+.combat-header {
+  flex-shrink: 0;
   padding-bottom: 12px;
   margin-bottom: 6px;
-  background: var(--bg);
-  z-index: 10;
   border-bottom: 1px solid var(--border-soft);
 }
 
@@ -1063,8 +1064,7 @@ textarea::placeholder {
 }
 
 .combat-row {
-  /* Keep auto-scrolled rows clear of the sticky header. */
-  scroll-margin-top: 72px;
+  scroll-margin-top: 8px;
 }
 
 .combat-row {
@@ -1811,31 +1811,29 @@ textarea::placeholder {
 /* ---- Combat log sidebar + archive ---- */
 
 .combat-with-log {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: 14px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
+/* The initiative list scrolls in its own column, so its scrollbar sits
+   right beside it (left of the log), not at the window edge. */
 .combat-with-log > .combat-list {
   flex: 1;
   min-width: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
 }
 
 .log-panel {
-  width: 264px;
+  width: 320px;
   flex-shrink: 0;
-  position: sticky;
-  /* Pins below the sticky combat header; the height runs the panel down to
-     the bottom of the window in its natural (unscrolled) position, where
-     the panel sits ~65px from the top — no dead space under the collapse
-     bar, and only a slim margin once it pins at 40px while scrolled. The
-     negative bottom margin cancels the content's trailing padding so the
-     panel alone never forces the window into scrolling. */
-  top: 40px;
-  height: calc(100vh - 66px);
-  margin-bottom: -16px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

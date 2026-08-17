@@ -309,8 +309,8 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
   };
 
   return (
-    <div className="screen">
-      <header className="screen-header combat-sticky">
+    <div className="screen combat-screen">
+      <header className="screen-header combat-header">
         <h1>
           {t('combat.header')}{' '}
           <span className="round-badge">{t('combat.roundBadge', { n: combat.round })}</span>

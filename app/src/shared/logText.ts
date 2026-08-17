@@ -132,16 +132,23 @@ export function logEntryText(lang: Lang, e: LogEntry): string {
 
 /**
  * Split a damage-math string into segments: dice notation ("2d6", "1W8")
- * gets lr-dice, the numbers actually rolled ("[3+5]") get lr-rolls, the
- * connective arithmetic stays plain.
+ * gets lr-dice, the numbers actually rolled ("[3+5]") get lr-rolls — or the
+ * damage type's own tint when the entry knows which type each bracket group
+ * rolled (types aligns with bracket order; null = unknown).
  */
-function mathSegments(s: string): LogSegment[] {
+function mathSegments(s: string, types?: (string | null)[]): LogSegment[] {
   const out: LogSegment[] = [];
   const re = /(\d*[dW]\d+|\[[^\]]*\])/g;
   let last = 0;
+  let bracket = 0;
   for (const m of s.matchAll(re)) {
     if (m.index > last) out.push({ text: s.slice(last, m.index) });
-    out.push({ text: m[0], cls: m[0].startsWith('[') ? 'lr-rolls' : 'lr-dice' });
+    if (m[0].startsWith('[')) {
+      const type = types?.[bracket++];
+      out.push({ text: m[0], cls: type ? `dt-${type}` : 'lr-rolls' });
+    } else {
+      out.push({ text: m[0], cls: 'lr-dice' });
+    }
     last = m.index + m[0].length;
   }
   if (last < s.length) out.push({ text: s.slice(last) });
@@ -156,7 +163,7 @@ function mathSegments(s: string): LogSegment[] {
  */
 export function logRollSegments(lang: Lang, e: LogEntry): LogSegment[] | null {
   if (e.kind === 'damage') {
-    return e.math ? mathSegments(displayDice(lang, e.math)) : null;
+    return e.math ? mathSegments(displayDice(lang, e.math), e.mathTypes) : null;
   }
   if (e.kind !== 'attackRoll' || e.total === undefined) return null;
   const d20 = lang === 'de' ? 'W20' : 'd20';

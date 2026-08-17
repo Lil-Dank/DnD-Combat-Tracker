@@ -68,6 +68,7 @@ interface ActionCtx {
   actorName?: string;
   actorType?: 'pc' | 'monster';
   math?: string;
+  mathTypes?: (string | null)[];
   sourceName?: string;
 }
 
@@ -79,6 +80,7 @@ const deckCtx = (cmd: BridgeCommand): ActionCtx => ({
     actorName: cmd.actorName,
     actorType: cmd.actorType === 'pc' || cmd.actorType === 'monster' ? cmd.actorType : undefined,
     math: cmd.math,
+    mathTypes: cmd.mathTypes,
   });
 
 interface BridgeCommand {
@@ -90,6 +92,7 @@ interface BridgeCommand {
   actorName?: string;
   actorType?: string;
   math?: string;
+  mathTypes?: (string | null)[];
   roll?: {
     actorName?: string;
     actorType?: string;
@@ -326,6 +329,7 @@ export function createDemoApi(): Api {
       targetType: c.type,
       amount,
       math: ctx.math,
+      mathTypes: ctx.mathTypes,
       source: ctx.source,
       sourceName: ctx.sourceName,
     });
@@ -876,6 +880,7 @@ export function createDemoApi(): Api {
             die: undefined,
             total: e.kind === 'attackRoll' ? undefined : e.total,
             math: undefined,
+            mathTypes: undefined,
           }
         : e,
     );
@@ -972,9 +977,14 @@ export function createDemoApi(): Api {
     return own !== undefined && targets.length === 1 && targets[0] === own.id;
   }
 
-  function rollActionDamage(action: MonsterAction): { total: number; math: string } {
+  function rollActionDamage(action: MonsterAction): {
+    total: number;
+    math: string;
+    mathTypes: (string | null)[];
+  } {
     let total = 0;
     const mathParts: string[] = [];
+    const mathTypes: (string | null)[] = [];
     for (const d of action.onHit.damage) {
       if (d.condition) continue;
       if (d.count && d.die) {
@@ -984,6 +994,7 @@ export function createDemoApi(): Api {
         total += rolls.reduce((a, b) => a + b, 0) + bonus;
         const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
         mathParts.push(`${d.dice ?? `${d.count}d${d.die}`} [${rolls.join('+')}]${bonusStr}`);
+        mathTypes.push(d.type ?? null);
       } else {
         const value = d.average ?? 0;
         total += value;
@@ -991,7 +1002,7 @@ export function createDemoApi(): Api {
       }
     }
     total = Math.max(0, total);
-    return { total, math: `${mathParts.join(' + ')} = ${total}` };
+    return { total, math: `${mathParts.join(' + ')} = ${total}`, mathTypes };
   }
 
   function sourceNameFor(pcId: string): string | undefined {
@@ -1157,6 +1168,7 @@ export function createDemoApi(): Api {
         applyDamage(target.id, damage, {
           ...playerCtx(pcId),
           math: manualDmg ? undefined : rolledDmg.math,
+          mathTypes: manualDmg ? undefined : rolledDmg.mathTypes,
         });
       } else {
         save();

@@ -12,6 +12,10 @@
   --good: #4caf7d;
   --bad: #e05555;
   --gold: #d4af37;
+  --pc-color: #3b82f6;
+  --pc-tint: rgba(59, 130, 246, 0.14);
+  --monster-color: #d97706;
+  --monster-tint: rgba(217, 119, 6, 0.1);
 }
 
 * {
@@ -250,6 +254,14 @@ h3 {
   background: var(--panel-2);
 }
 
+.init-row.pc {
+  border-left: 4px solid var(--pc-color);
+}
+
+.init-row.monster {
+  border-left: 4px solid var(--monster-color);
+}
+
 .init-row.me {
   border-left: 4px solid var(--accent-2);
 }
@@ -371,6 +383,21 @@ h3 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.target {
+  border-left: 4px solid var(--border);
+  text-align: left;
+}
+
+.target.pc {
+  border-left-color: var(--pc-color);
+  background: linear-gradient(90deg, var(--pc-tint), var(--panel) 70%);
+}
+
+.target.monster {
+  border-left-color: var(--monster-color);
+  background: linear-gradient(90deg, var(--monster-tint), var(--panel) 70%);
 }
 
 .target.selected {

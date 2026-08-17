@@ -22,6 +22,7 @@ export interface KeyPalette {
  */
 export type KeyRole =
   | 'item'
+  | 'itemPc'
   | 'selected'
   | 'confirm'
   | 'cancel'
@@ -32,6 +33,9 @@ export type KeyRole =
 
 export const ROLE_PALETTES: Record<KeyRole, KeyPalette> = {
   item: { from: '#241d33', to: '#4a3d69' },
+  // Player characters get a cool blue so PCs and monsters separate at a
+  // glance in actor lists (deeper navy than the brighter page key).
+  itemPc: { from: '#16233f', to: '#2d5aa8' },
   selected: { from: '#14532d', to: '#3f9d55' },
   confirm: { from: '#155e2e', to: '#22c55e' },
   cancel: { from: '#4a1010', to: '#b91c1c' },

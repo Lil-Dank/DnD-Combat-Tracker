@@ -327,7 +327,7 @@ function InitiativeList({
       {state.combatants.map((c) => (
         <li
           key={c.id}
-          className={`init-row ${c.isCurrentTurn ? 'current' : ''} ${
+          className={`init-row ${c.type} ${c.isCurrentTurn ? 'current' : ''} ${
             c.id === state.you?.combatantId ? 'me' : ''
           } ${c.isDowned ? 'downed' : ''}`}
         >
@@ -399,7 +399,7 @@ function HpFlow({
           .map((c) => (
             <button
               key={c.id}
-              className={`target ${targets.includes(c.id) ? 'selected' : ''}`}
+              className={`target ${c.type} ${targets.includes(c.id) ? 'selected' : ''}`}
               onClick={() => toggle(c.id)}
             >
               {c.name}
@@ -580,7 +580,7 @@ function AttackFlow({
               .map((c) => (
                 <button
                   key={c.id}
-                  className={`target ${targets.includes(c.id) ? 'selected' : ''}`}
+                  className={`target ${c.type} ${targets.includes(c.id) ? 'selected' : ''}`}
                   onClick={() => toggleTarget(c.id)}
                 >
                   {c.name}

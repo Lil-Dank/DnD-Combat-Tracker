@@ -510,6 +510,8 @@ export function createDemoApi(): Api {
       combatants: active
         ? combat.combatants.map((c, i) => ({
             id: c.id,
+            sourceId: c.sourceId,
+            type: c.type,
             displayName: monsterName(lang, c.displayName),
             currentHp: c.currentHp,
             maxHp: c.maxHp,

@@ -573,3 +573,56 @@ h3 {
 .mob-form {
   padding-bottom: 30px;
 }
+
+/* dice picker */
+
+.field-label {
+  display: block;
+  margin: 10px 0 4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.dice-picker {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 8px;
+  align-items: end;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.stepper button {
+  width: 44px;
+  padding: 10px 0;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.stepper-value {
+  min-width: 34px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.dice-picker .bonus-label {
+  margin: 0;
+}
+
+.dice-picker select {
+  min-height: 44px;
+}
+
+.dice-preview {
+  margin: 4px 0 0;
+  text-align: right;
+}

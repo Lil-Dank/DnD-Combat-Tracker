@@ -264,6 +264,11 @@ const en: Dict = {
   'mob.err.badTarget': 'Invalid target.',
   'mob.err.badAttack': 'Unknown attack.',
   'mob.done': 'Done',
+  'mob.bonus': 'Bonus',
+  'mob.dmgType': 'Damage type',
+  'mob.typeOther': 'Other…',
+  'mob.typeCustom': 'custom type',
+  'mob.usePicker': 'use picker',
 
   'nav.archive': '📜 Archive',
   'archive.title': 'Combat Archive',
@@ -663,6 +668,11 @@ const de: Dict = {
   'mob.err.badTarget': 'Ungültiges Ziel.',
   'mob.err.badAttack': 'Unbekannter Angriff.',
   'mob.done': 'Fertig',
+  'mob.bonus': 'Bonus',
+  'mob.dmgType': 'Schadensart',
+  'mob.typeOther': 'Andere…',
+  'mob.typeCustom': 'eigener Typ',
+  'mob.usePicker': 'Auswahl verwenden',
 
   'nav.archive': '📜 Archiv',
   'archive.title': 'Kampf-Archiv',

@@ -30,6 +30,8 @@ export interface BridgeCombatant {
   id: string;
   /** Monster template id in the app; used for per-attack sound lookups. */
   sourceId: string;
+  /** 'pc' | 'monster'; absent on pre-1.4 apps. */
+  type?: string;
   displayName: string;
   currentHp: number;
   maxHp: number;
@@ -57,11 +59,23 @@ export type BridgeCommand =
   | { type: 'applyHeal'; actorId: string; amount: number }
   | { type: 'toggleCondition'; actorId: string; condition: string }
   | {
-      /** Attack-flow progress report; app-side it only triggers Kenku sounds. */
+      /**
+       * Attack-flow progress report; app-side it triggers Kenku sounds and,
+       * on verdict phases with roll details, a combat-log entry.
+       */
       type: 'attackEvent';
       sourceId: string;
       attackId: string;
       phase: AttackEventPhase;
+      /** Roll details for the app's combat log (verdict phases only). */
+      roll?: {
+        actorName: string;
+        actorType?: string;
+        targetName?: string;
+        attackName: string;
+        die: number;
+        total: number;
+      };
     };
 
 const DEFAULT_PORT = 57321;

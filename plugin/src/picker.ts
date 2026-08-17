@@ -163,6 +163,8 @@ class Picker {
   private attackList: BridgeAttack[] = [];
   /** Template id of the attacking monster, for per-attack Kenku sounds. */
   private attackerSourceId = '';
+  /** 'pc' | 'monster' when the app sends it; drives combat-log attribution. */
+  private attackerType: string | undefined;
   private selectedAttack: BridgeAttack | null = null;
   private lastRoll = '';
   /** Selected target ids (one for attack rolls, several for AoE saves). */
@@ -250,16 +252,33 @@ class Picker {
    * Entry point from the Attack action: pick one of the current-turn
    * monster's attacks, then roll attack/damage from the deck.
    */
-  /** Reports attack-flow progress; the app uses it only for Kenku sounds. */
+  /**
+   * Reports attack-flow progress; the app triggers Kenku sounds on every
+   * phase and logs a combat-log line on verdict phases carrying roll details.
+   */
   private sendAttackEvent(
     phase: 'attackRoll' | 'attackHit' | 'attackCrit' | 'attackMiss' | 'damageRoll' | 'damageApplied',
+    roll?: { die: number; total: number },
   ): void {
     if (!this.selectedAttack) return;
+    const target = roll ? this.alive().find((c) => c.id === this.targets[0]) : undefined;
     bridge.send({
       type: 'attackEvent',
       sourceId: this.attackerSourceId,
       attackId: this.selectedAttack.id,
       phase,
+      ...(roll
+        ? {
+            roll: {
+              actorName: this.actorName,
+              actorType: this.attackerType,
+              targetName: target?.displayName,
+              attackName: this.selectedAttack.name,
+              die: roll.die,
+              total: roll.total,
+            },
+          }
+        : {}),
     });
   }
 
@@ -272,6 +291,7 @@ class Picker {
       this.actorId = current.id;
       this.actorName = current.displayName;
       this.attackerSourceId = current.sourceId;
+      this.attackerType = current.type;
       this.attackList = attacks;
       await this.render();
     }
@@ -990,9 +1010,9 @@ class Picker {
       const verdict = hit === null ? '' : `\n${L(hit ? 'hit' : 'miss')}`;
       this.lastRoll = `${L('atk')} ${total}\n${note}${verdict}`;
       this.sendAttackEvent('attackRoll');
-      if (die === 20) this.sendAttackEvent('attackCrit');
-      else if (hit === true) this.sendAttackEvent('attackHit');
-      else if (hit === false) this.sendAttackEvent('attackMiss');
+      if (die === 20) this.sendAttackEvent('attackCrit', { die, total });
+      else if (hit === true) this.sendAttackEvent('attackHit', { die, total });
+      else if (hit === false) this.sendAttackEvent('attackMiss', { die, total });
       await action.showOk();
       return this.render();
     }

@@ -1,5 +1,11 @@
-import { useState } from 'react';
-import type { AppState, KenkuEventId, KenkuSoundRef, ThemeId } from '../../../shared/types';
+import { useEffect, useState } from 'react';
+import type {
+  AppState,
+  KenkuEventId,
+  KenkuSoundRef,
+  PlayerWebGating,
+  ThemeId,
+} from '../../../shared/types';
 import { THEMES } from '../../../shared/types';
 import { LANGUAGES, type Lang } from '../../../shared/i18n';
 import { api } from '../api';
@@ -18,6 +24,119 @@ const KENKU_EVENTS: KenkuEventId[] = [
   'attackHit',
   'attackMiss',
 ];
+
+/** The player web companion (phones on the LAN) settings section. */
+function PlayerWebSection({ state }: { state: AppState }) {
+  const { t } = useI18n();
+  const pw = state.settings.playerWeb;
+  const [qr, setQr] = useState<{
+    urls: string[];
+    dataUrls: string[];
+    error: string | null;
+  } | null>(null);
+
+  const update = (patch: Partial<typeof pw>) =>
+    void api.updateSettings({ playerWeb: { ...pw, ...patch } });
+
+  useEffect(() => {
+    if (!pw.enabled) {
+      setQr(null);
+      return;
+    }
+    let cancelled = false;
+    // Small delay so a server restart after the toggle settles first.
+    const timer = setTimeout(() => {
+      void api.getPlayerWebQr().then((r) => {
+        if (!cancelled) setQr(r);
+      });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [pw.enabled, pw.port]);
+
+  const pcName = (pcId: string) => state.pcs.find((p) => p.id === pcId)?.name ?? '?';
+
+  return (
+    <section className="settings-section">
+      <h2>{t('pw.section')}</h2>
+      <label className="inline-label checkbox-label">
+        <input
+          type="checkbox"
+          checked={pw.enabled}
+          onChange={(e) => update({ enabled: e.target.checked })}
+        />
+        {t('pw.enable')}
+      </label>
+      <p className="muted">{t('pw.enableNote')}</p>
+
+      {pw.enabled && (
+        <>
+          <label className="inline-label">
+            {t('pw.port')}
+            <input
+              type="number"
+              defaultValue={pw.port}
+              onBlur={(e) => {
+                const port = parseInt(e.target.value, 10);
+                if (port >= 1024 && port <= 65535 && port !== pw.port) update({ port });
+              }}
+            />
+          </label>
+          <label className="inline-label">
+            {t('pw.gating')}
+            <select
+              value={pw.gating}
+              onChange={(e) => update({ gating: e.target.value as PlayerWebGating })}
+            >
+              <option value="strict">{t('pw.gating.strict')}</option>
+              <option value="relaxed">{t('pw.gating.relaxed')}</option>
+            </select>
+          </label>
+
+          {qr?.error && <p className="pw-error">{t('pw.error', { code: qr.error })}</p>}
+          {qr && !qr.error && qr.urls.length > 0 && (
+            <div className="pw-qr-row">
+              {qr.urls.map((url, i) => (
+                <figure key={url} className="pw-qr">
+                  <img src={qr.dataUrls[i]} alt={url} width={160} height={160} />
+                  <figcaption>
+                    <code>{url}</code>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+          <p className="muted">{t('pw.urlNote')}</p>
+
+          <h3>{t('pw.claims')}</h3>
+          {state.playerClients.length === 0 ? (
+            <p className="muted">{t('pw.noClaims')}</p>
+          ) : (
+            <ul className="pw-claims">
+              {state.playerClients.map((c) => (
+                <li key={c.pcId}>
+                  <span>
+                    <strong>{pcName(c.pcId)}</strong>
+                    {c.playerName && ` — ${t('pw.claimedBy', { name: c.playerName })}`}
+                    <span className={c.connected ? 'pw-online' : 'pw-offline'}>
+                      {' '}
+                      ({t(c.connected ? 'pw.connected' : 'pw.offline')})
+                    </span>
+                  </span>
+                  <button className="btn small" onClick={() => void api.kickPlayer(c.pcId)}>
+                    {t('pw.kick')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
 
 /** The Kenku FM settings section. */
 function KenkuSection({ state }: { state: AppState }) {
@@ -258,6 +377,8 @@ export function SettingsScreen({ state }: { state: AppState }) {
       </section>
 
       <KenkuSection state={state} />
+
+      <PlayerWebSection state={state} />
 
       <section className="settings-section">
         <h2>{t('settings.about')}</h2>

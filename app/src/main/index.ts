@@ -3,6 +3,7 @@ import { store } from './state';
 import { registerIpc, broadcastPlayerViewStatus } from './ipc';
 import { createDmWindow, initWindowState, onPlayerViewChanged } from './windows';
 import { startBridge } from './bridge';
+import { startPlayerServer, stopPlayerServer } from './playerServer';
 import { loadGermanMonsterNames } from './srd';
 import { handleCombatEvent, startKenkuStatusPolling } from './kenku';
 import { setMonsterNameMap } from '../shared/i18n';
@@ -17,6 +18,7 @@ app.whenReady().then(async () => {
   registerIpc();
   onPlayerViewChanged(() => broadcastPlayerViewStatus());
   startBridge();
+  startPlayerServer(userData);
   store.onCombatEvent(handleCombatEvent);
   startKenkuStatusPolling();
   createDmWindow();
@@ -27,5 +29,6 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  stopPlayerServer();
   app.quit();
 });

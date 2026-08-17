@@ -6,19 +6,24 @@ import { MonsterScreen } from './screens/MonsterScreen';
 import { TemplatesScreen } from './screens/TemplatesScreen';
 import { CombatScreen } from './screens/CombatScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { ArchiveScreen } from './screens/ArchiveScreen';
 import { PlayerView } from './screens/PlayerView';
 import { ConfirmProvider } from './Confirm';
 import { I18nProvider } from './i18n';
 import { KenkuSoundboardModal } from './KenkuSoundboardModal';
+import { PlayerWebQrModal } from './PlayerWebQrModal';
+import { PlayerSaveModal } from './PlayerSaveModal';
+import type { PlayerSavePendingInfo } from '../../preload/index';
 import { translate } from '../../shared/i18n';
 
-type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'settings';
+type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'archive' | 'settings';
 
 const TABS: { id: Tab; key: string }[] = [
   { id: 'combat', key: 'nav.combat' },
   { id: 'pcs', key: 'nav.party' },
   { id: 'monsters', key: 'nav.monsters' },
   { id: 'templates', key: 'nav.encounters' },
+  { id: 'archive', key: 'nav.archive' },
   { id: 'settings', key: 'nav.settings' },
 ];
 
@@ -28,6 +33,8 @@ export function App() {
   const [playerViewOpen, setPlayerViewOpen] = useState(false);
   const [combatTemplateId, setCombatTemplateId] = useState<string | null>(null);
   const [showSoundboard, setShowSoundboard] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [pendingSave, setPendingSave] = useState<PlayerSavePendingInfo | null>(null);
   const isPlayerView = window.location.hash.replace('#', '') === 'player';
   const lang = state?.settings.language ?? 'en';
 
@@ -57,11 +64,19 @@ export function App() {
     const offFocus = api.onFocusCombat(() => {
       if (!isPlayerView) setTab('combat');
     });
+    // A phone launched a save-based attack: the DM adjudicates in a modal.
+    const offSave = api.onPlayerSavePending((pending) => {
+      if (!isPlayerView) {
+        setPendingSave(pending);
+        setTab('combat');
+      }
+    });
     return () => {
       mounted = false;
       off();
       offPv();
       offFocus();
+      offSave();
     };
   }, []);
 
@@ -100,6 +115,12 @@ export function App() {
               {translate(lang, 'kenku.soundboard')}
             </button>
           )}
+          {state.settings.playerWeb.enabled && (
+            <button className="nav-btn" onClick={() => setShowQr(true)}>
+              {'📱 '}
+              {translate(lang, 'pw.qrButton')}
+            </button>
+          )}
           <button
             className={`nav-btn pv-toggle ${playerViewOpen ? 'active' : ''}`}
             onClick={() => void api.togglePlayerView()}
@@ -129,8 +150,17 @@ export function App() {
           />
         )}
         {tab === 'combat' && <CombatScreen state={state} preselectedTemplateId={combatTemplateId} />}
+        {tab === 'archive' && <ArchiveScreen />}
         {tab === 'settings' && <SettingsScreen state={state} />}
         {showSoundboard && <KenkuSoundboardModal onClose={() => setShowSoundboard(false)} />}
+        {showQr && <PlayerWebQrModal onClose={() => setShowQr(false)} />}
+        {pendingSave && (
+          <PlayerSaveModal
+            state={state}
+            pending={pendingSave}
+            onClose={() => setPendingSave(null)}
+          />
+        )}
       </main>
     </div>
     </ConfirmProvider>

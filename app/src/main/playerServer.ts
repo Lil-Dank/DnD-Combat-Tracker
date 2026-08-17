@@ -1,0 +1,795 @@
+import { createServer, type Server } from 'http';
+import { promises as fs } from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { randomUUID } from 'crypto';
+import { WebSocketServer, WebSocket } from 'ws';
+import { store } from './state';
+import { JsonValue } from './storage';
+import { handleAttackEvent } from './kenku';
+import { logAttackEvent } from './combatLog';
+import { rollPool } from '../shared/dice';
+import { monsterName } from '../shared/i18n';
+import type {
+  AppState,
+  Combatant,
+  LogEntry,
+  MonsterAction,
+  PlayerClaimInfo,
+} from '../shared/types';
+
+/**
+ * LAN webserver for the player companion web app: one HTTP server (static
+ * mobile bundle from out/mobile) with an attached WebSocket endpoint.
+ * Completely separate from the Stream Deck bridge — this one binds all
+ * interfaces so phones on the same Wi-Fi can reach it, and it speaks a
+ * player-scoped protocol with Player-View-level disclosure (monster HP/AC
+ * never leave the machine). Opt-in: it only runs while settings.playerWeb
+ * .enabled is true.
+ */
+
+// ---- module state -----------------------------------------------------------
+
+interface Claim {
+  token: string;
+  playerName: string | null;
+}
+
+interface SocketInfo {
+  token: string | null;
+  pcId: string | null;
+}
+
+interface PendingSave {
+  id: string;
+  pcId: string;
+  actorName: string;
+  attackId: string;
+  attackName: string;
+  /** Localized ability code + DC for the DM modal heading. */
+  ability: string;
+  dc: number;
+  targetIds: string[];
+  damage: number;
+  socket: WebSocket;
+}
+
+let httpServer: Server | null = null;
+let wss: WebSocketServer | null = null;
+let claims: JsonValue<Record<string, Claim>> | null = null;
+let currentPort = 0;
+let currentlyEnabled = false;
+let listenersRegistered = false;
+let lastError: string | null = null;
+const sockets = new Map<WebSocket, SocketInfo>();
+const pendingSaves = new Map<string, PendingSave>();
+
+/** DM-side listener: a player initiated a save-based attack. */
+let savePendingListener:
+  | ((pending: {
+      id: string;
+      actorName: string;
+      attackName: string;
+      ability: string;
+      dc: number;
+      damage: number;
+      targetIds: string[];
+    }) => void)
+  | null = null;
+
+export function onPlayerSavePending(cb: typeof savePendingListener): void {
+  savePendingListener = cb;
+}
+
+// ---- static files -----------------------------------------------------------
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+};
+
+function mobileRoot(): string {
+  // out/main/... → out/mobile (same layout in dev and packaged builds).
+  return path.join(__dirname, '..', 'mobile');
+}
+
+async function serveStatic(urlPath: string, res: import('http').ServerResponse): Promise<void> {
+  const root = mobileRoot();
+  let file = path.normalize(path.join(root, decodeURIComponent(urlPath)));
+  if (!file.startsWith(root)) {
+    res.writeHead(403).end();
+    return;
+  }
+  if (urlPath === '/' || urlPath === '') file = path.join(root, 'index.html');
+  try {
+    const body = await fs.readFile(file);
+    res.writeHead(200, { 'content-type': MIME[path.extname(file)] ?? 'application/octet-stream' });
+    res.end(body);
+  } catch {
+    // SPA fallback: unknown paths get the app shell.
+    try {
+      const body = await fs.readFile(path.join(root, 'index.html'));
+      res.writeHead(200, { 'content-type': MIME['.html'] });
+      res.end(body);
+    } catch {
+      res.writeHead(404).end('player app bundle missing (out/mobile)');
+    }
+  }
+}
+
+// ---- claims -----------------------------------------------------------------
+
+function claimsMap(): Record<string, Claim> {
+  return claims?.get() ?? {};
+}
+
+function tokenPcId(token: string | null): string | null {
+  if (!token) return null;
+  for (const [pcId, claim] of Object.entries(claimsMap())) {
+    if (claim.token === token) return pcId;
+  }
+  return null;
+}
+
+function publishClaims(): void {
+  const connectedPcIds = new Set(
+    [...sockets.values()].filter((s) => s.pcId).map((s) => s.pcId as string),
+  );
+  const list: PlayerClaimInfo[] = Object.entries(claimsMap()).map(([pcId, claim]) => ({
+    pcId,
+    playerName: claim.playerName,
+    connected: connectedPcIds.has(pcId),
+  }));
+  store.setPlayerClients(list);
+}
+
+/** DM-side kick: frees the PC and boots the phone back to the claim screen. */
+export async function kickPlayer(pcId: string): Promise<void> {
+  if (!claims) return;
+  const map = { ...claimsMap() };
+  if (!map[pcId]) return;
+  delete map[pcId];
+  await claims.set(map);
+  for (const [socket, info] of sockets) {
+    if (info.pcId === pcId) {
+      info.pcId = null;
+      info.token = null;
+      send(socket, { type: 'kicked' });
+    }
+  }
+  publishClaims();
+  broadcastState();
+}
+
+// ---- URLs -------------------------------------------------------------------
+
+/** All LAN URLs a phone could use (one per non-internal IPv4 interface). */
+export function getPlayerWebUrls(): { urls: string[]; port: number; error: string | null } {
+  const port = store.getState().settings.playerWeb.port;
+  const urls: string[] = [];
+  for (const infos of Object.values(os.networkInterfaces())) {
+    for (const info of infos ?? []) {
+      if (info.family === 'IPv4' && !info.internal) {
+        urls.push(`http://${info.address}:${port}`);
+      }
+    }
+  }
+  return { urls, port, error: lastError };
+}
+
+// ---- player-facing state projection ----------------------------------------
+
+function isBloodied(c: Combatant): boolean {
+  return c.currentHp < c.maxHp * 0.5;
+}
+
+/**
+ * The player log filter: monster attack-roll numbers stay hidden (players
+ * see the outcome, not the d20 math). Everything else passes through.
+ */
+function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
+  return log.map((e) =>
+    e.kind === 'attackRoll' && e.actorType === 'monster'
+      ? { ...e, die: undefined, total: undefined }
+      : e,
+  );
+}
+
+function playerStateMessage(state: AppState, info: SocketInfo): string {
+  const lang = state.settings.language;
+  const combat = state.combat;
+  const active = combat !== null && combat.phase === 'active';
+  const ownPc = info.pcId ? state.pcs.find((p) => p.id === info.pcId) ?? null : null;
+  const ownCombatant = active
+    ? combat!.combatants.find((c) => c.type === 'pc' && c.sourceId === info.pcId) ?? null
+    : null;
+
+  const combatants = active
+    ? combat!.combatants.map((c, i) => {
+        const base = {
+          id: c.id,
+          name: monsterName(lang, c.displayName),
+          type: c.type,
+          isCurrentTurn: i === combat!.currentIndex,
+          isDowned: c.isDowned,
+          conditions: c.conditions,
+          isBloodied: c.type === 'monster' ? isBloodied(c) : undefined,
+        };
+        // Player-View disclosure: monster HP/AC never leave the app.
+        if (c.type !== 'pc') return base;
+        const pcExtra = { currentHp: c.currentHp, maxHp: c.maxHp };
+        if (c.sourceId !== info.pcId) return { ...base, ...pcExtra };
+        return { ...base, ...pcExtra, ac: c.ac, initiative: c.initiative };
+      })
+    : [];
+
+  const claimed = claimsMap();
+  return JSON.stringify({
+    type: 'state',
+    language: lang,
+    gating: state.settings.playerWeb.gating,
+    combatActive: active,
+    round: active ? combat!.round : 0,
+    currentIndex: active ? combat!.currentIndex : 0,
+    myTurn: ownCombatant ? combat!.combatants.indexOf(ownCombatant) === combat!.currentIndex : false,
+    claims: state.pcs.map((p) => ({
+      pcId: p.id,
+      name: p.name,
+      taken: p.id in claimed,
+      mine: p.id === info.pcId,
+      playerName: claimed[p.id]?.playerName ?? null,
+    })),
+    you: ownPc
+      ? {
+          pcId: ownPc.id,
+          name: ownPc.name,
+          maxHp: ownPc.maxHp,
+          ac: ownPc.ac,
+          initMod: ownPc.initMod,
+          attacks: ownPc.attacks,
+          combatantId: ownCombatant?.id ?? null,
+        }
+      : null,
+    combatants,
+    log: active ? filterLogForPlayers(combat!.log).slice(-200) : [],
+    archive: store.listArchive().map((a) => ({
+      id: a.id,
+      templateName: a.templateName,
+      endedAt: a.endedAt,
+      rounds: a.rounds,
+    })),
+  });
+}
+
+function send(socket: WebSocket, msg: object): void {
+  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg));
+}
+
+function sendState(socket: WebSocket): void {
+  const info = sockets.get(socket);
+  if (!info) return;
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(playerStateMessage(store.getState(), info));
+  }
+}
+
+function broadcastState(): void {
+  if (!wss) return;
+  const state = store.getState();
+  for (const [socket, info] of sockets) {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(playerStateMessage(state, info));
+    }
+  }
+}
+
+// ---- command validation ------------------------------------------------------
+
+interface PlayerCommand {
+  type: string;
+  token?: string;
+  pcId?: string;
+  playerName?: string;
+  targets?: string[];
+  amount?: number;
+  attackId?: string;
+  targetIds?: string[];
+  d20Total?: number;
+  natural?: number;
+  damage?: number;
+  mode?: string;
+  action?: MonsterAction;
+  actionId?: string;
+  archiveId?: string;
+}
+
+/** The acting PC's live combatant, or null when it isn't in the fight. */
+function ownCombatant(pcId: string): Combatant | null {
+  const combat = store.getState().combat;
+  if (!combat || combat.phase !== 'active') return null;
+  return combat.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId) ?? null;
+}
+
+function isMyTurn(pcId: string): boolean {
+  const combat = store.getState().combat;
+  if (!combat || combat.phase !== 'active') return false;
+  const own = ownCombatant(pcId);
+  return own !== null && combat.combatants.indexOf(own) === combat.currentIndex;
+}
+
+/**
+ * Turn gating, enforced here regardless of what the phone UI shows.
+ * strict: nothing off-turn. relaxed: self-targeted damage/heal allowed.
+ */
+function gateAllows(pcId: string, targets: string[], kind: 'hpChange' | 'attack'): boolean {
+  if (isMyTurn(pcId)) return true;
+  const gating = store.getState().settings.playerWeb.gating;
+  if (gating !== 'relaxed' || kind !== 'hpChange') return false;
+  const own = ownCombatant(pcId);
+  return own !== null && targets.length === 1 && targets[0] === own.id;
+}
+
+function validAmount(n: unknown): n is number {
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 999;
+}
+
+// ---- attack resolution -------------------------------------------------------
+
+/** Same convention as the DM attack modal: sum non-conditional damage rows. */
+function rollActionDamage(action: MonsterAction): number {
+  let total = 0;
+  for (const d of action.onHit.damage) {
+    if (d.condition) continue;
+    total +=
+      d.dice && d.count && d.die
+        ? rollPool([{ count: d.count, die: d.die }], d.bonus ?? 0).total
+        : (d.average ?? 0);
+  }
+  return total;
+}
+
+interface AttackContext {
+  pcId: string;
+  pc: { name: string };
+  action: MonsterAction;
+}
+
+/** Shared validation for all attack commands. */
+function attackContext(cmd: PlayerCommand, info: SocketInfo): AttackContext | null {
+  if (!info.pcId) return null;
+  const pc = store.getState().pcs.find((p) => p.id === info.pcId);
+  const action = pc?.attacks.find((a) => a.id === cmd.attackId);
+  if (!pc || !action) return null;
+  return { pcId: info.pcId, pc, action };
+}
+
+async function resolveAttackRoll(
+  socket: WebSocket,
+  ctx: AttackContext,
+  targetId: string,
+  die: number | null,
+  total: number,
+): Promise<void> {
+  const combat = store.getState().combat;
+  const target = combat?.combatants.find((c) => c.id === targetId);
+  if (!combat || !target) {
+    send(socket, { type: 'error', code: 'badTarget' });
+    return;
+  }
+  const outcome =
+    die === 20 ? 'crit' : die === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
+
+  handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'attackRoll' });
+  const phase = outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss';
+  handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase });
+  logAttackEvent(
+    phase,
+    {
+      actorName: ctx.pc.name,
+      actorType: 'pc',
+      targetName: target.displayName,
+      attackName: ctx.action.name,
+      die: die ?? undefined,
+      total,
+    },
+    'player',
+  );
+
+  let damage: number | null = null;
+  if (outcome !== 'miss') {
+    damage = rollActionDamage(ctx.action);
+    handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageRoll' });
+    await store.applyDamage(target.id, damage, {
+      source: 'player',
+      actorName: ctx.pc.name,
+      actorType: 'pc',
+    });
+    handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageApplied' });
+  }
+  send(socket, {
+    type: 'attackResult',
+    targetId,
+    targetName: target.displayName,
+    die,
+    total,
+    outcome,
+    damage,
+  });
+}
+
+async function resolveManualAttack(socket: WebSocket, ctx: AttackContext, cmd: PlayerCommand): Promise<void> {
+  const combat = store.getState().combat;
+  const targetId = cmd.targetIds?.[0];
+  const target = combat?.combatants.find((c) => c.id === targetId);
+  if (!combat || !target || typeof cmd.d20Total !== 'number') {
+    send(socket, { type: 'error', code: 'badTarget' });
+    return;
+  }
+  // A typed total can't reveal naturals, so the player flags nat 20 / nat 1.
+  const outcome =
+    cmd.natural === 20
+      ? 'crit'
+      : cmd.natural === 1
+        ? 'miss'
+        : cmd.d20Total >= target.ac
+          ? 'hit'
+          : 'miss';
+
+  const phase = outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss';
+  handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase });
+  logAttackEvent(
+    phase,
+    {
+      actorName: ctx.pc.name,
+      actorType: 'pc',
+      targetName: target.displayName,
+      attackName: ctx.action.name,
+      die: cmd.natural === 20 ? 20 : cmd.natural === 1 ? 1 : undefined,
+      total: cmd.d20Total,
+    },
+    'player',
+  );
+
+  let damage: number | null = null;
+  if (outcome !== 'miss' && validAmount(cmd.damage)) {
+    damage = cmd.damage;
+    await store.applyDamage(target.id, damage, {
+      source: 'player',
+      actorName: ctx.pc.name,
+      actorType: 'pc',
+    });
+    handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageApplied' });
+  }
+  send(socket, {
+    type: 'attackResult',
+    targetId,
+    targetName: target.displayName,
+    die: null,
+    total: cmd.d20Total,
+    outcome,
+    damage,
+  });
+}
+
+/** Save-based action: park it for the DM to adjudicate in the desktop modal. */
+function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerCommand): void {
+  const combat = store.getState().combat;
+  if (!combat || !ctx.action.save) {
+    send(socket, { type: 'error', code: 'badAttack' });
+    return;
+  }
+  const targetIds = (cmd.targetIds ?? []).filter((id) =>
+    combat.combatants.some((c) => c.id === id),
+  );
+  if (targetIds.length === 0) {
+    send(socket, { type: 'error', code: 'badTarget' });
+    return;
+  }
+  const damage = cmd.mode === 'manual' && validAmount(cmd.damage) ? cmd.damage : rollActionDamage(ctx.action);
+  handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageRoll' });
+
+  const pending: PendingSave = {
+    id: randomUUID(),
+    pcId: ctx.pcId,
+    actorName: ctx.pc.name,
+    attackId: ctx.action.id,
+    attackName: ctx.action.name,
+    ability: ctx.action.save.ability,
+    dc: ctx.action.save.dc,
+    targetIds,
+    damage,
+    socket,
+  };
+  pendingSaves.set(pending.id, pending);
+  send(socket, { type: 'savePending', id: pending.id, damage });
+  savePendingListener?.({
+    id: pending.id,
+    actorName: pending.actorName,
+    attackName: pending.attackName,
+    ability: pending.ability,
+    dc: pending.dc,
+    damage: pending.damage,
+    targetIds: pending.targetIds,
+  });
+}
+
+/** DM modal resolution: apply full damage on failure, half on success. */
+export async function resolvePendingSave(
+  id: string,
+  results: Array<{ targetId: string; saved: boolean; total?: number }>,
+): Promise<void> {
+  const pending = pendingSaves.get(id);
+  if (!pending) return;
+  pendingSaves.delete(id);
+  const combat = store.getState().combat;
+  const half = Math.floor(pending.damage / 2);
+  const applied: Array<{ targetId: string; targetName: string; saved: boolean; amount: number }> = [];
+  for (const r of results) {
+    const target = combat?.combatants.find((c) => c.id === r.targetId);
+    if (!target || !pending.targetIds.includes(r.targetId)) continue;
+    const amount = r.saved ? half : pending.damage;
+    void store.appendLog({
+      kind: 'save',
+      actorName: target.displayName,
+      actorType: target.type,
+      targetName: pending.actorName,
+      attackName: pending.attackName,
+      total: r.total,
+      outcome: r.saved ? 'saved' : 'failed',
+      source: 'dm',
+    });
+    if (amount > 0) {
+      await store.applyDamage(r.targetId, amount, {
+        source: 'player',
+        actorName: pending.actorName,
+        actorType: 'pc',
+      });
+    }
+    applied.push({ targetId: r.targetId, targetName: target.displayName, saved: r.saved, amount });
+  }
+  handleAttackEvent({ sourceId: pending.pcId, attackId: pending.attackId, phase: 'damageApplied' });
+  send(pending.socket, { type: 'saveResolved', id, results: applied });
+}
+
+/** DM dismissed the modal (or combat ended) without adjudicating. */
+export function dismissPendingSave(id: string): void {
+  const pending = pendingSaves.get(id);
+  if (!pending) return;
+  pendingSaves.delete(id);
+  send(pending.socket, { type: 'saveResolved', id, cancelled: true, results: [] });
+}
+
+// ---- command handling --------------------------------------------------------
+
+async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<void> {
+  const info = sockets.get(socket);
+  if (!info || !claims) return;
+
+  switch (cmd.type) {
+    case 'hello': {
+      // Re-attach a device whose token still owns a claim.
+      info.token = typeof cmd.token === 'string' ? cmd.token : null;
+      info.pcId = tokenPcId(info.token);
+      publishClaims();
+      sendState(socket);
+      return;
+    }
+
+    case 'claim': {
+      if (typeof cmd.pcId !== 'string' || typeof cmd.token !== 'string') return;
+      const pc = store.getState().pcs.find((p) => p.id === cmd.pcId);
+      if (!pc) {
+        send(socket, { type: 'claimResult', ok: false, reason: 'unknownPc' });
+        return;
+      }
+      const map = { ...claimsMap() };
+      const existing = map[cmd.pcId];
+      if (existing && existing.token !== cmd.token) {
+        send(socket, { type: 'claimResult', ok: false, reason: 'taken' });
+        return;
+      }
+      const name = typeof cmd.playerName === 'string' ? cmd.playerName.trim().slice(0, 40) : '';
+      map[cmd.pcId] = { token: cmd.token, playerName: name || null };
+      await claims.set(map);
+      // One PC per device: release any other claim this token held.
+      for (const [pcId, claim] of Object.entries(map)) {
+        if (pcId !== cmd.pcId && claim.token === cmd.token) {
+          delete map[pcId];
+          await claims.set(map);
+        }
+      }
+      info.token = cmd.token;
+      info.pcId = cmd.pcId;
+      send(socket, { type: 'claimResult', ok: true });
+      publishClaims();
+      broadcastState();
+      return;
+    }
+
+    case 'release': {
+      if (!info.pcId) return;
+      const map = { ...claimsMap() };
+      delete map[info.pcId];
+      await claims.set(map);
+      info.pcId = null;
+      info.token = null;
+      publishClaims();
+      broadcastState();
+      return;
+    }
+
+    case 'applyDamage':
+    case 'applyHeal': {
+      if (!info.pcId || !Array.isArray(cmd.targets) || !validAmount(cmd.amount)) return;
+      const targets = cmd.targets.filter((t): t is string => typeof t === 'string');
+      if (targets.length === 0) return;
+      if (!gateAllows(info.pcId, targets, 'hpChange')) {
+        send(socket, { type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      const pc = store.getState().pcs.find((p) => p.id === info.pcId);
+      const ctx = { source: 'player' as const, actorName: pc?.name, actorType: 'pc' as const };
+      for (const id of targets) {
+        if (cmd.type === 'applyDamage') await store.applyDamage(id, cmd.amount, ctx);
+        else await store.applyHeal(id, cmd.amount, ctx);
+      }
+      return;
+    }
+
+    case 'attackDigital':
+    case 'attackManual': {
+      const ctx = attackContext(cmd, info);
+      if (!ctx) {
+        send(socket, { type: 'error', code: 'badAttack' });
+        return;
+      }
+      const targetIds = cmd.targetIds ?? [];
+      if (!gateAllows(ctx.pcId, targetIds, 'attack')) {
+        send(socket, { type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      // Save-based actions go through the DM's adjudication modal.
+      if (ctx.action.type === 'save' || ctx.action.save) {
+        startPendingSave(socket, ctx, { ...cmd, mode: cmd.type === 'attackManual' ? 'manual' : 'digital' });
+        return;
+      }
+      if (cmd.type === 'attackDigital') {
+        const toHit = ctx.action.attack?.toHit ?? 0;
+        const die = Math.floor(Math.random() * 20) + 1;
+        await resolveAttackRoll(socket, ctx, targetIds[0] ?? '', die, die + toHit);
+      } else {
+        await resolveManualAttack(socket, ctx, cmd);
+      }
+      return;
+    }
+
+    case 'saveAttack': {
+      // Never turn-gated: editing your character between turns is the point.
+      if (!info.pcId || !cmd.action || typeof cmd.action !== 'object') return;
+      const action = cmd.action;
+      if (typeof action.id !== 'string' || typeof action.name !== 'string') return;
+      await store.savePcAttack(info.pcId, action);
+      return;
+    }
+
+    case 'deleteAttack': {
+      if (!info.pcId || typeof cmd.actionId !== 'string') return;
+      await store.deletePcAttack(info.pcId, cmd.actionId);
+      return;
+    }
+
+    case 'getArchive': {
+      if (typeof cmd.archiveId !== 'string') return;
+      const entry = store.listArchive().find((a) => a.id === cmd.archiveId);
+      if (!entry) return;
+      send(socket, {
+        type: 'archiveEntry',
+        id: entry.id,
+        templateName: entry.templateName,
+        endedAt: entry.endedAt,
+        rounds: entry.rounds,
+        log: filterLogForPlayers(entry.log),
+      });
+      return;
+    }
+
+    default:
+      return;
+  }
+}
+
+// ---- lifecycle ---------------------------------------------------------------
+
+export function startPlayerServer(userDataDir: string): void {
+  if (!claims) {
+    claims = new JsonValue<Record<string, Claim>>(
+      path.join(userDataDir, 'data', 'player-claims.json'),
+      {},
+    );
+    void claims.load().then(() => publishClaims());
+  }
+
+  if (!listenersRegistered) {
+    listenersRegistered = true;
+    store.onChange((state) => {
+      broadcastState();
+      // Combat over → any save the DM never adjudicated is moot.
+      if (!state.combat || state.combat.phase !== 'active') {
+        for (const id of [...pendingSaves.keys()]) dismissPendingSave(id);
+      }
+      const { enabled, port } = state.settings.playerWeb;
+      if (enabled !== currentlyEnabled || (enabled && port !== currentPort)) {
+        restart();
+      }
+    });
+  }
+  restart();
+}
+
+function restart(): void {
+  stopPlayerServer();
+  const { enabled, port } = store.getState().settings.playerWeb;
+  currentlyEnabled = enabled;
+  currentPort = port;
+  if (!enabled) {
+    store.setPlayerClients([]);
+    return;
+  }
+  lastError = null;
+
+  httpServer = createServer((req, res) => {
+    void serveStatic(new URL(req.url ?? '/', 'http://x').pathname, res);
+  });
+  httpServer.on('error', (err) => {
+    lastError = String((err as NodeJS.ErrnoException).code ?? err.message);
+    console.error('Player web: server error', err);
+    store.setPlayerClients([]);
+  });
+
+  wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  wss.on('connection', (socket) => {
+    sockets.set(socket, { token: null, pcId: null });
+    sendState(socket);
+    socket.on('message', (data) => {
+      try {
+        const cmd = JSON.parse(data.toString()) as PlayerCommand;
+        void handleCommand(socket, cmd);
+      } catch {
+        // Ignore malformed messages.
+      }
+    });
+    socket.on('close', () => {
+      sockets.delete(socket);
+      publishClaims();
+    });
+    socket.on('error', () => {
+      // Socket errors are followed by 'close'.
+    });
+  });
+
+  httpServer.listen(port, '0.0.0.0', () => {
+    console.log(`Player web: listening on 0.0.0.0:${port}`);
+    publishClaims();
+  });
+}
+
+export function stopPlayerServer(): void {
+  for (const id of [...pendingSaves.keys()]) dismissPendingSave(id);
+  if (wss) {
+    wss.close();
+    for (const client of wss.clients) client.terminate();
+    wss = null;
+  }
+  if (httpServer) {
+    httpServer.close();
+    httpServer = null;
+  }
+  sockets.clear();
+}

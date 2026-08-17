@@ -103,6 +103,13 @@ export interface PC {
   maxHp: number;
   ac: number;
   initMod: number;
+  /**
+   * The PC's attack/save actions — same schema as monster actions so the DM
+   * attack modal, Stream Deck picker, and player web app all roll them with
+   * one code path. Editable in the Party screen and (own PC only) from the
+   * player web app.
+   */
+  attacks: MonsterAction[];
 }
 
 export type MonsterSource = 'manual' | 'srd';
@@ -203,6 +210,63 @@ export interface Combat {
   combatants: Combatant[];
   currentIndex: number;
   round: number;
+  /** Chronological combat log; moved to the archive when combat ends. */
+  log: LogEntry[];
+}
+
+// ---- Combat log -----------------------------------------------------------
+
+/** Where an action originated. */
+export type LogSource = 'dm' | 'deck' | 'player';
+
+export type LogKind =
+  | 'combatStart'
+  | 'combatEnd'
+  | 'turn'
+  | 'damage'
+  | 'heal'
+  | 'attackRoll'
+  | 'save'
+  | 'conditionAdded'
+  | 'conditionRemoved'
+  | 'down'
+  | 'kill';
+
+/**
+ * One combat-log line. Structured params, not prose: every surface renders
+ * entries through i18n keys so a language switch re-renders history.
+ */
+export interface LogEntry {
+  id: string;
+  /** Unix ms. */
+  ts: number;
+  round: number;
+  kind: LogKind;
+  /** Display name of who acted (turn entries: whose turn began). */
+  actorName?: string;
+  actorType?: CombatantType;
+  targetName?: string;
+  /** Damage/heal amount. */
+  amount?: number;
+  /** Attack rolls: the raw d20. */
+  die?: number;
+  /** Attack rolls: die + toHit; saves: the save total. */
+  total?: number;
+  outcome?: 'crit' | 'hit' | 'miss' | 'saved' | 'failed';
+  /** attackRoll entries: the action's name (e.g. "Scimitar"). */
+  attackName?: string;
+  condition?: Condition;
+  source: LogSource;
+}
+
+/** An ended combat's log, kept until the DM deletes it. */
+export interface ArchivedCombat {
+  id: string;
+  /** Template name at the time the combat ended (templates can be renamed). */
+  templateName: string;
+  endedAt: number;
+  rounds: number;
+  log: LogEntry[];
 }
 
 export type ThemeId = 'phb' | 'electron' | 'dark' | 'light';
@@ -255,6 +319,35 @@ export const DEFAULT_KENKU_SETTINGS: KenkuSettings = {
   eventSounds: {},
 };
 
+// ---- Player web companion --------------------------------------------------
+
+/** Off-turn behavior for the player web app. Enforced server-side. */
+export type PlayerWebGating = 'strict' | 'relaxed';
+
+export interface PlayerWebSettings {
+  /** Off by default — the app is fully functional without it. */
+  enabled: boolean;
+  /** HTTP+WebSocket port, bound on all interfaces (LAN). */
+  port: number;
+  /** strict: no actions off-turn; relaxed: self-targeted damage/heal allowed. */
+  gating: PlayerWebGating;
+}
+
+export const DEFAULT_PLAYER_WEB_SETTINGS: PlayerWebSettings = {
+  enabled: false,
+  port: 57322,
+  gating: 'strict',
+};
+
+/** A PC claim as shown to the DM (claims live in data/player-claims.json). */
+export interface PlayerClaimInfo {
+  pcId: string;
+  /** Optional name the player typed when claiming. */
+  playerName: string | null;
+  /** Whether a socket holding this claim's token is currently connected. */
+  connected: boolean;
+}
+
 export interface Settings {
   playerViewBgColor: string;
   bridgePort: number;
@@ -265,6 +358,8 @@ export interface Settings {
   language: Lang;
   /** Kenku FM Remote integration (sounds play through Kenku, not this app). */
   kenku: KenkuSettings;
+  /** LAN webserver for players' phones. */
+  playerWeb: PlayerWebSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -274,6 +369,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoOpenAttacks: true,
   language: DEFAULT_LANG,
   kenku: DEFAULT_KENKU_SETTINGS,
+  playerWeb: DEFAULT_PLAYER_WEB_SETTINGS,
 };
 
 /** Full snapshot pushed to every window on any change. */
@@ -286,4 +382,6 @@ export interface AppState {
   bridgeClientCount: number;
   /** Whether Kenku Remote answered the most recent connection check. */
   kenkuConnected: boolean;
+  /** Current PC claims from the player web server (empty while disabled). */
+  playerClients: PlayerClaimInfo[];
 }

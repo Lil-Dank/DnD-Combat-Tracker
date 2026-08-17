@@ -94,7 +94,20 @@ export function MonsterAttackModal({
       const phase =
         die === 20 ? 'attackCrit' : verdict === 'hit' ? 'attackHit' : verdict === 'miss' ? 'attackMiss' : null;
       if (phase) {
-        void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase });
+        void api.kenkuAttackEvent({
+          sourceId: attacker.sourceId,
+          attackId: attack.id,
+          phase,
+          // Roll details ride along for the combat log.
+          roll: {
+            actorName: attacker.displayName,
+            actorType: attacker.type,
+            targetName: singleTarget?.displayName,
+            attackName: attack.name,
+            die,
+            total,
+          },
+        });
       }
     }
   };

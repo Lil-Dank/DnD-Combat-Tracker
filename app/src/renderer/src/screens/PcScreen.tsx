@@ -3,6 +3,7 @@ import type { AppState, PC } from '../../../shared/types';
 import { api } from '../api';
 import { useConfirm } from '../Confirm';
 import { useI18n } from '../i18n';
+import { PcAttackEditor } from '../PcAttackEditor';
 
 interface PcFormData {
   id?: string;
@@ -30,12 +31,14 @@ export function PcScreen({ state }: { state: AppState }) {
 
   const submit = async () => {
     if (!form || !form.name.trim()) return;
+    const existing = form.id ? state.pcs.find((p) => p.id === form.id) : undefined;
     await api.savePc({
       id: form.id,
       name: form.name.trim(),
       maxHp: Math.max(1, parseInt(form.maxHp, 10) || 1),
       ac: parseInt(form.ac, 10) || 10,
       initMod: parseInt(form.initMod, 10) || 0,
+      attacks: existing?.attacks ?? [],
     });
     setForm(null);
   };
@@ -128,6 +131,12 @@ export function PcScreen({ state }: { state: AppState }) {
                 />
               </label>
             </div>
+            {(() => {
+              const savedPc = form.id ? state.pcs.find((p) => p.id === form.id) : undefined;
+              return savedPc ? (
+                <PcAttackEditor pc={savedPc} kenkuOn={state.settings.kenku.enabled} />
+              ) : null;
+            })()}
             <div className="modal-actions">
               <button className="btn" onClick={() => setForm(null)}>{t('common.cancel')}</button>
               <button className="btn primary" disabled={!form.name.trim()} onClick={() => void submit()}>

@@ -1371,3 +1371,193 @@ input, button, select, textarea {
 .combat-row-main.clickable {
   cursor: pointer;
 }
+
+/* ---- Player web (phones) ---- */
+
+.pw-qr-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0;
+}
+
+.pw-qr {
+  margin: 0;
+  text-align: center;
+}
+
+.pw-qr img {
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px;
+  display: block;
+  margin: 0 auto 6px;
+}
+
+.pw-qr figcaption code {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.pw-qr-modal {
+  max-width: 680px;
+}
+
+.pw-qr-row.large .pw-qr img {
+  padding: 10px;
+}
+
+.pw-error {
+  color: var(--danger, #e05555);
+  font-weight: 600;
+}
+
+.pw-claims {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.pw-claims li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+}
+
+.pw-online {
+  color: var(--success, #4caf7d);
+}
+
+.pw-offline {
+  opacity: 0.6;
+}
+
+.pw-save-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+}
+
+.pw-save-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+}
+
+.pw-save-input {
+  width: 70px;
+}
+
+.pc-attacks {
+  margin-top: 14px;
+  border-top: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+  padding-top: 10px;
+}
+
+.pc-attack-list {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+}
+
+.pc-attack-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.2));
+}
+
+.pc-attack-buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ---- Combat log sidebar + archive ---- */
+
+.combat-with-log {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.combat-with-log > .combat-list {
+  flex: 1;
+  min-width: 0;
+}
+
+.log-panel {
+  width: 270px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 64px;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg, rgba(0, 0, 0, 0.15));
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.3));
+  border-radius: 10px;
+}
+
+.log-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.3));
+}
+
+.log-panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.log-panel-body {
+  overflow-y: auto;
+  padding: 6px 10px 10px;
+  font-size: 13px;
+}
+
+.log-panel-collapsed {
+  flex-shrink: 0;
+  position: sticky;
+  top: 64px;
+  writing-mode: vertical-rl;
+  padding: 12px 6px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+.log-round {
+  font-weight: 700;
+  opacity: 0.85;
+  margin: 8px 0 2px;
+}
+
+.log-entry {
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.12);
+}
+
+.log-entry.kind-kill,
+.log-entry.kind-down {
+  color: var(--danger, #c0392b);
+}
+
+.log-entry.kind-heal {
+  color: var(--success, #2e8b57);
+}
+
+.log-src {
+  opacity: 0.55;
+  font-size: 11px;
+}
+
+.archive-log {
+  max-width: 760px;
+  font-size: 14px;
+}

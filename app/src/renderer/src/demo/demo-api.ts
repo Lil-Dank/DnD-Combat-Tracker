@@ -108,6 +108,7 @@ export function createDemoApi(): Api {
       // The simulated deck on this page counts as a connected client.
       bridgeClientCount: 1,
       kenkuConnected,
+      playerClients: [],
     };
   }
 
@@ -374,7 +375,7 @@ export function createDemoApi(): Api {
       { name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2 },
       { name: 'Seraphina Dawnbringer', maxHp: 45, ac: 17, initMod: 1 },
     ]) {
-      data.pcs.push({ id: uuid(), ...p });
+      data.pcs.push({ id: uuid(), ...p, attacks: [] });
     }
 
     const byName = (n: string) => data.monsters.find((m) => m.name === n);
@@ -447,7 +448,7 @@ export function createDemoApi(): Api {
         ac: pc.ac,
         initMod: pc.initMod,
         abilities: null,
-        attacks: [],
+        attacks: pc.attacks.map((a) => ({ ...a })),
         conditions: [],
         initiative: d20() + pc.initMod,
         isDowned: false,
@@ -460,6 +461,7 @@ export function createDemoApi(): Api {
       combatants,
       currentIndex: 0,
       round: 0,
+      log: [],
     };
     sortCombatants(combat);
     combat.phase = 'active';
@@ -612,6 +614,24 @@ export function createDemoApi(): Api {
       data.pcs = data.pcs.filter((p) => p.id !== id);
       save();
     },
+    savePcAttack: async (pcId, action) => {
+      const pc = data.pcs.find((p) => p.id === pcId);
+      if (!pc) return;
+      const idx = pc.attacks.findIndex((a) => a.id === action.id);
+      if (idx === -1) pc.attacks.push(action);
+      else pc.attacks[idx] = action;
+      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
+      save();
+    },
+    deletePcAttack: async (pcId, actionId) => {
+      const pc = data.pcs.find((p) => p.id === pcId);
+      if (!pc) return;
+      pc.attacks = pc.attacks.filter((a) => a.id !== actionId);
+      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
+      save();
+    },
 
     saveMonster: async (m) => {
       const id = m.id ?? uuid();
@@ -689,6 +709,7 @@ export function createDemoApi(): Api {
         combatants,
         currentIndex: 0,
         round: 0,
+        log: [],
       };
       sortCombatants(combat);
       data.combat = combat;
@@ -820,5 +841,14 @@ export function createDemoApi(): Api {
     togglePlayerFullscreen: async () => {
       channel.postMessage('pv-fullscreen');
     },
+
+    // Player web + archive: inert in the browser demo (no LAN server here).
+    getPlayerWebQr: async () => ({ urls: [], port: 0, error: null, dataUrls: [] }),
+    kickPlayer: async () => {},
+    resolvePlayerSave: async () => {},
+    dismissPlayerSave: async () => {},
+    onPlayerSavePending: () => () => {},
+    listArchive: async () => [],
+    deleteArchivedCombat: async () => {},
   } as Api;
 }

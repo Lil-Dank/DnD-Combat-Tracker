@@ -1961,6 +1961,42 @@ textarea::placeholder {
   border-bottom: 1px solid rgba(128, 128, 128, 0.12);
 }
 
+/* Inside the math line: the dice thrown vs the numbers they rolled. */
+.log-roll .lr-dice {
+  color: var(--accent);
+  opacity: 0.9;
+}
+
+.log-roll .lr-rolls {
+  color: var(--warn);
+  opacity: 0.85;
+}
+
+/* ---- Damage-type tints (dt-<canonical type>) ---- */
+.dt-fire { color: #e0623c; }
+.dt-cold { color: #58a6d8; }
+.dt-lightning { color: #d8b93f; }
+.dt-thunder { color: #9d8fc0; }
+.dt-poison { color: #58b86a; }
+.dt-acid { color: #96b83a; }
+.dt-necrotic { color: #9d6fd0; }
+.dt-radiant { color: #e0c060; }
+.dt-psychic { color: #d070b8; }
+.dt-force { color: #7a9fe0; }
+.dt-bludgeoning { color: #b09a78; }
+.dt-piercing { color: #93a8bc; }
+.dt-slashing { color: #c08878; }
+
+/* The pale hues need darker inks on the light-paper themes. */
+:root[data-theme='light'] .dt-lightning, :root[data-theme='phb'] .dt-lightning { color: #a3841c; }
+:root[data-theme='light'] .dt-radiant, :root[data-theme='phb'] .dt-radiant { color: #ac7f1d; }
+:root[data-theme='light'] .dt-acid, :root[data-theme='phb'] .dt-acid { color: #6e8a20; }
+:root[data-theme='light'] .dt-cold, :root[data-theme='phb'] .dt-cold { color: #2e7dbf; }
+:root[data-theme='light'] .dt-poison, :root[data-theme='phb'] .dt-poison { color: #2f8f4e; }
+:root[data-theme='light'] .dt-bludgeoning, :root[data-theme='phb'] .dt-bludgeoning { color: #8a7758; }
+:root[data-theme='light'] .dt-piercing, :root[data-theme='phb'] .dt-piercing { color: #5f7691; }
+:root[data-theme='light'] .dt-slashing, :root[data-theme='phb'] .dt-slashing { color: #a05f4e; }
+
 .log-src {
   opacity: 0.55;
   font-size: 11px;

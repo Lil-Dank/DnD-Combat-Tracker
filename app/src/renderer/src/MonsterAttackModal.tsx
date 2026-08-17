@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AppState, Combatant, MonsterAction } from '../../shared/types';
 import { rollPool } from '../../shared/dice';
 import { api } from './api';
+import { DmgText } from './DmgText';
 import { useI18n } from './i18n';
 
 /**
@@ -247,7 +248,9 @@ export function MonsterAttackModal({
                 : singleTarget
                   ? t('attack.vsTarget', { name: targetName(singleTarget), ac: singleTarget.ac })
                   : ''}
-              {locAction(l10nDe, attack).damage && ` · ${locAction(l10nDe, attack).damage}`}
+              {locAction(l10nDe, attack).damage && (
+                <> · <DmgText text={locAction(l10nDe, attack).damage!} /></>
+              )}
             </p>
 
             {attack.attack && (
@@ -278,10 +281,10 @@ export function MonsterAttackModal({
                   <span className="dice-total atk-result">
                     {' '}DMG {dmgRoll.total}
                     {dmgRoll.parts.length > 1 && (
-                      <span className="muted"> ({dmgRoll.parts.join(' + ')})</span>
+                      <span className="muted"> (<DmgText text={dmgRoll.parts.join(' + ')} />)</span>
                     )}
                     {dmgRoll.conditional.map((c) => (
-                      <span key={c} className="muted"> · {c}</span>
+                      <span key={c} className="muted"> · <DmgText text={c} /></span>
                     ))}
                   </span>
                 )}

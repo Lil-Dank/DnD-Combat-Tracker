@@ -1,5 +1,5 @@
 import type { LogEntry } from './types';
-import { conditionLabel, translate, type Lang } from './i18n';
+import { DAMAGE_TYPE_DE, conditionLabel, translate, type Lang } from './i18n';
 import { displayDice } from './dice';
 
 /**
@@ -131,20 +131,81 @@ export function logEntryText(lang: Lang, e: LogEntry): string {
 }
 
 /**
- * The dice math behind an attack roll ("d20 14 + 5 = 19"), or null when the
- * entry carries no numbers (monster rolls on player surfaces, old entries).
- * Manual rolls without a known die show just the total.
+ * Split a damage-math string into segments: dice notation ("2d6", "1W8")
+ * gets lr-dice, the numbers actually rolled ("[3+5]") get lr-rolls, the
+ * connective arithmetic stays plain.
  */
-export function logRollMath(lang: Lang, e: LogEntry): string | null {
+function mathSegments(s: string): LogSegment[] {
+  const out: LogSegment[] = [];
+  const re = /(\d*[dW]\d+|\[[^\]]*\])/g;
+  let last = 0;
+  for (const m of s.matchAll(re)) {
+    if (m.index > last) out.push({ text: s.slice(last, m.index) });
+    out.push({ text: m[0], cls: m[0].startsWith('[') ? 'lr-rolls' : 'lr-dice' });
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) out.push({ text: s.slice(last) });
+  return out;
+}
+
+/**
+ * The dice math behind an attack roll ("d20 14 + 5 = 19") as segments that
+ * tell the dice apart from what they rolled, or null when the entry carries
+ * no numbers (monster rolls on player surfaces, old entries). Manual rolls
+ * without a known die show just the total.
+ */
+export function logRollSegments(lang: Lang, e: LogEntry): LogSegment[] | null {
   if (e.kind === 'damage') {
-    return e.math ? displayDice(lang, e.math) : null;
+    return e.math ? mathSegments(displayDice(lang, e.math)) : null;
   }
   if (e.kind !== 'attackRoll' || e.total === undefined) return null;
   const d20 = lang === 'de' ? 'W20' : 'd20';
-  if (e.die === undefined) return `= ${e.total}`;
+  if (e.die === undefined) return [{ text: `= ${e.total}` }];
   const mod = e.total - e.die;
   const modStr = mod === 0 ? '' : ` ${mod > 0 ? '+' : '−'} ${Math.abs(mod)}`;
-  return `${d20} ${e.die}${modStr} = ${e.total}`;
+  return [
+    { text: d20, cls: 'lr-dice' },
+    { text: ' ' },
+    { text: String(e.die), cls: 'lr-rolls' },
+    { text: `${modStr} = ${e.total}` },
+  ];
+}
+
+// Damage-type words, matched case-insensitively in display strings. German
+// SRD sentences use compounds ("Hiebschaden"), so the optional suffix is
+// swallowed into the colored span.
+const DT_CANONICAL = Object.keys(DAMAGE_TYPE_DE);
+const DT_DE_TO_CANONICAL = Object.fromEntries(
+  Object.entries(DAMAGE_TYPE_DE).map(([canon, de]) => [de.toLowerCase(), canon]),
+);
+const DT_RE_EN = new RegExp(`\\b(${DT_CANONICAL.join('|')})\\b`, 'gi');
+// \b guards keep "Gift" from matching inside "vergiftet" and the like.
+const DT_RE_DE = new RegExp(
+  `\\b(${Object.values(DAMAGE_TYPE_DE).join('|')})(schaden)?\\b`,
+  'gi',
+);
+
+/**
+ * Wrap the damage-type words of a damage display string ("7 (1d8+3)
+ * Piercing", "8 (1W8 + 4) Hiebschaden") in dt-<type> segments so surfaces
+ * can color them. Only feed damage strings in - plain action text would
+ * false-positive on words like "cold".
+ */
+export function damageTypeSegments(lang: Lang, text: string): LogSegment[] {
+  const re = lang === 'de' ? DT_RE_DE : DT_RE_EN;
+  const out: LogSegment[] = [];
+  let last = 0;
+  re.lastIndex = 0;
+  for (const m of text.matchAll(re)) {
+    const canon =
+      lang === 'de' ? DT_DE_TO_CANONICAL[m[1].toLowerCase()] : m[1].toLowerCase();
+    if (!canon) continue;
+    if (m.index > last) out.push({ text: text.slice(last, m.index) });
+    out.push({ text: m[0], cls: `dt-${canon}` });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last) });
+  return out;
 }
 
 /** Short source tag ("DM", "Deck", "Phone (Alex)") for the DM-side log views. */

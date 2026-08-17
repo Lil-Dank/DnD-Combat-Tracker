@@ -375,10 +375,36 @@ h3 {
   text-overflow: ellipsis;
 }
 
+/* The expand affordance reads as a button, not a stray glyph. */
 .log-peek .peek-chevron {
   flex-shrink: 0;
-  color: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: -5px -7px -5px 0;
+  border-radius: 9px;
+  background: var(--gold);
+  color: #1a1423;
+  font-size: 15px;
+  font-weight: 700;
 }
+
+/* Damage-type tints (dt-<canonical type>), matching the DM window. */
+.dt-fire { color: #e0623c; }
+.dt-cold { color: #58a6d8; }
+.dt-lightning { color: #d8b93f; }
+.dt-thunder { color: #9d8fc0; }
+.dt-poison { color: #58b86a; }
+.dt-acid { color: #96b83a; }
+.dt-necrotic { color: #9d6fd0; }
+.dt-radiant { color: #e0c060; }
+.dt-psychic { color: #d070b8; }
+.dt-force { color: #7a9fe0; }
+.dt-bludgeoning { color: #b09a78; }
+.dt-piercing { color: #93a8bc; }
+.dt-slashing { color: #c08878; }
 
 .action-bar {
   position: fixed;

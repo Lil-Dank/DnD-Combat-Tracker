@@ -5,6 +5,7 @@ import { api } from '../api';
 import { useConfirm } from '../Confirm';
 import { AttackText } from '../AttackText';
 import { AbilityTable } from '../AbilityTable';
+import { DmgText } from '../DmgText';
 import { DiceRollerModal } from '../DiceRoller';
 import { MonsterAttackModal, hasRollableAttacks } from '../MonsterAttackModal';
 import { useI18n } from '../i18n';
@@ -619,7 +620,7 @@ function AttackPanel({
             {a.display.toHit && <span>{a.display.toHit} {t('combat.toHit')}</span>}
             {a.save && <span>{t('combat.saveDc', { ability: abilityCode(a.save.ability), dc: a.save.dc })}</span>}
             {loc.range && <span>{fmtRange(loc.range)}</span>}
-            {loc.damage && <span>{loc.damage}</span>}
+            {loc.damage && <span><DmgText text={loc.damage} /></span>}
             {a.attack?.usage?.type === 'recharge' && <span className="muted">{t('attack.recharge', { min: a.attack.usage.min })}</span>}
             {showText && <AttackText text={loc.text} />}
           </div>

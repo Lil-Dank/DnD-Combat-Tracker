@@ -13,6 +13,7 @@ import { ABILITY_KEYS } from '../../../shared/types';
 import type { AbilityScores } from '../../../shared/types';
 import { averageOf, parseDice } from '../../../shared/dice';
 import { api } from '../api';
+import { DmgText } from '../DmgText';
 import { useConfirm } from '../Confirm';
 import { AttackText } from '../AttackText';
 import { AbilityTable } from '../AbilityTable';
@@ -220,7 +221,7 @@ export function MonsterScreen({ state }: { state: AppState }) {
                               {a.save &&
                                 ` ${t('combat.saveDc', { ability: abilityCode(a.save.ability), dc: a.save.dc })}`}
                               {loc.range && `, ${fmtRange(loc.range)}`}
-                              {loc.damage && `, ${loc.damage}`}
+                              {loc.damage && <>, <DmgText text={loc.damage} /></>}
                               {a.type !== 'attack' && loc.text && <AttackText text={loc.text} />}
                             </li>
                           );

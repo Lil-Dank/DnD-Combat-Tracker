@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { abilityCodeLabel, abilityLabels, conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
 import { displayDice, formatDice, parseDice } from '../shared/dice';
-import { logEntrySegments, logEntryText } from '../shared/logText';
+import { damageTypeSegments, logEntrySegments, logEntryText } from '../shared/logText';
 import type { LogEntry, MonsterAction } from '../shared/types';
 import { ABILITY_KEYS, abilityMod } from '../shared/types';
 import { formToAction, actionToForm, emptyAction, ABILITIES, type ActionForm } from '../renderer/src/actionForm';
@@ -586,7 +586,9 @@ function AttackFlow({
                   <strong>{a.name}</strong>
                   <span className="muted">
                     {a.display.toHit ?? (a.save ? `${abilityCodeLabel(state.language, a.save.ability)} ${a.save.dc}` : '')}
-                    {a.display.damage ? ` · ${a.display.damage}` : ''}
+                    {a.display.damage ? (
+                      <> · <DmgText lang={state.language} text={a.display.damage} /></>
+                    ) : ''}
                   </span>
                 </button>
               </li>
@@ -724,7 +726,9 @@ function MyAttacks({
                   <strong>{a.name}</strong>
                   <span className="muted">
                     {a.display.toHit ?? (a.save ? `${abilityCodeLabel(state.language, a.save.ability)} ${a.save.dc}` : '')}
-                    {a.display.damage ? ` · ${a.display.damage}` : ''}
+                    {a.display.damage ? (
+                      <> · <DmgText lang={state.language} text={a.display.damage} /></>
+                    ) : ''}
                   </span>
                 </button>
                 <button
@@ -856,6 +860,23 @@ function LogPeek({
       <span className="peek-entry">{logEntryText(lang, last)}</span>
       <span className="peek-chevron">▴</span>
     </button>
+  );
+}
+
+/** Damage display string with dt-<type> colored damage-type words. */
+function DmgText({ lang, text }: { lang: Lang; text: string }) {
+  return (
+    <>
+      {damageTypeSegments(lang, text).map((seg, i) =>
+        seg.cls ? (
+          <span key={i} className={seg.cls}>
+            {seg.text}
+          </span>
+        ) : (
+          seg.text
+        ),
+      )}
+    </>
   );
 }
 

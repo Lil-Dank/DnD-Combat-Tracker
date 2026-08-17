@@ -91,6 +91,19 @@ export interface AttackRollResultMsg {
   outcome: 'crit' | 'hit' | 'miss';
 }
 
+/**
+ * A save-based action is parked for DM adjudication. Digital rolls carry
+ * the roller's own damage dice so the phone can reveal them while waiting.
+ */
+export interface SavePendingMsg {
+  type: 'savePending';
+  id: string;
+  damage: number;
+  rolls?: number[];
+  math?: string;
+  mathTypes?: (string | null)[];
+}
+
 /** Stage 2: damage rolled and applied. The roller sees their own numbers. */
 export interface DamageResultMsg {
   type: 'damageResult';
@@ -129,6 +142,6 @@ export type ServerMsg =
   | SaveResolvedMsg
   | ArchiveEntryMsg
   | { type: 'claimResult'; ok: boolean; reason?: string }
-  | { type: 'savePending'; id: string; damage: number }
+  | SavePendingMsg
   | { type: 'kicked' }
   | { type: 'error'; code: string };

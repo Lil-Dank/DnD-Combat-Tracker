@@ -546,6 +546,22 @@ h3 {
   margin: 0;
 }
 
+/* Save resolutions: green for saved-half, red for failed-full. */
+.save-results .save-ok {
+  color: #58b86a;
+  font-weight: 600;
+}
+
+.save-results .save-fail {
+  color: #e0623c;
+  font-weight: 600;
+}
+
+.save-results .save-amount {
+  color: var(--gold);
+  font-size: 17px;
+}
+
 /* Damage-type tints (dt-<canonical type>), matching the DM window. */
 .dt-fire { color: #e0623c; }
 .dt-cold { color: #58a6d8; }

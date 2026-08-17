@@ -15,6 +15,7 @@ import type {
   AttackResultMsg,
   AttackRollResultMsg,
   DamageResultMsg,
+  SavePendingMsg,
   SaveResolvedMsg,
   StateMsg,
   WireCombatant,
@@ -42,6 +43,7 @@ export function App() {
   const [attackMsg, setAttackMsg] = useState<AttackResultMsg | SaveResolvedMsg | null>(null);
   const [atkRollMsg, setAtkRollMsg] = useState<AttackRollResultMsg | null>(null);
   const [dmgMsg, setDmgMsg] = useState<DamageResultMsg | null>(null);
+  const [savePendingMsg, setSavePendingMsg] = useState<SavePendingMsg | null>(null);
   const [waitingSave, setWaitingSave] = useState(false);
   const [archiveEntry, setArchiveEntry] = useState<ArchiveEntryMsg | null>(null);
   const socketRef = useRef<PlayerSocket | null>(null);
@@ -66,6 +68,7 @@ export function App() {
           break;
         case 'savePending':
           setWaitingSave(true);
+          setSavePendingMsg(msg);
           break;
         case 'saveResolved':
           setWaitingSave(false);
@@ -213,12 +216,14 @@ export function App() {
               result={attackMsg}
               atkRoll={atkRollMsg}
               dmgResult={dmgMsg}
+              savePending={savePendingMsg}
               waiting={waitingSave}
               clearResult={() => setAttackMsg(null)}
               onClose={() => {
                 setAttackMsg(null);
                 setAtkRollMsg(null);
                 setDmgMsg(null);
+                setSavePendingMsg(null);
                 setWaitingSave(false);
                 setView({ id: 'home' });
               }}
@@ -487,6 +492,7 @@ function AttackFlow({
   result,
   atkRoll,
   dmgResult,
+  savePending,
   waiting,
   clearResult,
   onClose,
@@ -497,6 +503,7 @@ function AttackFlow({
   result: AttackResultMsg | SaveResolvedMsg | null;
   atkRoll: AttackRollResultMsg | null;
   dmgResult: DamageResultMsg | null;
+  savePending: SavePendingMsg | null;
   waiting: boolean;
   clearResult: () => void;
   onClose: () => void;
@@ -509,10 +516,9 @@ function AttackFlow({
   const [natural, setNatural] = useState<20 | 1 | null>(null);
   const [damage, setDamage] = useState('');
   const [rollMode, setRollMode] = useState<RollMode>('normal');
-  // Save-based digital rolls hold the DM-wait screen behind a short tumble.
-  const [rolling, setRolling] = useState(false);
   // Split digital flow: tumble → the dice settle on their numbers → the
   // verdict builds around them → damage tumbles and settles in place.
+  // Save-based digital rolls ride the same phases with their damage dice.
   const [phase, setPhase] = useState<
     'form' | 'tumbling' | 'settled' | 'verdict' | 'dmgTumbling' | 'dmgSettled'
   >('form');
@@ -532,10 +538,12 @@ function AttackFlow({
     return sizes.length > 0 ? sizes : [6];
   }, [attack]);
 
-  // The d20 tumble ends AND the server result is in → settle on the number.
+  // The tumble ends AND the server result is in → settle on the numbers.
   useEffect(() => {
-    if (phase === 'tumbling' && tumbleDone && atkRoll) setPhase('settled');
-  }, [phase, tumbleDone, atkRoll]);
+    if (phase !== 'tumbling' || !tumbleDone) return;
+    if (atkRoll) setPhase('settled');
+    else if (savePending) setPhase(savePending.rolls?.length ? 'settled' : 'verdict');
+  }, [phase, tumbleDone, atkRoll, savePending]);
 
   // Hold the settled number for a beat, then build the verdict around it.
   useEffect(() => {
@@ -564,10 +572,12 @@ function AttackFlow({
     }
   };
 
-  // Save-based actions keep the one-shot flow (the DM adjudicates them).
+  // Save-based actions: one shot (the DM adjudicates), but the roller still
+  // gets the damage-dice reveal before the waiting screen.
   const fireDigitalSave = () => {
-    setRolling(true);
-    setTimeout(() => setRolling(false), 3500);
+    setPhase('tumbling');
+    setTumbleDone(false);
+    setTimeout(() => setTumbleDone(true), 3000);
     send({ type: 'attackDigital', attackId: attack!.id, targetIds: targets });
   };
 
@@ -611,26 +621,27 @@ function AttackFlow({
   };
 
   // The dice are in the air: the result stays hidden until the tumble ends.
-  if (rolling || phase === 'tumbling') {
+  if (phase === 'tumbling') {
     return (
       <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
         <RollingDice
           label={t('mob.rolling')}
-          sizes={!rolling && rollMode !== 'normal' ? [20, 20] : [20]}
+          sizes={isSave ? dmgDiceSizes : rollMode !== 'normal' ? [20, 20] : [20]}
         />
       </Sheet>
     );
   }
 
   // The dice settle on their numbers and hold a beat before the verdict.
-  if (phase === 'settled' && atkRoll) {
+  if (phase === 'settled' && (atkRoll || savePending)) {
+    const dice = atkRoll ? atkRoll.dice : (savePending?.rolls ?? []);
     return (
       <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
         <div className="rolling">
           <DiceValues
-            dice={atkRoll.dice}
-            kept={atkRoll.die}
-            size={atkRoll.dice.length > 1 ? 76 : 96}
+            dice={dice}
+            kept={atkRoll?.die}
+            size={dice.length > 6 ? 44 : dice.length > 1 ? 76 : 96}
             settled
           />
         </div>
@@ -706,7 +717,36 @@ function AttackFlow({
   if (result || waiting) {
     return (
       <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
-        {waiting && <p className="waiting">{t('mob.waitingDm')}</p>}
+        {waiting && (
+          <div className="result">
+            {savePending?.rolls && savePending.rolls.length > 0 && (
+              <DiceValues
+                dice={savePending.rolls}
+                size={savePending.rolls.length > 6 ? 44 : 58}
+              />
+            )}
+            {savePending?.math && (
+              <div className="dmg-detail">
+                <p className="dmg-breakdown tnum">
+                  {rollMathSegments(
+                    displayDice(state.language, savePending.math),
+                    savePending.mathTypes,
+                  ).map((seg, i) =>
+                    seg.cls ? (
+                      <span key={i} className={seg.cls}>
+                        {seg.text}
+                      </span>
+                    ) : (
+                      seg.text
+                    ),
+                  )}
+                </p>
+                <p className="dmg-total tnum">{savePending.damage}</p>
+              </div>
+            )}
+            <p className="waiting">{t('mob.waitingDm')}</p>
+          </div>
+        )}
         {result?.type === 'attackResult' && (
           <div className="result">
             <div className={`verdict ${result.outcome}`}>
@@ -736,8 +776,11 @@ function AttackFlow({
                 {result.results.map((r) => (
                   <li key={r.targetId}>
                     <strong>{r.targetName}</strong>{' '}
-                    {t(r.saved ? 'mob.savedHalf' : 'mob.failedFull')} ·{' '}
-                    {t('mob.dmgDealt', { damage: r.amount })}
+                    <span className={r.saved ? 'save-ok' : 'save-fail'}>
+                      {t(r.saved ? 'mob.savedHalf' : 'mob.failedFull')}
+                    </span>{' '}
+                    · <strong className="save-amount tnum">{r.amount}</strong>{' '}
+                    {t('mob.dmgDealtShort')}
                   </li>
                 ))}
               </ul>

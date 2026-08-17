@@ -407,6 +407,15 @@ function locName(name: string): string {
   return monsterName(store.getState().settings.language, name);
 }
 
+/**
+ * Broadcast side effects of digital rolls (log entry, verdict sound, damage
+ * application) wait until the roller's phone animation has revealed — so
+ * nobody reads the log faster than the person who rolled. Slightly under the
+ * phone's tumble (3.0s/2.2s) + settle (0.95s) timings.
+ */
+const ATTACK_REVEAL_MS = 3600;
+const DAMAGE_REVEAL_MS = 2900;
+
 /** Coarse device label so anonymous phones are still tellable apart. */
 function deviceLabel(ua: string | undefined): string | null {
   if (!ua) return null;
@@ -594,7 +603,15 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
     sourceName: sourceNameOf(sockets.get(socket)),
   };
   pendingSaves.set(pending.id, pending);
-  send(socket, { type: 'savePending', id: pending.id, damage });
+  // Digital rolls carry the roller's own dice so the phone can reveal them.
+  send(socket, {
+    type: 'savePending',
+    id: pending.id,
+    damage,
+    rolls: manual ? undefined : rolled.rolls,
+    math: manual ? undefined : rolled.math,
+    mathTypes: manual ? undefined : rolled.mathTypes,
+  });
   savePendingListener?.({
     id: pending.id,
     actorName: pending.actorName,
@@ -770,26 +787,34 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
       handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'attackRoll' });
       const phase =
         outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss';
-      handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase });
-      logAttackEvent(
-        phase,
-        {
-          actorName: ctx.pc.name,
-          actorType: 'pc',
-          targetName: locName(target.displayName),
-          targetType: target.type,
-          attackName: ctx.action.name,
-          die,
-          dice,
-          total,
-        },
-        'player',
-        sourceName,
-      );
+      const targetName = locName(target.displayName);
+      const targetType = target.type;
+      const pcId = ctx.pcId;
+      const attackId = ctx.action.id;
+      const actorName = ctx.pc.name;
+      const attackName = ctx.action.name;
+      setTimeout(() => {
+        handleAttackEvent({ sourceId: pcId, attackId, phase });
+        logAttackEvent(
+          phase,
+          {
+            actorName,
+            actorType: 'pc',
+            targetName,
+            targetType,
+            attackName,
+            die,
+            dice,
+            total,
+          },
+          'player',
+          sourceName,
+        );
+      }, ATTACK_REVEAL_MS);
       send(socket, {
         type: 'attackRollResult',
         targetId: target.id,
-        targetName: locName(target.displayName),
+        targetName,
         die,
         dice,
         total,
@@ -818,15 +843,26 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
       }
       const rolled = rollActionDamage(ctx.action);
       handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageRoll' });
-      await store.applyDamage(target.id, rolled.total, {
-        source: 'player',
-        actorName: ctx.pc.name,
-        actorType: 'pc',
-        math: rolled.math,
-        mathTypes: rolled.mathTypes,
-        sourceName: sourceNameOf(info),
-      });
-      handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageApplied' });
+      {
+        const targetId = target.id;
+        const pcId = ctx.pcId;
+        const attackId = ctx.action.id;
+        const actorName = ctx.pc.name;
+        const sourceName = sourceNameOf(info);
+        setTimeout(() => {
+          void (async () => {
+            await store.applyDamage(targetId, rolled.total, {
+              source: 'player',
+              actorName,
+              actorType: 'pc',
+              math: rolled.math,
+              mathTypes: rolled.mathTypes,
+              sourceName,
+            });
+            handleAttackEvent({ sourceId: pcId, attackId, phase: 'damageApplied' });
+          })();
+        }, DAMAGE_REVEAL_MS);
+      }
       // The roller sees their own numbers: per-die results for the settle
       // animation plus the breakdown string (other phones still get nothing).
       send(socket, {

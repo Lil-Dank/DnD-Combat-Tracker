@@ -1107,26 +1107,31 @@ export function createDemoApi(): Api {
       const total = die + (action.attack?.toHit ?? 0);
       const outcome =
         die === 20 ? 'crit' : die === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
-      pushLog(combat, {
-        kind: 'attackRoll',
-        actorName: pc.name,
-        actorType: 'pc',
-        targetName: target.displayName,
-        targetType: target.type,
-        attackName: action.name,
-        die,
-        dice: dice.length > 1 ? dice : undefined,
-        total,
-        outcome,
-        source: 'player',
-        sourceName: sourceNameFor(pcId),
-      });
-      kenkuAttackEvent({
-        sourceId: pcId,
-        attackId: action.id,
-        phase: outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss',
-      });
-      save();
+      // The log waits for the roller's reveal, like the real server.
+      setTimeout(() => {
+        const c = data.combat;
+        if (!c) return;
+        pushLog(c, {
+          kind: 'attackRoll',
+          actorName: pc.name,
+          actorType: 'pc',
+          targetName: target.displayName,
+          targetType: target.type,
+          attackName: action.name,
+          die,
+          dice: dice.length > 1 ? dice : undefined,
+          total,
+          outcome,
+          source: 'player',
+          sourceName: sourceNameFor(pcId),
+        });
+        kenkuAttackEvent({
+          sourceId: pcId,
+          attackId: action.id,
+          phase: outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss',
+        });
+        save();
+      }, 3600);
       sendTo({
         type: 'attackRollResult',
         targetId: target.id,
@@ -1159,12 +1164,15 @@ export function createDemoApi(): Api {
         return;
       }
       const rolled = rollActionDamage(action);
-      applyDamage(target.id, rolled.total, {
-        ...playerCtx(pcId),
-        math: rolled.math,
-        mathTypes: rolled.mathTypes,
-      });
-      kenkuAttackEvent({ sourceId: pcId, attackId: action.id, phase: 'damageApplied' });
+      // Damage lands after the roller's reveal, like the real server.
+      setTimeout(() => {
+        applyDamage(target.id, rolled.total, {
+          ...playerCtx(pcId),
+          math: rolled.math,
+          mathTypes: rolled.mathTypes,
+        });
+        kenkuAttackEvent({ sourceId: pcId, attackId: action.id, phase: 'damageApplied' });
+      }, 2900);
       sendTo({
         type: 'damageResult',
         targetId: target.id,
@@ -1206,7 +1214,16 @@ export function createDemoApi(): Api {
           session,
         };
         pendingSaves.set(pending.id, pending);
-        sendTo({ type: 'savePending', id: pending.id, damage });
+        const savedManual =
+          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0;
+        sendTo({
+          type: 'savePending',
+          id: pending.id,
+          damage,
+          rolls: savedManual ? undefined : rolledSave.rolls,
+          math: savedManual ? undefined : rolledSave.math,
+          mathTypes: savedManual ? undefined : rolledSave.mathTypes,
+        });
         for (const cb of savePendingListeners) {
           cb({
             id: pending.id,

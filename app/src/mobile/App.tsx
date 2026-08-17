@@ -231,7 +231,11 @@ export function App() {
                   </button>
                   <h3>
                     {archiveEntry.templateName}{' '}
-                    <span className="muted">{t('mob.rounds', { rounds: archiveEntry.rounds })}</span>
+                    <span className="muted">
+                    {archiveEntry.rounds === 1
+                      ? t('mob.roundsOne')
+                      : t('mob.rounds', { rounds: archiveEntry.rounds })}
+                  </span>
                   </h3>
                   <LogList log={archiveEntry.log} lang={lang} />
                 </>
@@ -247,7 +251,7 @@ export function App() {
                           {new Date(a.endedAt).toLocaleDateString(
                             state.language === 'de' ? 'de-DE' : 'en-US',
                           )}{' '}
-                          · {t('mob.rounds', { rounds: a.rounds })}
+                          · {a.rounds === 1 ? t('mob.roundsOne') : t('mob.rounds', { rounds: a.rounds })}
                         </span>
                       </button>
                     </li>

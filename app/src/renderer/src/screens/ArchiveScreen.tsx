@@ -49,7 +49,7 @@ export function ArchiveScreen() {
                   <strong>{e.templateName}</strong>
                   <span className="muted">
                     {new Date(e.endedAt).toLocaleDateString(locale)} ·{' '}
-                    {t('archive.rounds', { rounds: e.rounds })}
+                    {e.rounds === 1 ? t('archive.roundsOne') : t('archive.rounds', { rounds: e.rounds })}
                   </span>
                 </div>
                 <button
@@ -76,7 +76,7 @@ export function ArchiveScreen() {
                   {open.templateName}{' '}
                   <span className="muted">
                     {new Date(open.endedAt).toLocaleString(locale)} ·{' '}
-                    {t('archive.rounds', { rounds: open.rounds })}
+                    {open.rounds === 1 ? t('archive.roundsOne') : t('archive.rounds', { rounds: open.rounds })}
                   </span>
                 </h2>
                 <div className="archive-log">

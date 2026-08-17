@@ -193,8 +193,8 @@ function isBloodied(c: Combatant): boolean {
 }
 
 /**
- * The player log filter: monster attack-roll numbers stay hidden (players
- * see the outcome, not the d20 math). Everything else passes through.
+ * The player log filter: no dice compositions on player surfaces. Attack-roll
+ * numbers and damage math stay DM-side; save totals remain (table-announced).
  */
 function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
   // No dice compositions on player surfaces at all: attack-roll numbers and

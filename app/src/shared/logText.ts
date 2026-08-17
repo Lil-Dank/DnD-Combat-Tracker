@@ -74,11 +74,28 @@ export function logEntrySegments(lang: Lang, e: LogEntry): LogSegment[] {
     case 'turn':
       text = t('log.turn', { actor });
       break;
-    case 'damage':
-      text = e.actorName
-        ? t('log.damageBy', { actor, target, amount: mark(e.amount ?? 0, 'seg-dmg') })
-        : t('log.damage', { target, amount: mark(e.amount ?? 0, 'seg-dmg') });
+    case 'damage': {
+      // Name the damage type when the entry knows exactly one; mixed-type
+      // hits stay generic (the math sub-line still tints each part).
+      const known = [...new Set((e.mathTypes ?? []).filter((x): x is string => x !== null))];
+      const type = known.length === 1 ? known[0] : null;
+      const amount = mark(e.amount ?? 0, 'seg-dmg');
+      if (type) {
+        const label =
+          lang === 'de'
+            ? (DAMAGE_TYPE_DE[type] ?? type)
+            : type.charAt(0).toUpperCase() + type.slice(1);
+        const typeSeg = mark(label, `dt-${type}`);
+        text = e.actorName
+          ? t('log.damageByTyped', { actor, target, amount, type: typeSeg })
+          : t('log.damageTyped', { target, amount, type: typeSeg });
+      } else {
+        text = e.actorName
+          ? t('log.damageBy', { actor, target, amount })
+          : t('log.damage', { target, amount });
+      }
       break;
+    }
     case 'heal':
       text = e.actorName
         ? t('log.healBy', { actor, target, amount: mark(e.amount ?? 0, 'seg-heal') })

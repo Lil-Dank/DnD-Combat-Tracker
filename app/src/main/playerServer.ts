@@ -212,7 +212,8 @@ function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
           dice: undefined,
           total: e.kind === 'attackRoll' ? undefined : e.total,
           math: undefined,
-          mathTypes: undefined,
+          // mathTypes stays: the damage TYPE is table knowledge, only the
+          // dice compositions are DM-side.
         }
       : e,
   );

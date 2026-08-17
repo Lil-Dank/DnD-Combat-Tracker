@@ -884,7 +884,7 @@ export function createDemoApi(): Api {
             dice: undefined,
             total: e.kind === 'attackRoll' ? undefined : e.total,
             math: undefined,
-            mathTypes: undefined,
+            // mathTypes stays: damage type is table knowledge.
           }
         : e,
     );

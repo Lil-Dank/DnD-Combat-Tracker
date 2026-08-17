@@ -1,7 +1,7 @@
 {
-  "name": "dnd-combat-tracker-streamdeck",
+  "name": "deck-of-many-turns-streamdeck",
   "version": "1.0.0",
-  "description": "Stream Deck plugin for the D&D Combat Tracker desktop app",
+  "description": "Stream Deck plugin for the Deck of Many Turns desktop app",
   "type": "module",
   "private": true,
   "scripts": {

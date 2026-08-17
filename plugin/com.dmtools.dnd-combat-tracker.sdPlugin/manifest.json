@@ -1,13 +1,13 @@
 {
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "UUID": "com.dmtools.dnd-combat-tracker",
-  "Name": "D&D Combat Tracker",
+  "Name": "Deck of Many Turns",
   "Version": "2.1.0.0",
   "Author": "DM Tools",
-  "Description": "Control the D&D Combat Tracker desktop app: turns, damage, healing, and conditions from your Stream Deck.",
+  "Description": "Control the Deck of Many Turns desktop app: turns, damage, healing, and conditions from your Stream Deck.",
   "Icon": "imgs/plugin/icon",
   "CodePath": "bin/plugin.js",
-  "Category": "D&D Combat Tracker",
+  "Category": "Deck of Many Turns",
   "CategoryIcon": "imgs/plugin/category",
   "Nodejs": {
     "Version": "20",

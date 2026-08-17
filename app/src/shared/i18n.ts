@@ -60,9 +60,9 @@ export const DAMAGE_TYPE_DE: Record<string, string> = {
 type Dict = Record<string, string>;
 
 const en: Dict = {
-  'app.title': 'Combat Tracker',
+  'app.title': 'Deck of Many Turns',
   'app.loading': 'Loading…',
-  'app.playerViewTitle': 'D&D Combat Tracker - Player View',
+  'app.playerViewTitle': 'Deck of Many Turns — Player View',
   'nav.combat': '⚔ Combat',
   'nav.party': '🛡 Party',
   'nav.monsters': '🐉 Monsters',
@@ -474,9 +474,9 @@ const en: Dict = {
 };
 
 const de: Dict = {
-  'app.title': 'Kampf-Tracker',
+  'app.title': 'Deck of Many Turns',
   'app.loading': 'Lädt…',
-  'app.playerViewTitle': 'D&D Kampf-Tracker – Spieleransicht',
+  'app.playerViewTitle': 'Deck of Many Turns – Spieleransicht',
   'nav.combat': '⚔ Kampf',
   'nav.party': '🛡 Gruppe',
   'nav.monsters': '🐉 Monster',

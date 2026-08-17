@@ -46,9 +46,9 @@ import {
   demoKenkuStopSound,
 } from './demo-kenku';
 
-// v3: reseeds visitors so PC attacks, the combat log and the archive from
-// the UI overhaul show up for everyone.
-const LS_KEY = 'dnd-combat-tracker-demo-v3';
+// Key bump reseeds returning visitors — this one brings the Deck of Many
+// Turns rebrand plus PC stat blocks and colorized log targets.
+const LS_KEY = 'deck-of-many-turns-demo-v1';
 const uuid = () => crypto.randomUUID();
 const d20 = () => 1 + Math.floor(Math.random() * 20);
 

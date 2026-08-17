@@ -1,7 +1,7 @@
 {
-  "name": "dnd-combat-tracker",
+  "name": "deck-of-many-turns",
   "version": "2.1.0",
-  "description": "D&D Combat Tracker for Dungeon Masters \u2014 DM window, Player View, Stream Deck integration",
+  "description": "Deck of Many Turns — D&D combat for Dungeon Masters: DM window, Player View, player phones, Stream Deck",
   "main": "out/main/index.js",
   "author": "DM Tools",
   "license": "MIT",
@@ -37,7 +37,7 @@
   },
   "build": {
     "appId": "com.dmtools.dnd-combat-tracker",
-    "productName": "DnD Combat Tracker",
+    "productName": "Deck of Many Turns",
     "directories": {
       "output": "release"
     },

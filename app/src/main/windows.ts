@@ -46,7 +46,7 @@ export function createDmWindow(): BrowserWindow {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
-    title: 'D&D Combat Tracker — DM',
+    title: 'Deck of Many Turns — DM',
     backgroundColor: '#14101c',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -97,7 +97,7 @@ export function togglePlayerView(): void {
     y: useSaved ? saved.bounds!.y : undefined,
     show: false,
     autoHideMenuBar: true,
-    title: 'D&D Combat Tracker — Player View',
+    title: 'Deck of Many Turns — Player View',
     backgroundColor: '#1a1423',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

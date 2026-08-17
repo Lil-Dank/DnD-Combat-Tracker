@@ -356,6 +356,10 @@ accounts.
 | ![The phone claim screen listing the party's characters](docs/images/phone-claim.png) | ![The phone initiative view: your-turn banner, PC and monster rows with color edges, conditions and the log ticker](docs/images/phone-home.png) | ![The phone attack flow with the attack chosen and color-coded targets](docs/images/phone-attack.png) |
 | **Claim your character** | **Follow the fight** | **Roll your attacks** |
 
+![Two polyhedral dice tumbling with cycling numbers — an advantage attack roll in the air](docs/images/phone-roll.gif)
+
+<i>Digital rolls tumble before they land — advantage throws two dice and keeps the better one.</i>
+
 </div>
 
 - **Claim once** — a player taps their character (optionally typing their name) and

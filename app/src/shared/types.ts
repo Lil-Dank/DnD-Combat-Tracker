@@ -272,9 +272,9 @@ export interface ArchivedCombat {
 export type ThemeId = 'phb' | 'electron' | 'dark' | 'light';
 
 export const THEMES: { id: ThemeId; label: string }[] = [
-  { id: 'phb', label: 'PHB Style (Default)' },
+  { id: 'dark', label: 'Dark (Default)' },
+  { id: 'phb', label: 'PHB Style' },
   { id: 'electron', label: 'Default Electron' },
-  { id: 'dark', label: 'Dark' },
   { id: 'light', label: 'Light' },
 ];
 
@@ -365,7 +365,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   playerViewBgColor: '#1a1423',
   bridgePort: 57321,
-  theme: 'phb',
+  theme: 'dark',
   autoOpenAttacks: true,
   language: DEFAULT_LANG,
   kenku: DEFAULT_KENKU_SETTINGS,

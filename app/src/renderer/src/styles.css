@@ -1050,10 +1050,11 @@ textarea::placeholder {
   min-height: 0;
 }
 
-/* The combat screen never scrolls at the content level, so the reserved
-   scrollbar gutter is dead space - reclaim it and slim the side padding.
-   Bottom matches the right so the log frames evenly. */
-.content:has(.combat-screen) {
+/* Viewport-owning screens never scroll at the content level, so the
+   reserved scrollbar gutter is dead space - reclaim it and slim the side
+   padding. Bottom matches the right so the panes frame evenly. */
+.content:has(.combat-screen),
+.content:has(.archive-screen) {
   scrollbar-gutter: auto;
   padding-left: 14px;
   padding-right: 6px;
@@ -2158,10 +2159,21 @@ textarea::placeholder {
 
 /* ---- Archive: two-pane master-detail ---- */
 
+/* The Archive owns the viewport: the fight selector stays put with its
+   own scrollbar, and the log scrolls independently beside it. */
+.archive-screen {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 32px);
+  min-height: 0;
+}
+
 .archive-panes {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .archive-list-pane {
@@ -2170,6 +2182,9 @@ textarea::placeholder {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 2px;
 }
 
 .archive-item {
@@ -2207,6 +2222,8 @@ textarea::placeholder {
 .archive-log-pane {
   flex: 1;
   min-width: 0;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .archive-log-pane h2 {

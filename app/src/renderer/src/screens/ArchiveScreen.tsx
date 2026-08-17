@@ -29,7 +29,7 @@ export function ArchiveScreen() {
   const locale = lang === 'de' ? 'de-DE' : 'en-US';
 
   return (
-    <div className="screen">
+    <div className="screen archive-screen">
       <header className="screen-header">
         <h1>{t('archive.title')}</h1>
       </header>

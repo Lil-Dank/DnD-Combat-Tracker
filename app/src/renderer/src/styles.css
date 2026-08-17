@@ -1860,7 +1860,6 @@ textarea::placeholder {
 }
 
 .archive-log {
-  max-width: 760px;
   font-size: 14px;
 }
 
@@ -1972,4 +1971,63 @@ textarea::placeholder {
 
 .dmg-type-row input {
   width: 150px;
+}
+
+/* ---- Archive: two-pane master-detail ---- */
+
+.archive-panes {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.archive-list-pane {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.archive-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.archive-item:hover {
+  background: var(--row-hover);
+}
+
+.archive-item.selected {
+  border-color: var(--accent);
+  background: var(--bg-panel-2);
+}
+
+.archive-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.archive-item-main .muted {
+  font-size: 12px;
+}
+
+.archive-log-pane {
+  flex: 1;
+  min-width: 0;
+}
+
+.archive-log-pane h2 {
+  font-size: 16px;
+  color: var(--gold);
+  margin-bottom: 10px;
 }

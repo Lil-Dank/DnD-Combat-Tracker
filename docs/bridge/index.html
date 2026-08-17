@@ -208,8 +208,14 @@
         <td><code>applyDamage</code></td>
         <td><code>{"type":"applyDamage",
  "actorId":"6f0c…",
- "amount":7}</code></td>
-        <td>Damage floors at 0 HP; monsters die and leave the order, PCs go down.</td>
+ "amount":7,
+ "actorName":"Goblin 2",
+ "actorType":"monster",
+ "math":"1d6 [4] +2 = 6"}</code></td>
+        <td>Damage floors at 0 HP; monsters die and leave the order, PCs go
+          down. The last three fields are optional (v2.2+): they attribute the
+          combat-log entry to an attacker and record the dice composition
+          (DM-side only &mdash; player phones never receive it).</td>
       </tr>
       <tr>
         <td><code>applyHeal</code></td>

@@ -28,6 +28,10 @@ interface BridgeCommand {
   sourceId?: string;
   attackId?: string;
   phase?: string;
+  /** applyDamage attribution + dice composition (v2.2+ plugins). */
+  actorName?: string;
+  actorType?: string;
+  math?: string;
   /** Optional attackEvent roll details for the combat log (v1.4+ plugins). */
   roll?: AttackRollDetails;
 }
@@ -97,7 +101,16 @@ const KNOWN_COMMANDS = new Set([
 async function handleCommand(cmd: BridgeCommand): Promise<void> {
   // Any hardware action means the DM is running combat — surface that screen.
   if (KNOWN_COMMANDS.has(cmd.type)) commandListener?.();
-  const ctx = { source: 'deck' as const };
+  const actorType =
+    cmd.actorType === 'pc' || cmd.actorType === 'monster'
+      ? (cmd.actorType as 'pc' | 'monster')
+      : undefined;
+  const ctx = {
+    source: 'deck' as const,
+    actorName: cmd.actorName,
+    actorType,
+    math: cmd.math,
+  };
   switch (cmd.type) {
     case 'nextTurn':
       return store.nextTurn(ctx);

@@ -1,5 +1,6 @@
 import type { LogEntry } from './types';
 import { conditionLabel, translate, type Lang } from './i18n';
+import { displayDice } from './dice';
 
 /**
  * Combat-log rendering. Entries store structured params; surfaces render
@@ -135,6 +136,9 @@ export function logEntryText(lang: Lang, e: LogEntry): string {
  * Manual rolls without a known die show just the total.
  */
 export function logRollMath(lang: Lang, e: LogEntry): string | null {
+  if (e.kind === 'damage') {
+    return e.math ? displayDice(lang, e.math) : null;
+  }
   if (e.kind !== 'attackRoll' || e.total === undefined) return null;
   const d20 = lang === 'de' ? 'W20' : 'd20';
   if (e.die === undefined) return `= ${e.total}`;

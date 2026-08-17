@@ -28,6 +28,8 @@ export interface ActionContext {
   /** Acting combatant's display name (player web actions carry their PC). */
   actorName?: string;
   actorType?: 'pc' | 'monster';
+  /** Rolled-damage composition for the log ("2d6 [3+5] +4 = 12"). */
+  math?: string;
 }
 
 const DM_CTX: ActionContext = { source: 'dm' };
@@ -530,6 +532,7 @@ export class AppStore {
       targetName: c.displayName,
       targetType: c.type,
       amount,
+      math: ctx.math,
       source: ctx.source,
     });
     let killedOrDowned: KenkuEventId | null = null;

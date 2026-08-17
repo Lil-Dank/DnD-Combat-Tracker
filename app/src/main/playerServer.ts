@@ -51,6 +51,8 @@ interface PendingSave {
   dc: number;
   targetIds: string[];
   damage: number;
+  /** Dice composition of the rolled damage, for the log (digital rolls). */
+  math?: string;
   socket: WebSocket;
 }
 
@@ -195,9 +197,11 @@ function isBloodied(c: Combatant): boolean {
  * see the outcome, not the d20 math). Everything else passes through.
  */
 function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
+  // No dice compositions on player surfaces at all: attack-roll numbers and
+  // damage math stay DM-side (save totals remain - they're table-announced).
   return log.map((e) =>
-    e.kind === 'attackRoll' && e.actorType === 'monster'
-      ? { ...e, die: undefined, total: undefined }
+    e.kind === 'attackRoll' || e.math !== undefined
+      ? { ...e, die: undefined, total: e.kind === 'attackRoll' ? undefined : e.total, math: undefined }
       : e,
   );
 }
@@ -345,16 +349,24 @@ function validAmount(n: unknown): n is number {
 // ---- attack resolution -------------------------------------------------------
 
 /** Same convention as the DM attack modal: sum non-conditional damage rows. */
-function rollActionDamage(action: MonsterAction): number {
+function rollActionDamage(action: MonsterAction): { total: number; math: string } {
   let total = 0;
+  const mathParts: string[] = [];
   for (const d of action.onHit.damage) {
     if (d.condition) continue;
-    total +=
-      d.dice && d.count && d.die
-        ? rollPool([{ count: d.count, die: d.die }], d.bonus ?? 0).total
-        : (d.average ?? 0);
+    if (d.dice && d.count && d.die) {
+      const roll = rollPool([{ count: d.count, die: d.die }], d.bonus ?? 0);
+      total += roll.total;
+      const bonus = d.bonus ?? 0;
+      const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
+      mathParts.push(`${d.dice} [${roll.perPart[0].join('+')}]${bonusStr}`);
+    } else {
+      const value = d.average ?? 0;
+      total += value;
+      mathParts.push(`${value}`);
+    }
   }
-  return total;
+  return { total, math: `${mathParts.join(' + ')} = ${total}` };
 }
 
 interface AttackContext {
@@ -407,12 +419,14 @@ async function resolveAttackRoll(
 
   let damage: number | null = null;
   if (outcome !== 'miss') {
-    damage = rollActionDamage(ctx.action);
+    const rolled = rollActionDamage(ctx.action);
+    damage = rolled.total;
     handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageRoll' });
     await store.applyDamage(target.id, damage, {
       source: 'player',
       actorName: ctx.pc.name,
       actorType: 'pc',
+      math: rolled.math,
     });
     handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageApplied' });
   }
@@ -496,7 +510,10 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
     send(socket, { type: 'error', code: 'badTarget' });
     return;
   }
-  const damage = cmd.mode === 'manual' && validAmount(cmd.damage) ? cmd.damage : rollActionDamage(ctx.action);
+  const rolled = rollActionDamage(ctx.action);
+  const manual = cmd.mode === 'manual' && validAmount(cmd.damage);
+  const damage = manual ? (cmd.damage as number) : rolled.total;
+  const damageMath = manual ? undefined : rolled.math;
   handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageRoll' });
 
   const pending: PendingSave = {
@@ -509,6 +526,7 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
     dc: ctx.action.save.dc,
     targetIds,
     damage,
+    math: damageMath,
     socket,
   };
   pendingSaves.set(pending.id, pending);
@@ -555,6 +573,11 @@ export async function resolvePendingSave(
         source: 'player',
         actorName: pending.actorName,
         actorType: 'pc',
+        math: pending.math
+          ? r.saved
+            ? `${pending.math} → ½ ${amount}`
+            : pending.math
+          : undefined,
       });
     }
     applied.push({ targetId: r.targetId, targetName: target.displayName, saved: r.saved, amount });

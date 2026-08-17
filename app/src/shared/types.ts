@@ -260,6 +260,8 @@ export interface LogEntry {
   outcome?: 'crit' | 'hit' | 'miss' | 'saved' | 'failed';
   /** attackRoll entries: the action's name (e.g. "Scimitar"). */
   attackName?: string;
+  /** damage entries: the dice composition ("2d6 [3+5] +4 = 12"), DM-only. */
+  math?: string;
   condition?: Condition;
   source: LogSource;
 }

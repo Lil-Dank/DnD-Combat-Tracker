@@ -67,10 +67,18 @@ interface ActionCtx {
   source: LogSource;
   actorName?: string;
   actorType?: 'pc' | 'monster';
+  math?: string;
 }
 
 const DM_CTX: ActionCtx = { source: 'dm' };
 const DECK_CTX: ActionCtx = { source: 'deck' };
+
+const deckCtx = (cmd: BridgeCommand): ActionCtx => ({
+    source: 'deck',
+    actorName: cmd.actorName,
+    actorType: cmd.actorType === 'pc' || cmd.actorType === 'monster' ? cmd.actorType : undefined,
+    math: cmd.math,
+  });
 
 interface BridgeCommand {
   type: string;
@@ -78,6 +86,9 @@ interface BridgeCommand {
   amount?: number;
   condition?: string;
   phase?: string;
+  actorName?: string;
+  actorType?: string;
+  math?: string;
   roll?: {
     actorName?: string;
     actorType?: string;
@@ -313,6 +324,7 @@ export function createDemoApi(): Api {
       targetName: c.displayName,
       targetType: c.type,
       amount,
+      math: ctx.math,
       source: ctx.source,
     });
     let downedOrKilled: KenkuEventId | null = null;
@@ -664,23 +676,26 @@ export function createDemoApi(): Api {
       entry({ kind: 'turn', actorName: pName(0), actorType: 'pc', source: 'dm', round: 1 }),
       entry({
         kind: 'attackRoll', actorName: pName(0), actorType: 'pc', targetName: mName(0),
+        targetType: 'monster',
         attackName: 'Rapier', die: 14, total: 19, outcome: 'hit', source: 'player', round: 1,
       }),
       entry({
         kind: 'damage', actorName: pName(0), actorType: 'pc', targetName: mName(0),
-        amount: 7, source: 'player', round: 1,
+        targetType: 'monster', amount: 7, source: 'player', round: 1,
       }),
       entry({ kind: 'turn', actorName: mName(0), actorType: 'monster', source: 'deck', round: 1 }),
       entry({
         kind: 'attackRoll', actorName: mName(0), actorType: 'monster', targetName: pName(0),
+        targetType: 'pc',
         attackName: 'Scimitar', die: 17, total: 21, outcome: 'hit', source: 'deck', round: 1,
       }),
       entry({
         kind: 'damage', actorName: mName(0), actorType: 'monster', targetName: pName(0),
-        amount: 6, source: 'deck', round: 1,
+        targetType: 'pc', amount: 6, source: 'deck', round: 1,
       }),
       entry({
-        kind: 'conditionAdded', targetName: mName(1), condition: 'Prone', source: 'dm', round: 1,
+        kind: 'conditionAdded', targetName: mName(1), targetType: 'monster',
+        condition: 'Prone', source: 'dm', round: 1,
       }),
       entry({ kind: 'turn', actorName: mName(0), actorType: 'monster', source: 'dm', round: 2 }),
     );
@@ -692,23 +707,25 @@ export function createDemoApi(): Api {
       { kind: 'turn', actorName: 'Owlbear 1', actorType: 'monster', source: 'dm', round: 1 },
       {
         kind: 'attackRoll', actorName: 'Owlbear 1', actorType: 'monster',
-        targetName: 'Thorin Oakenshield', attackName: 'Rend', die: 18, total: 25,
-        outcome: 'hit', source: 'deck', round: 1,
+        targetName: 'Thorin Oakenshield', targetType: 'pc', attackName: 'Rend',
+        die: 18, total: 25, outcome: 'hit', source: 'deck', round: 1,
       },
       {
         kind: 'damage', actorName: 'Owlbear 1', actorType: 'monster',
-        targetName: 'Thorin Oakenshield', amount: 14, source: 'deck', round: 1,
+        targetName: 'Thorin Oakenshield', targetType: 'pc', amount: 14,
+        source: 'deck', round: 1,
       },
       {
         kind: 'attackRoll', actorName: 'Thorin Oakenshield', actorType: 'pc',
-        targetName: 'Owlbear 1', attackName: 'Warhammer', die: 20, total: 26,
-        outcome: 'crit', source: 'player', round: 1,
+        targetName: 'Owlbear 1', targetType: 'monster', attackName: 'Warhammer',
+        die: 20, total: 26, outcome: 'crit', source: 'player', round: 1,
       },
       {
         kind: 'damage', actorName: 'Thorin Oakenshield', actorType: 'pc',
-        targetName: 'Owlbear 1', amount: 18, source: 'player', round: 2,
+        targetName: 'Owlbear 1', targetType: 'monster', amount: 18,
+        source: 'player', round: 2,
       },
-      { kind: 'kill', targetName: 'Owlbear 1', source: 'player', round: 2 },
+      { kind: 'kill', targetName: 'Owlbear 1', targetType: 'monster', source: 'player', round: 2 },
       { kind: 'combatEnd', source: 'dm', round: 2 },
     ].map((e, i) => ({ ...e, id: uuid(), ts: Date.now() - 86400000 + i * 60000 }) as LogEntry);
     data.archive.push({
@@ -801,10 +818,10 @@ export function createDemoApi(): Api {
         logAttackRoll(cmd);
         break;
       case 'applyDamage':
-        if (cmd.actorId && typeof cmd.amount === 'number') applyDamage(cmd.actorId, cmd.amount, DECK_CTX);
+        if (cmd.actorId && typeof cmd.amount === 'number') applyDamage(cmd.actorId, cmd.amount, deckCtx(cmd));
         break;
       case 'applyHeal':
-        if (cmd.actorId && typeof cmd.amount === 'number') applyHeal(cmd.actorId, cmd.amount, DECK_CTX);
+        if (cmd.actorId && typeof cmd.amount === 'number') applyHeal(cmd.actorId, cmd.amount, deckCtx(cmd));
         break;
       case 'toggleCondition':
         if (cmd.actorId && cmd.condition) toggleCondition(cmd.actorId, cmd.condition as Condition, DECK_CTX);
@@ -847,9 +864,15 @@ export function createDemoApi(): Api {
   }
 
   function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
+    // Mirror of the real server: no dice compositions on player surfaces.
     return log.map((e) =>
-      e.kind === 'attackRoll' && e.actorType === 'monster'
-        ? { ...e, die: undefined, total: undefined }
+      e.kind === 'attackRoll' || e.math !== undefined
+        ? {
+            ...e,
+            die: undefined,
+            total: e.kind === 'attackRoll' ? undefined : e.total,
+            math: undefined,
+          }
         : e,
     );
   }
@@ -945,18 +968,26 @@ export function createDemoApi(): Api {
     return own !== undefined && targets.length === 1 && targets[0] === own.id;
   }
 
-  function rollActionDamage(action: MonsterAction): number {
+  function rollActionDamage(action: MonsterAction): { total: number; math: string } {
     let total = 0;
+    const mathParts: string[] = [];
     for (const d of action.onHit.damage) {
       if (d.condition) continue;
       if (d.count && d.die) {
-        for (let i = 0; i < d.count; i++) total += 1 + Math.floor(Math.random() * d.die);
-        total += d.bonus ?? 0;
+        const rolls: number[] = [];
+        for (let i = 0; i < d.count; i++) rolls.push(1 + Math.floor(Math.random() * d.die));
+        const bonus = d.bonus ?? 0;
+        total += rolls.reduce((a, b) => a + b, 0) + bonus;
+        const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
+        mathParts.push(`${d.dice ?? `${d.count}d${d.die}`} [${rolls.join('+')}]${bonusStr}`);
       } else {
-        total += d.average ?? 0;
+        const value = d.average ?? 0;
+        total += value;
+        mathParts.push(`${value}`);
       }
     }
-    return Math.max(0, total);
+    total = Math.max(0, total);
+    return { total, math: `${mathParts.join(' + ')} = ${total}` };
   }
 
   function playerCtx(pcId: string): ActionCtx {
@@ -1039,10 +1070,11 @@ export function createDemoApi(): Api {
         return;
       }
       if (action.type === 'save' || action.save) {
+        const rolledSave = rollActionDamage(action);
         const damage =
           type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0
             ? (cmd.damage as number)
-            : rollActionDamage(action);
+            : rolledSave.total;
         const pending: PendingSave = {
           id: uuid(),
           pcId,
@@ -1109,11 +1141,14 @@ export function createDemoApi(): Api {
       });
       let damage: number | null = null;
       if (outcome !== 'miss') {
-        damage =
-          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0
-            ? (cmd.damage as number)
-            : rollActionDamage(action);
-        applyDamage(target.id, damage, playerCtx(pcId));
+        const manualDmg =
+          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0;
+        const rolledDmg = rollActionDamage(action);
+        damage = manualDmg ? (cmd.damage as number) : rolledDmg.total;
+        applyDamage(target.id, damage, {
+          ...playerCtx(pcId),
+          math: manualDmg ? undefined : rolledDmg.math,
+        });
       } else {
         save();
       }

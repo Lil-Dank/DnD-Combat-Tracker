@@ -55,7 +55,15 @@ export type BridgeCommand =
   | { type: 'nextTurn' }
   | { type: 'prevTurn' }
   | { type: 'endCombat' }
-  | { type: 'applyDamage'; actorId: string; amount: number }
+  | {
+      type: 'applyDamage';
+      actorId: string;
+      amount: number;
+      /** Attacker attribution + dice composition for the app's combat log. */
+      actorName?: string;
+      actorType?: string;
+      math?: string;
+    }
   | { type: 'applyHeal'; actorId: string; amount: number }
   | { type: 'toggleCondition'; actorId: string; condition: string }
   | {

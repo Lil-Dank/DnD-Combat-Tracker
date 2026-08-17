@@ -485,6 +485,8 @@ function AttackFlow({
   const [d20, setD20] = useState('');
   const [natural, setNatural] = useState<20 | 1 | null>(null);
   const [damage, setDamage] = useState('');
+  // Digital rolls hold the result behind a short dice animation for suspense.
+  const [rolling, setRolling] = useState(false);
 
   const attacks = useMemo(() => you.attacks.filter(rollable), [you.attacks]);
   const isSave = attack ? attack.type === 'save' || attack.save !== null : false;
@@ -498,11 +500,9 @@ function AttackFlow({
   };
 
   const fireDigital = () => {
-    send(
-      isSave
-        ? { type: 'attackDigital', attackId: attack!.id, targetIds: targets }
-        : { type: 'attackDigital', attackId: attack!.id, targetIds: targets },
-    );
+    setRolling(true);
+    setTimeout(() => setRolling(false), 3500);
+    send({ type: 'attackDigital', attackId: attack!.id, targetIds: targets });
   };
 
   const fireManual = () => {
@@ -524,6 +524,15 @@ function AttackFlow({
       damage: parseInt(damage, 10) || 0,
     });
   };
+
+  // The dice are in the air: the result stays hidden until the tumble ends.
+  if (rolling) {
+    return (
+      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+        <RollingDice label={t('mob.rolling')} />
+      </Sheet>
+    );
+  }
 
   // Result view (single attack or resolved saves)
   if (result || waiting) {
@@ -639,6 +648,11 @@ function AttackFlow({
                     <>
                       <label>
                         {t('mob.d20Total')}
+                        {attack.display.toHit && (
+                          <span className="roll-hint tnum">
+                            🎲 {displayDice(state.language, 'd20')} {attack.display.toHit}
+                          </span>
+                        )}
                         <input
                           type="number"
                           inputMode="numeric"
@@ -664,6 +678,11 @@ function AttackFlow({
                   )}
                   <label>
                     {t('mob.damageRolled')}
+                    {attack.display.damage && (
+                      <span className="roll-hint tnum">
+                        🎲 <DmgText lang={state.language} text={attack.display.damage} />
+                      </span>
+                    )}
                     <input
                       type="number"
                       inputMode="numeric"
@@ -860,6 +879,37 @@ function LogPeek({
       <span className="peek-entry">{logEntryText(lang, last)}</span>
       <span className="peek-chevron">▴</span>
     </button>
+  );
+}
+
+/**
+ * The suspense dice: a tumbling die cycling random faces, decelerating
+ * toward the end of the ~3.5 s hold before the real result shows.
+ */
+function RollingDice({ label }: { label: string }) {
+  const [face, setFace] = useState(1);
+  useEffect(() => {
+    let delay = 80;
+    let stopped = false;
+    let id: number;
+    const tick = () => {
+      if (stopped) return;
+      setFace(1 + Math.floor(Math.random() * 20));
+      delay = Math.min(280, delay * 1.09);
+      id = window.setTimeout(tick, delay);
+    };
+    tick();
+    return () => {
+      stopped = true;
+      clearTimeout(id);
+    };
+  }, []);
+  return (
+    <div className="rolling">
+      <div className="rolling-die">🎲</div>
+      <div className="rolling-face tnum">{face}</div>
+      <p className="muted">{label}</p>
+    </div>
   );
 }
 

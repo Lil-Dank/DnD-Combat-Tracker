@@ -1970,6 +1970,19 @@ textarea::placeholder {
   opacity: 0.85;
 }
 
+/* Advantage / normal / disadvantage selector in the attack modal. */
+.adv-toggle-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* The discarded die of an adv/dis pair. */
+.die-dropped {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
 /* ---- Damage-type tints (dt-<canonical type>) ---- */
 .dt-fire { color: #e0623c; }
 .dt-cold { color: #58a6d8; }

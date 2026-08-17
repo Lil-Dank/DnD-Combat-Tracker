@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AppState, Combatant, MonsterAction } from '../../shared/types';
-import { rollPool } from '../../shared/dice';
+import { rollD20, rollPool, type RollMode } from '../../shared/dice';
 import { api } from './api';
 import { DmgText } from './DmgText';
 import { useI18n } from './i18n';
@@ -21,6 +21,8 @@ export const hasRollableAttacks = (c: Combatant) => c.attacks.some(isRollable);
 
 interface AtkRoll {
   die: number;
+  /** Every d20 thrown: one entry normally, two under adv/dis. */
+  dice: number[];
   total: number;
   verdict: 'hit' | 'miss' | null;
   crit: boolean;
@@ -52,6 +54,7 @@ export function MonsterAttackModal({
 
   const [step, setStep] = useState<Step>('attack');
   const [attack, setAttack] = useState<MonsterAction | null>(null);
+  const [advMode, setAdvMode] = useState<RollMode>('normal');
   const [targets, setTargets] = useState<string[]>([]);
   const [atkRoll, setAtkRoll] = useState<AtkRoll | null>(null);
   const [dmgRoll, setDmgRoll] = useState<DmgRoll | null>(null);
@@ -87,12 +90,13 @@ export function MonsterAttackModal({
 
   const rollAttack = () => {
     if (!attack?.attack) return;
-    const die = Math.floor(Math.random() * 20) + 1;
+    // Advantage/disadvantage: two dice, keep one, THEN add the bonus.
+    const { die, dice } = rollD20(advMode);
     const total = die + attack.attack.toHit;
     const ac = singleTarget?.ac ?? null;
     const verdict =
       die === 20 ? 'hit' : die === 1 ? 'miss' : ac !== null ? (total >= ac ? 'hit' : 'miss') : null;
-    setAtkRoll({ die, total, verdict, crit: die === 20, nat1: die === 1 });
+    setAtkRoll({ die, dice, total, verdict, crit: die === 20, nat1: die === 1 });
     if (attacker) {
       void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'attackRoll' });
       const phase =
@@ -259,12 +263,34 @@ export function MonsterAttackModal({
             </p>
 
             {attack.attack && (
+              <div className="adv-toggle-row">
+                {(['dis', 'normal', 'adv'] as const).map((m) => (
+                  <button
+                    key={m}
+                    className={`btn small ${advMode === m ? 'primary' : ''}`}
+                    onClick={() => setAdvMode(m)}
+                  >
+                    {t(`roll.${m}`)}
+                  </button>
+                ))}
+              </div>
+            )}
+            {attack.attack && (
               <div className="dice-result">
                 <button className="btn primary" onClick={rollAttack}>{t('attack.rollAttack')}</button>
                 {atkRoll && (
                   <span className="dice-total atk-result">
                     {' '}ATK {atkRoll.total}
-                    <span className="muted"> (d20: {atkRoll.die})</span>{' '}
+                    <span className="muted">
+                      {' '}(d20:{' '}
+                      {atkRoll.dice.map((d, i) => (
+                        <span key={i}>
+                          {i > 0 && ' · '}
+                          <span className={d === atkRoll.die ? '' : 'die-dropped'}>{d}</span>
+                        </span>
+                      ))}
+                      )
+                    </span>{' '}
                     {atkRoll.crit
                       ? t('attack.crit')
                       : atkRoll.nat1

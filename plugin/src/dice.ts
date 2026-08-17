@@ -30,9 +30,21 @@ export function rollDice(dice: string): DiceRoll | null {
   };
 }
 
-export function rollD20(modifier: number): { die: number; total: number } {
-  const die = Math.floor(Math.random() * 20) + 1;
-  return { die, total: die + modifier };
+/**
+ * Roll a d20 honoring advantage/disadvantage: two dice, keep the higher
+ * (adv) or lower (dis); the modifier is added AFTER choosing. `dice` lists
+ * every die thrown so keys can show the discarded one.
+ */
+export function rollD20(
+  modifier: number,
+  mode: 'normal' | 'adv' | 'dis' = 'normal',
+): { die: number; dice: number[]; total: number } {
+  const one = () => Math.floor(Math.random() * 20) + 1;
+  const first = one();
+  if (mode === 'normal') return { die: first, dice: [first], total: first + modifier };
+  const second = one();
+  const die = mode === 'adv' ? Math.max(first, second) : Math.min(first, second);
+  return { die, dice: [first, second], total: die + modifier };
 }
 
 export interface DicePoolPart {

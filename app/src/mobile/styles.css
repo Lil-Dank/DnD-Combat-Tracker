@@ -429,6 +429,59 @@ h3 {
   100% { transform: rotate(-16deg) translateY(0); }
 }
 
+/* The die settles: the number pops and glows, then the verdict builds
+   around it while it stays put. */
+.rolling-face.settled {
+  font-size: 56px;
+  animation: die-settle 0.45s ease-out;
+  text-shadow: 0 0 18px rgba(212, 175, 55, 0.45);
+}
+
+@keyframes die-settle {
+  0% { transform: scale(0.6); opacity: 0.4; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* Both d20s under advantage/disadvantage; the discarded one dims out. */
+.dice-pair {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.dice-pair .kept {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.dice-pair .dropped {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+/* The damage roll tumbles inline on the verdict screen. */
+.rolling.inline {
+  padding: 10px 0;
+}
+
+.rolling.inline .rolling-die {
+  font-size: 40px;
+}
+
+.rolling.inline .rolling-face {
+  font-size: 26px;
+}
+
+.result .rolling-face.settled {
+  margin-bottom: 2px;
+}
+
+.result .dice-pair {
+  margin-bottom: 8px;
+}
+
 /* Damage-type tints (dt-<canonical type>), matching the DM window. */
 .dt-fire { color: #e0623c; }
 .dt-cold { color: #58a6d8; }

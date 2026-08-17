@@ -8,7 +8,7 @@ import { store } from './state';
 import { JsonValue } from './storage';
 import { handleAttackEvent } from './kenku';
 import { logAttackEvent } from './combatLog';
-import { rollPool } from '../shared/dice';
+import { rollD20, rollPool, type RollMode } from '../shared/dice';
 import { monsterName } from '../shared/i18n';
 import type {
   AppState,
@@ -322,6 +322,8 @@ interface PlayerCommand {
   natural?: number;
   damage?: number;
   mode?: string;
+  /** Digital attack rolls: 'adv' | 'dis' | absent for a normal roll. */
+  advantage?: string;
   action?: MonsterAction;
   actionId?: string;
   archiveId?: string;
@@ -731,6 +733,99 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
         if (cmd.type === 'applyDamage') await store.applyDamage(id, cmd.amount, ctx);
         else await store.applyHeal(id, cmd.amount, ctx);
       }
+      return;
+    }
+
+    case 'attackRollDigital': {
+      // Stage 1 of the split digital flow: just the d20, no damage yet.
+      const ctx = attackContext(cmd, info);
+      if (!ctx || ctx.action.type === 'save' || ctx.action.save) {
+        send(socket, { type: 'error', code: 'badAttack' });
+        return;
+      }
+      const targetIds = cmd.targetIds ?? [];
+      if (!gateAllows(ctx.pcId, targetIds, 'attack')) {
+        send(socket, { type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      const combat = store.getState().combat;
+      const target = combat?.combatants.find((c) => c.id === targetIds[0]);
+      if (!combat || !target) {
+        send(socket, { type: 'error', code: 'badTarget' });
+        return;
+      }
+      const mode: RollMode =
+        cmd.advantage === 'adv' || cmd.advantage === 'dis' ? cmd.advantage : 'normal';
+      const { die, dice } = rollD20(mode);
+      const total = die + (ctx.action.attack?.toHit ?? 0);
+      const outcome =
+        die === 20 ? 'crit' : die === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
+      const sourceName = sourceNameOf(info);
+      handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'attackRoll' });
+      const phase =
+        outcome === 'crit' ? 'attackCrit' : outcome === 'hit' ? 'attackHit' : 'attackMiss';
+      handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase });
+      logAttackEvent(
+        phase,
+        {
+          actorName: ctx.pc.name,
+          actorType: 'pc',
+          targetName: locName(target.displayName),
+          targetType: target.type,
+          attackName: ctx.action.name,
+          die,
+          total,
+        },
+        'player',
+        sourceName,
+      );
+      send(socket, {
+        type: 'attackRollResult',
+        targetId: target.id,
+        targetName: locName(target.displayName),
+        die,
+        dice,
+        total,
+        outcome,
+      });
+      return;
+    }
+
+    case 'damageRollDigital': {
+      // Stage 2: roll and apply the damage for a hit confirmed in stage 1.
+      const ctx = attackContext(cmd, info);
+      if (!ctx) {
+        send(socket, { type: 'error', code: 'badAttack' });
+        return;
+      }
+      const targetIds = cmd.targetIds ?? [];
+      if (!gateAllows(ctx.pcId, targetIds, 'attack')) {
+        send(socket, { type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      const combat = store.getState().combat;
+      const target = combat?.combatants.find((c) => c.id === targetIds[0]);
+      if (!combat || !target) {
+        send(socket, { type: 'error', code: 'badTarget' });
+        return;
+      }
+      const rolled = rollActionDamage(ctx.action);
+      handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageRoll' });
+      await store.applyDamage(target.id, rolled.total, {
+        source: 'player',
+        actorName: ctx.pc.name,
+        actorType: 'pc',
+        math: rolled.math,
+        mathTypes: rolled.mathTypes,
+        sourceName: sourceNameOf(info),
+      });
+      handleAttackEvent({ sourceId: ctx.pcId, attackId: ctx.action.id, phase: 'damageApplied' });
+      send(socket, {
+        type: 'damageResult',
+        targetId: target.id,
+        targetName: locName(target.displayName),
+        damage: rolled.total,
+      });
       return;
     }
 

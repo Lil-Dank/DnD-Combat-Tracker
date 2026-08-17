@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { abilityCodeLabel, abilityLabels, conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
-import { displayDice, formatDice, parseDice } from '../shared/dice';
+import { displayDice, formatDice, parseDice, type RollMode } from '../shared/dice';
 import { damageTypeSegments, logEntrySegments, logEntryText } from '../shared/logText';
 import type { LogEntry, MonsterAction } from '../shared/types';
 import { ABILITY_KEYS, abilityMod } from '../shared/types';
@@ -8,6 +8,8 @@ import { formToAction, actionToForm, emptyAction, ABILITIES, type ActionForm } f
 import type {
   ArchiveEntryMsg,
   AttackResultMsg,
+  AttackRollResultMsg,
+  DamageResultMsg,
   SaveResolvedMsg,
   StateMsg,
   WireCombatant,
@@ -33,6 +35,8 @@ export function App() {
   const [view, setView] = useState<View>({ id: 'home' });
   const [toast, setToast] = useState<string | null>(null);
   const [attackMsg, setAttackMsg] = useState<AttackResultMsg | SaveResolvedMsg | null>(null);
+  const [atkRollMsg, setAtkRollMsg] = useState<AttackRollResultMsg | null>(null);
+  const [dmgMsg, setDmgMsg] = useState<DamageResultMsg | null>(null);
   const [waitingSave, setWaitingSave] = useState(false);
   const [archiveEntry, setArchiveEntry] = useState<ArchiveEntryMsg | null>(null);
   const socketRef = useRef<PlayerSocket | null>(null);
@@ -48,6 +52,12 @@ export function App() {
           break;
         case 'attackResult':
           setAttackMsg(msg);
+          break;
+        case 'attackRollResult':
+          setAtkRollMsg(msg);
+          break;
+        case 'damageResult':
+          setDmgMsg(msg);
           break;
         case 'savePending':
           setWaitingSave(true);
@@ -196,10 +206,14 @@ export function App() {
               t={t}
               send={send}
               result={attackMsg}
+              atkRoll={atkRollMsg}
+              dmgResult={dmgMsg}
               waiting={waitingSave}
               clearResult={() => setAttackMsg(null)}
               onClose={() => {
                 setAttackMsg(null);
+                setAtkRollMsg(null);
+                setDmgMsg(null);
                 setWaitingSave(false);
                 setView({ id: 'home' });
               }}
@@ -466,6 +480,8 @@ function AttackFlow({
   t,
   send,
   result,
+  atkRoll,
+  dmgResult,
   waiting,
   clearResult,
   onClose,
@@ -474,6 +490,8 @@ function AttackFlow({
   t: (k: string, p?: Record<string, string | number>) => string;
   send: (msg: Record<string, unknown>) => void;
   result: AttackResultMsg | SaveResolvedMsg | null;
+  atkRoll: AttackRollResultMsg | null;
+  dmgResult: DamageResultMsg | null;
   waiting: boolean;
   clearResult: () => void;
   onClose: () => void;
@@ -485,11 +503,35 @@ function AttackFlow({
   const [d20, setD20] = useState('');
   const [natural, setNatural] = useState<20 | 1 | null>(null);
   const [damage, setDamage] = useState('');
-  // Digital rolls hold the result behind a short dice animation for suspense.
+  const [rollMode, setRollMode] = useState<RollMode>('normal');
+  // Save-based digital rolls hold the DM-wait screen behind a short tumble.
   const [rolling, setRolling] = useState(false);
+  // Split digital flow: tumble → the die settles on its number → the verdict
+  // builds around it → damage rolls in place.
+  const [phase, setPhase] = useState<'form' | 'tumbling' | 'settled' | 'verdict' | 'dmgTumbling'>(
+    'form',
+  );
+  const [tumbleDone, setTumbleDone] = useState(false);
 
   const attacks = useMemo(() => you.attacks.filter(rollable), [you.attacks]);
   const isSave = attack ? attack.type === 'save' || attack.save !== null : false;
+
+  // The d20 tumble ends AND the server result is in → settle on the number.
+  useEffect(() => {
+    if (phase === 'tumbling' && tumbleDone && atkRoll) setPhase('settled');
+  }, [phase, tumbleDone, atkRoll]);
+
+  // Hold the settled number for a beat, then build the verdict around it.
+  useEffect(() => {
+    if (phase !== 'settled') return;
+    const id = setTimeout(() => setPhase('verdict'), 950);
+    return () => clearTimeout(id);
+  }, [phase]);
+
+  // Damage tumble ends AND the damage arrived → back to the verdict screen.
+  useEffect(() => {
+    if (phase === 'dmgTumbling' && tumbleDone && dmgResult) setPhase('verdict');
+  }, [phase, tumbleDone, dmgResult]);
 
   const toggleTarget = (id: string) => {
     if (isSave) {
@@ -499,10 +541,30 @@ function AttackFlow({
     }
   };
 
-  const fireDigital = () => {
+  // Save-based actions keep the one-shot flow (the DM adjudicates them).
+  const fireDigitalSave = () => {
     setRolling(true);
     setTimeout(() => setRolling(false), 3500);
     send({ type: 'attackDigital', attackId: attack!.id, targetIds: targets });
+  };
+
+  const fireAttackRoll = () => {
+    setPhase('tumbling');
+    setTumbleDone(false);
+    setTimeout(() => setTumbleDone(true), 3000);
+    send({
+      type: 'attackRollDigital',
+      attackId: attack!.id,
+      targetIds: targets,
+      advantage: rollMode === 'normal' ? undefined : rollMode,
+    });
+  };
+
+  const fireDamageRoll = () => {
+    setPhase('dmgTumbling');
+    setTumbleDone(false);
+    setTimeout(() => setTumbleDone(true), 2200);
+    send({ type: 'damageRollDigital', attackId: attack!.id, targetIds: targets });
   };
 
   const fireManual = () => {
@@ -526,10 +588,76 @@ function AttackFlow({
   };
 
   // The dice are in the air: the result stays hidden until the tumble ends.
-  if (rolling) {
+  if (rolling || phase === 'tumbling') {
     return (
       <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
         <RollingDice label={t('mob.rolling')} />
+      </Sheet>
+    );
+  }
+
+  // The die settles on its number and holds a beat before the verdict.
+  if (phase === 'settled' && atkRoll) {
+    return (
+      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+        <div className="rolling">
+          <div className="rolling-face tnum settled">{atkRoll.die}</div>
+          {atkRoll.dice.length > 1 && (
+            <div className="dice-pair muted tnum">
+              {atkRoll.dice.map((d, i) => (
+                <span key={i} className={d === atkRoll.die ? 'kept' : 'dropped'}>
+                  {d}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </Sheet>
+    );
+  }
+
+  // The verdict builds around the settled number, which stays put.
+  if ((phase === 'verdict' || phase === 'dmgTumbling') && atkRoll) {
+    return (
+      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+        <div className="result">
+          <div className="rolling-face tnum settled">{atkRoll.die}</div>
+          {atkRoll.dice.length > 1 && (
+            <div className="dice-pair muted tnum">
+              {atkRoll.dice.map((d, i) => (
+                <span key={i} className={d === atkRoll.die ? 'kept' : 'dropped'}>
+                  {d}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className={`verdict ${atkRoll.outcome}`}>
+            {t(`log.outcome.${atkRoll.outcome}`)}
+          </div>
+          <p>
+            {atkRoll.targetName} · {atkRoll.total}
+          </p>
+          {phase === 'dmgTumbling' ? (
+            <RollingDice label={t('mob.rolling')} inline />
+          ) : dmgResult ? (
+            <p className="big-num">{t('mob.dmgDealt', { damage: dmgResult.damage })}</p>
+          ) : null}
+          {phase === 'verdict' && (
+            <>
+              {atkRoll.outcome !== 'miss' && !dmgResult && (
+                <button className="big primary" onClick={fireDamageRoll}>
+                  {t('mob.rollDamage')}
+                </button>
+              )}
+              <button
+                className={`big ${atkRoll.outcome === 'miss' || dmgResult ? 'primary' : ''}`}
+                onClick={onClose}
+              >
+                {t('mob.done')}
+              </button>
+            </>
+          )}
+        </div>
       </Sheet>
     );
   }
@@ -636,8 +764,36 @@ function AttackFlow({
                 </button>
               </div>
 
-              {!manual && (
-                <button className="big primary" onClick={fireDigital}>
+              {!manual && !isSave && (
+                <>
+                  <div className="mode-toggle adv-toggle">
+                    <button
+                      className={rollMode === 'dis' ? 'selected' : ''}
+                      onClick={() => setRollMode(rollMode === 'dis' ? 'normal' : 'dis')}
+                    >
+                      {t('roll.dis')}
+                    </button>
+                    <button
+                      className={rollMode === 'normal' ? 'selected' : ''}
+                      onClick={() => setRollMode('normal')}
+                    >
+                      {t('roll.normal')}
+                    </button>
+                    <button
+                      className={rollMode === 'adv' ? 'selected' : ''}
+                      onClick={() => setRollMode(rollMode === 'adv' ? 'normal' : 'adv')}
+                    >
+                      {t('roll.adv')}
+                    </button>
+                  </div>
+                  <button className="big primary" onClick={fireAttackRoll}>
+                    {t('mob.rollAttack')}
+                  </button>
+                </>
+              )}
+
+              {!manual && isSave && (
+                <button className="big primary" onClick={fireDigitalSave}>
                   {t('mob.roll')}
                 </button>
               )}
@@ -886,7 +1042,7 @@ function LogPeek({
  * The suspense dice: a tumbling die cycling random faces, decelerating
  * toward the end of the ~3.5 s hold before the real result shows.
  */
-function RollingDice({ label }: { label: string }) {
+function RollingDice({ label, inline }: { label: string; inline?: boolean }) {
   const [face, setFace] = useState(1);
   useEffect(() => {
     let delay = 80;
@@ -905,7 +1061,7 @@ function RollingDice({ label }: { label: string }) {
     };
   }, []);
   return (
-    <div className="rolling">
+    <div className={`rolling ${inline ? 'inline' : ''}`}>
       <div className="rolling-die">🎲</div>
       <div className="rolling-face tnum">{face}</div>
       <p className="muted">{label}</p>

@@ -273,6 +273,7 @@ class Picker {
               actorName: this.actorName,
               actorType: this.attackerType,
               targetName: target?.displayName,
+              targetType: target?.type,
               attackName: this.selectedAttack.name,
               die: roll.die,
               total: roll.total,

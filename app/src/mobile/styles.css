@@ -541,13 +541,49 @@ h3 {
   color: var(--text);
 }
 
-.log-entry.kind-kill,
-.log-entry.kind-down {
-  color: var(--bad);
+.seg-pc {
+  color: var(--pc-color);
+  font-weight: 600;
 }
 
-.log-entry.kind-heal {
+.seg-monster {
+  color: var(--monster-color);
+  font-weight: 600;
+}
+
+.seg-dmg {
+  color: var(--bad);
+  font-weight: 650;
+}
+
+.seg-heal {
   color: var(--good);
+  font-weight: 650;
+}
+
+.seg-crit {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.seg-hit {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.seg-miss {
+  color: var(--muted);
+}
+
+.seg-cond {
+  color: var(--gold);
+}
+
+.log-roll {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 0 4px 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* archive */

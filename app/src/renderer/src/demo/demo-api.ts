@@ -82,6 +82,7 @@ interface BridgeCommand {
     actorName?: string;
     actorType?: string;
     targetName?: string;
+    targetType?: string;
     attackName?: string;
     die?: number;
     total?: number;
@@ -310,6 +311,7 @@ export function createDemoApi(): Api {
       actorName: ctx.actorName,
       actorType: ctx.actorType,
       targetName: c.displayName,
+      targetType: c.type,
       amount,
       source: ctx.source,
     });
@@ -319,6 +321,7 @@ export function createDemoApi(): Api {
       pushLog(combat, {
         kind: c.type === 'monster' ? 'kill' : 'down',
         targetName: c.displayName,
+        targetType: c.type,
         source: ctx.source,
       });
       if (c.type === 'monster') {
@@ -352,6 +355,7 @@ export function createDemoApi(): Api {
       actorName: ctx.actorName,
       actorType: ctx.actorType,
       targetName: c.displayName,
+      targetType: c.type,
       amount,
       source: ctx.source,
     });
@@ -375,6 +379,7 @@ export function createDemoApi(): Api {
     pushLog(combat, {
       kind: removing ? 'conditionRemoved' : 'conditionAdded',
       targetName: c.displayName,
+      targetType: c.type,
       condition,
       source: ctx.source,
     });
@@ -442,6 +447,7 @@ export function createDemoApi(): Api {
       actorName: roll.actorName,
       actorType: roll.actorType as 'pc' | 'monster' | undefined,
       targetName: roll.targetName,
+      targetType: roll.targetType as 'pc' | 'monster' | undefined,
       attackName: roll.attackName,
       die: roll.die,
       total: roll.total,
@@ -1082,6 +1088,7 @@ export function createDemoApi(): Api {
           actorName: pc.name,
           actorType: 'pc',
           targetName: target.displayName,
+          targetType: target.type,
           attackName: action.name,
           die: die ?? undefined,
           total,
@@ -1174,6 +1181,7 @@ export function createDemoApi(): Api {
           actorName: target.displayName,
           actorType: target.type,
           targetName: pending.actorName,
+          targetType: 'pc',
           attackName: pending.attackName,
           total: r.total,
           outcome: r.saved ? 'saved' : 'failed',

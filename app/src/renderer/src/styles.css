@@ -285,11 +285,13 @@ textarea::placeholder {
 }
 
 .bridge-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   color: var(--text-muted);
-  /* Line up with the nav labels: button padding + icon column + gap. */
-  padding-left: 40px;
-  text-indent: -14px;
+  /* Same geometry as .nav-btn so the dot sits in the icon column. */
+  padding: 2px 12px;
 }
 
 .bridge-status.on {
@@ -1763,22 +1765,70 @@ textarea::placeholder {
 }
 
 .log-entry {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   padding: 2px 0;
   border-bottom: 1px solid rgba(128, 128, 128, 0.12);
 }
 
-.log-entry.kind-kill,
-.log-entry.kind-down {
-  color: var(--danger, #c0392b);
+.log-entry .log-text {
+  min-width: 0;
 }
 
-.log-entry.kind-heal {
-  color: var(--success, #2e8b57);
+/* Dev-log-style highlighting: who and what pop out of the prose. */
+.seg-pc {
+  color: var(--pc-color);
+  font-weight: 600;
+}
+
+.seg-monster {
+  color: var(--monster-color);
+  font-weight: 600;
+}
+
+.seg-dmg {
+  color: var(--danger);
+  font-weight: 650;
+}
+
+.seg-heal {
+  color: var(--success);
+  font-weight: 650;
+}
+
+.seg-crit {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.seg-hit {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.seg-miss {
+  color: var(--text-muted);
+}
+
+.seg-cond {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* The dice math behind a roll: present but visually secondary. */
+.log-roll {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 0 3px 10px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.12);
 }
 
 .log-src {
   opacity: 0.55;
   font-size: 11px;
+  flex-shrink: 0;
 }
 
 .archive-log {

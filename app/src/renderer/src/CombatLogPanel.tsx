@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LogEntry } from '../../shared/types';
-import { logEntryText, logSourceTag } from '../../shared/logText';
+import { logEntrySegments, logRollMath, logSourceTag } from '../../shared/logText';
 import { useI18n } from './i18n';
 
 const COLLAPSE_KEY = 'dct-log-collapsed';
@@ -54,13 +54,25 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
               <div className="log-round">{t('log.round', { round: e.round })}</div>
             ) : null;
           lastRound = e.round > 0 ? e.round : lastRound;
+          const math = logRollMath(e);
           return (
             <div key={e.id}>
               {header}
               <div className={`log-entry kind-${e.kind}`}>
-                {logEntryText(lang, e)}
-                <span className="log-src"> · {logSourceTag(lang, e)}</span>
+                <span className="log-text">
+                  {logEntrySegments(lang, e).map((seg, i) =>
+                    seg.cls ? (
+                      <span key={i} className={seg.cls}>
+                        {seg.text}
+                      </span>
+                    ) : (
+                      seg.text
+                    ),
+                  )}
+                </span>
+                <span className="log-src">{logSourceTag(lang, e)}</span>
               </div>
+              {math && <div className="log-roll tnum">{math}</div>}
             </div>
           );
         })}

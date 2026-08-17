@@ -246,6 +246,7 @@ export interface LogEntry {
   actorName?: string;
   actorType?: CombatantType;
   targetName?: string;
+  targetType?: CombatantType;
   /** Damage/heal amount. */
   amount?: number;
   /** Attack rolls: the raw d20. */

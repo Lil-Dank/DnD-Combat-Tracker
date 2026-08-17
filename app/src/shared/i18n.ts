@@ -71,8 +71,8 @@ const en: Dict = {
   'nav.openPlayerView': 'Open Player View',
   'nav.closePlayerView': 'Close Player View',
   'nav.fullscreen': '⛶ Fullscreen',
-  'nav.deckConnected': '● Stream Deck connected',
-  'nav.deckOffline': '○ Stream Deck offline',
+  'nav.deckConnected': 'Stream Deck connected',
+  'nav.deckOffline': 'Stream Deck offline',
 
   'common.add': 'Add',
   'common.edit': 'Edit',
@@ -480,8 +480,8 @@ const de: Dict = {
   'nav.openPlayerView': 'Spieleransicht öffnen',
   'nav.closePlayerView': 'Spieleransicht schließen',
   'nav.fullscreen': '⛶ Vollbild',
-  'nav.deckConnected': '● Stream Deck verbunden',
-  'nav.deckOffline': '○ Stream Deck getrennt',
+  'nav.deckConnected': 'Stream Deck verbunden',
+  'nav.deckOffline': 'Stream Deck getrennt',
 
   'common.add': 'Hinzufügen',
   'common.edit': 'Bearbeiten',

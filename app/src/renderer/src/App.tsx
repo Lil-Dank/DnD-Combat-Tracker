@@ -140,7 +140,8 @@ export function App() {
             </button>
           )}
           <div className={`bridge-status ${state.bridgeClientCount > 0 ? 'on' : ''}`}>
-            {translate(lang, state.bridgeClientCount > 0 ? 'nav.deckConnected' : 'nav.deckOffline')}
+            <span className="nav-icon">{state.bridgeClientCount > 0 ? '●' : '○'}</span>
+            <span>{translate(lang, state.bridgeClientCount > 0 ? 'nav.deckConnected' : 'nav.deckOffline')}</span>
           </div>
         </div>
       </nav>

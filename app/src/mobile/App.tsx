@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
 import { formatDice, parseDice } from '../shared/dice';
-import { logEntryText } from '../shared/logText';
+import { logEntrySegments, logEntryText, logRollMath } from '../shared/logText';
 import type { LogEntry, MonsterAction } from '../shared/types';
 import { formToAction, actionToForm, emptyAction, ABILITIES, type ActionForm } from '../renderer/src/actionForm';
 import type {
@@ -951,10 +951,22 @@ function LogList({ log, lang }: { log: LogEntry[]; lang: Lang }) {
             <div className="log-round">{translate(lang, 'log.round', { round: e.round })}</div>
           ) : null;
         lastRound = e.round > 0 ? e.round : lastRound;
+        const math = logRollMath(e);
         return (
           <div key={e.id}>
             {roundHeader}
-            <div className={`log-entry kind-${e.kind}`}>{logEntryText(lang, e)}</div>
+            <div className={`log-entry kind-${e.kind}`}>
+              {logEntrySegments(lang, e).map((seg, i) =>
+                seg.cls ? (
+                  <span key={i} className={seg.cls}>
+                    {seg.text}
+                  </span>
+                ) : (
+                  seg.text
+                ),
+              )}
+            </div>
+            {math && <div className="log-roll">{math}</div>}
           </div>
         );
       })}

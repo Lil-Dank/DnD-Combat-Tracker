@@ -116,6 +116,14 @@ export function logEntrySegments(lang: Lang, e: LogEntry): LogSegment[] {
         total: e.total ?? '?',
       });
       break;
+    case 'cast':
+      // The slot spend is public the moment the words are spoken; the roll
+      // itself follows as its own (possibly delayed) entries.
+      text =
+        e.slotLevel != null
+          ? t('log.cast', { actor, spell: e.attackName ?? '?', level: e.slotLevel })
+          : t('log.castCantrip', { actor, spell: e.attackName ?? '?' });
+      break;
     case 'conditionAdded':
       text = t('log.conditionAdded', {
         target,

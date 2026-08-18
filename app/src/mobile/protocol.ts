@@ -1,9 +1,12 @@
 import type {
   AbilityScores,
   Condition,
+  DamageInstance,
   LogEntry,
   MonsterAction,
   PlayerWebGating,
+  SpellSlots,
+  SpellUpcast,
 } from '../shared/types';
 import type { Lang } from '../shared/i18n';
 
@@ -43,7 +46,31 @@ export interface WireYou {
   abilities: AbilityScores | null;
   notes: string;
   attacks: MonsterAction[];
+  spellSlots: SpellSlots | null;
   combatantId: string | null;
+}
+
+/** One spellbook entry as served to phones (name/text pre-localized). */
+export interface WireSpell {
+  id: string;
+  name: string;
+  /** Stable key for search and attaching, even when `name` is German. */
+  englishName: string;
+  level: number;
+  school: string;
+  castingTime: string;
+  range: string;
+  components: string;
+  duration: string;
+  concentration: boolean;
+  ritual: boolean;
+  text: string;
+  attack: boolean;
+  save: { ability: string; onSuccess: 'half' | 'none' } | null;
+  damage: DamageInstance[];
+  healing: { dice: string; count: number; die: number } | null;
+  upcast: SpellUpcast | null;
+  upcastText: string | null;
 }
 
 export interface WireArchiveSummary {
@@ -134,6 +161,29 @@ export interface ArchiveEntryMsg {
   log: LogEntry[];
 }
 
+/** The on-demand spellbook reference (answer to getSpells). */
+export interface SpellListMsg {
+  type: 'spellList';
+  spells: WireSpell[];
+}
+
+/** A utility spell was cast: slot spent (or cantrip), nothing rolled. */
+export interface CastResultMsg {
+  type: 'castResult';
+  actionId: string;
+  slotLevel: number | null;
+}
+
+/** A healing spell resolved; digital rolls carry the roller's dice. */
+export interface HealResultMsg {
+  type: 'healResult';
+  targetId: string;
+  targetName: string;
+  amount: number;
+  rolls?: number[];
+  math?: string;
+}
+
 export type ServerMsg =
   | StateMsg
   | AttackResultMsg
@@ -141,6 +191,9 @@ export type ServerMsg =
   | DamageResultMsg
   | SaveResolvedMsg
   | ArchiveEntryMsg
+  | SpellListMsg
+  | CastResultMsg
+  | HealResultMsg
   | { type: 'claimResult'; ok: boolean; reason?: string }
   | SavePendingMsg
   | { type: 'kicked' }

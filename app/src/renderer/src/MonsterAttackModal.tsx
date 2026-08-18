@@ -12,10 +12,13 @@ import { useI18n } from './i18n';
  * (half damage, rounded down) → apply.
  */
 
-type Step = 'attack' | 'target' | 'roll' | 'saves';
+type Step = 'attack' | 'slot' | 'target' | 'roll' | 'saves';
 
+// Spell snapshots are always offered (incl. healing and utility casts, so the
+// DM can cast for a phone-less player); otherwise attack rolls and damaging
+// save actions, as before.
 const isRollable = (a: MonsterAction) =>
-  a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0);
+  a.spell != null || a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0);
 
 export const hasRollableAttacks = (c: Combatant) => c.attacks.some(isRollable);
 
@@ -59,6 +62,8 @@ export function MonsterAttackModal({
   const [atkRoll, setAtkRoll] = useState<AtkRoll | null>(null);
   const [dmgRoll, setDmgRoll] = useState<DmgRoll | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [slotLevel, setSlotLevel] = useState<number | null>(null);
+  const [castErr, setCastErr] = useState(false);
 
   // The flow is bound to the attacker; if it leaves the combat, close.
   useEffect(() => {
@@ -69,11 +74,18 @@ export function MonsterAttackModal({
   if (!combat || !attacker) return null;
 
   const isSave = attack?.type === 'save';
-  const candidates = combat.combatants.filter((c) => c.id !== attacker.id);
+  const isHeal = attack?.spell?.healing === true;
+  // Slots live on the PC record; combatants only snapshot attacks.
+  const pcRecord = attacker.type === 'pc' ? state.pcs.find((p) => p.id === attacker.sourceId) : undefined;
+  const candidates = combat.combatants.filter((c) => c.id !== attacker.id || isHeal);
   const targetObjs = targets
     .map((id) => combat.combatants.find((c) => c.id === id))
     .filter((c): c is Combatant => c !== undefined);
   const singleTarget = targetObjs.length === 1 ? targetObjs[0] : null;
+
+  /** Where a spell goes once its slot is settled. */
+  const stepAfterCast = (a: MonsterAction): Step | 'done' =>
+    a.onHit.damage.length > 0 || a.type === 'attack' ? 'target' : 'done';
 
   const pickAttack = (a: MonsterAction) => {
     setAttack(a);
@@ -81,7 +93,35 @@ export function MonsterAttackModal({
     setAtkRoll(null);
     setDmgRoll(null);
     setSaved(new Set());
+    setSlotLevel(null);
+    setCastErr(false);
+    if (a.spell && pcRecord) {
+      if (a.spell.level > 0) {
+        setStep('slot');
+        return;
+      }
+      // Cantrip: log the cast (free), then straight on — utility cantrips
+      // are done right there.
+      void api.castSpell(pcRecord.id, a.name, null);
+      if (stepAfterCast(a) === 'done') {
+        onClose();
+        return;
+      }
+    }
     setStep('target');
+  };
+
+  /** Slot step confirm: spend the slot (server-validated), log, move on. */
+  const castWithSlot = async (a: MonsterAction, lvl: number) => {
+    if (!pcRecord) return;
+    const ok = await api.castSpell(pcRecord.id, a.name, lvl);
+    if (!ok) {
+      setCastErr(true);
+      return;
+    }
+    setSlotLevel(lvl);
+    if (stepAfterCast(a) === 'done') onClose();
+    else setStep('target');
   };
 
   const toggleTarget = (id: string) => {
@@ -153,6 +193,16 @@ export function MonsterAttackModal({
         parts.push(`${value} ${dmg(d.type)}`);
       }
     }
+    // Upcast dice from the chosen slot, as their own math bracket.
+    const meta = attack.spell;
+    if (meta?.upcast && slotLevel !== null && slotLevel > meta.level) {
+      const count = meta.upcast.count * (slotLevel - meta.level);
+      const roll = rollPool([{ count, die: meta.upcast.die }], 0);
+      total += roll.total;
+      mathParts.push(`${count}d${meta.upcast.die} [${roll.perPart[0].join('+')}]`);
+      mathTypes.push(attack.onHit.damage[0]?.type ?? null);
+      parts.push(`${roll.total} ${dmg(attack.onHit.damage[0]?.type ?? 'variable')}`);
+    }
     setDmgRoll({ total, parts, conditional, math: `${mathParts.join(' + ')} = ${total}`, mathTypes });
     setSaved(new Set());
     if (attacker) {
@@ -162,6 +212,12 @@ export function MonsterAttackModal({
 
   const apply = async () => {
     if (!dmgRoll || !attacker) return;
+    // Healing spells flip the polarity: the rolled total restores HP.
+    if (isHeal) {
+      for (const id of targets) await api.applyHeal(id, dmgRoll.total);
+      onClose();
+      return;
+    }
     // Damage on a successful save: legacy default is half; some spells deal
     // nothing (Acid Splash).
     const onSuccess = attack?.save?.onSuccess ?? 'half';
@@ -202,6 +258,46 @@ export function MonsterAttackModal({
               ))}
             </div>
             <div className="modal-actions">
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+            </div>
+          </>
+        )}
+
+        {step === 'slot' && attack && attack.spell && pcRecord && (
+          <>
+            <h3>{t('cast.slotTitle', { spell: attack.name })}</h3>
+            <div className="monster-pick-list">
+              {Array.from({ length: 10 - attack.spell.level }, (_, i) => attack.spell!.level + i)
+                .filter((lvl) => (pcRecord.spellSlots?.max[lvl - 1] ?? 0) > 0)
+                .map((lvl) => {
+                  const left = pcRecord.spellSlots?.current[lvl - 1] ?? 0;
+                  return (
+                    <button
+                      key={lvl}
+                      className="pick-btn"
+                      disabled={left <= 0}
+                      onClick={() => void castWithSlot(attack, lvl)}
+                    >
+                      {t('cast.slotBtn', { n: lvl, left })}
+                    </button>
+                  );
+                })}
+            </div>
+            {attack.spell.upcast && (
+              <p className="muted">
+                ⬆{' '}
+                {t('spellbook.upcastPerLevel', {
+                  dice: `${attack.spell.upcast.count}d${attack.spell.upcast.die}`,
+                  level: attack.spell.level,
+                })}
+              </p>
+            )}
+            {!attack.spell.upcast && attack.spell.upcastText && (
+              <p className="muted">⬆ {attack.spell.upcastText}</p>
+            )}
+            {castErr && <p className="pw-error">{t('cast.noSlots')}</p>}
+            <div className="modal-actions">
+              <button className="btn" onClick={() => setStep('attack')}>{t('common.back')}</button>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
             </div>
           </>
@@ -260,7 +356,9 @@ export function MonsterAttackModal({
                     n: targets.length,
                   })
                 : singleTarget
-                  ? t('attack.vsTarget', { name: targetName(singleTarget), ac: singleTarget.ac })
+                  ? isHeal
+                    ? targetName(singleTarget)
+                    : t('attack.vsTarget', { name: targetName(singleTarget), ac: singleTarget.ac })
                   : ''}
               {locAction(l10nDe, attack).damage && (
                 <> · <DmgText text={locAction(l10nDe, attack).damage!} /></>
@@ -334,13 +432,17 @@ export function MonsterAttackModal({
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               {dmgRoll && (
                 <button
-                  className="btn danger"
+                  className={`btn ${isHeal ? 'primary' : 'danger'}`}
                   onClick={() => {
                     if (isSave) setStep('saves');
                     else void apply();
                   }}
                 >
-                  {isSave ? t('attack.whoSaved') : t('attack.apply', { total: dmgRoll.total })}
+                  {isSave
+                    ? t('attack.whoSaved')
+                    : isHeal
+                      ? t('attack.applyHeal', { total: dmgRoll.total })
+                      : t('attack.apply', { total: dmgRoll.total })}
                 </button>
               )}
             </div>

@@ -11,7 +11,7 @@ import {
   onPlayerSavePending,
   resolvePendingSave,
 } from './playerServer';
-import { importSrdMonsters } from './srd';
+import { importSrdMonsters, importSrdSpells } from './srd';
 import { onBridgeCommand } from './bridge';
 import {
   getAllWindows,
@@ -34,6 +34,14 @@ export function registerIpc(): void {
   ipcMain.handle('monster:save', (_e, m) => store.saveMonster(m));
   ipcMain.handle('monster:delete', (_e, id) => store.deleteMonster(id));
   ipcMain.handle('monster:importSrd', () => importSrdMonsters());
+
+  ipcMain.handle('spell:save', (_e, s) => store.saveSpell(s));
+  ipcMain.handle('spell:delete', (_e, id) => store.deleteSpell(id));
+  ipcMain.handle('spell:importSrd', () => importSrdSpells());
+  ipcMain.handle('pc:castSpell', (_e, { pcId, spellName, slotLevel }) =>
+    store.castSpell(pcId, spellName, slotLevel),
+  );
+  ipcMain.handle('pc:longRest', (_e, pcId) => store.longRest(pcId));
 
   ipcMain.handle('template:save', (_e, t) => store.saveTemplate(t));
   ipcMain.handle('template:delete', (_e, id) => store.deleteTemplate(id));

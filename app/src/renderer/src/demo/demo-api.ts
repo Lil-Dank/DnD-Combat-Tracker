@@ -28,6 +28,8 @@ import type {
   MonsterTemplate,
   PC,
   Settings,
+  Spell,
+  SpellSlots,
 } from '../../../shared/types';
 import { DEFAULT_SETTINGS } from '../../../shared/types';
 import { rollD20, type RollMode } from '../../../shared/dice';
@@ -48,9 +50,9 @@ import {
   demoKenkuStopSound,
 } from './demo-kenku';
 
-// Key bump reseeds returning visitors — this one brings campaigns (two are
-// seeded so the selector has something to show off).
-const LS_KEY = 'deck-of-many-turns-demo-v2';
+// Key bump reseeds returning visitors — this one brings the Spellbook
+// (seeded casters with slots and attached spells).
+const LS_KEY = 'deck-of-many-turns-demo-v3';
 const uuid = () => crypto.randomUUID();
 const d20 = () => 1 + Math.floor(Math.random() * 20);
 
@@ -67,6 +69,8 @@ interface DemoData {
   activeId: string;
   byCampaign: Record<string, CampaignData>;
   monsters: MonsterTemplate[];
+  /** Global spell library, like monsters (mirrors main's data/spells.json). */
+  spells: Spell[];
   settings: Settings;
   seeded: boolean;
 }
@@ -129,6 +133,7 @@ export function createDemoApi(): Api {
       activeId: id,
       byCampaign: { [id]: emptyCampaignData() },
       monsters: [],
+      spells: [],
       settings: { ...DEFAULT_SETTINGS },
       seeded: false,
     };
@@ -160,6 +165,7 @@ export function createDemoApi(): Api {
         if (!Array.isArray(slice.archive)) slice.archive = [];
         if (slice.combat && !Array.isArray(slice.combat.log)) slice.combat.log = [];
       }
+      if (!Array.isArray(stored.spells)) stored.spells = [];
       // Same deep-merge as main/state.ts: settings gain new sections over time.
       stored.settings = {
         ...DEFAULT_SETTINGS,
@@ -177,6 +183,7 @@ export function createDemoApi(): Api {
     return {
       pcs: [...cur().pcs].sort((a, b) => a.name.localeCompare(b.name)),
       monsters: [...data.monsters].sort((a, b) => a.name.localeCompare(b.name)),
+      spells: [...data.spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name)),
       encounterTemplates: [...cur().templates].sort((a, b) => a.name.localeCompare(b.name)),
       combat: cur().combat,
       settings: data.settings,
@@ -534,6 +541,86 @@ export function createDemoApi(): Api {
     data.monsters = [...manual, ...imported];
     save();
     return { imported: imported.length };
+  }
+
+  async function importSrdSpells(): Promise<{ imported: number }> {
+    const res = await fetch('srd/spells.json');
+    const bundled = (await res.json()) as Array<Omit<Spell, 'id' | 'source' | 'l10n'>>;
+    // German spell l10n ships as a separate file; absent (or pre-DE builds)
+    // everything simply stays English — same failure mode as the real app.
+    let l10nDe: Record<string, { name: string; text: string }> = {};
+    try {
+      l10nDe = await (await fetch('srd/spells.de.json')).json();
+    } catch {
+      /* stays English */
+    }
+    const existingByName = new Map(
+      data.spells.filter((s) => s.source === 'srd').map((s) => [s.name.toLowerCase(), s.id]),
+    );
+    const imported: Spell[] = bundled.map((s) => ({
+      ...s,
+      id: existingByName.get(s.name.toLowerCase()) ?? uuid(),
+      source: 'srd',
+      l10n: l10nDe[s.name] ? { de: l10nDe[s.name] } : null,
+    }));
+    const manual = data.spells.filter((s) => s.source !== 'srd');
+    data.spells = [...manual, ...imported];
+    save();
+    return { imported: imported.length };
+  }
+
+  // ---- Spell slots ------------------------------------------------------------
+
+  /** Mirror of state.ts normalizeSlots: 9 levels, current clamped to max. */
+  function normalizeSlots(slots: SpellSlots | null | undefined): SpellSlots | null {
+    if (!slots || !Array.isArray(slots.max)) return null;
+    const clean = (v: unknown) => Math.max(0, Math.floor(Number(v) || 0));
+    const max = Array.from({ length: 9 }, (_, i) => clean(slots.max[i]));
+    const current = Array.from({ length: 9 }, (_, i) =>
+      Math.min(clean((slots.current ?? [])[i] ?? max[i]), max[i]),
+    );
+    if (max.every((v) => v === 0)) return null;
+    return { max, current };
+  }
+
+  /** Spend a slot (null = cantrip, log only) and log the cast. Mirror of state.ts. */
+  function castSpellInner(
+    pcId: string,
+    spellName: string,
+    slotLevel: number | null,
+    ctx: ActionCtx = DM_CTX,
+  ): boolean {
+    const pc = cur().pcs.find((p) => p.id === pcId);
+    if (!pc) return false;
+    if (slotLevel !== null) {
+      const idx = slotLevel - 1;
+      const slots = normalizeSlots(pc.spellSlots);
+      if (!slots || idx < 0 || idx > 8 || slots.current[idx] <= 0) return false;
+      slots.current[idx] -= 1;
+      pc.spellSlots = slots;
+    }
+    const combat = cur().combat;
+    if (combat) {
+      pushLog(combat, {
+        kind: 'cast',
+        actorName: pc.name,
+        actorType: 'pc',
+        attackName: spellName,
+        ...(slotLevel !== null ? { slotLevel } : {}),
+        source: ctx.source,
+        sourceName: ctx.sourceName,
+      });
+    }
+    save();
+    return true;
+  }
+
+  function longRestInner(pcId: string): void {
+    const pc = cur().pcs.find((p) => p.id === pcId);
+    const slots = normalizeSlots(pc?.spellSlots);
+    if (!pc || !slots) return;
+    pc.spellSlots = { ...slots, current: [...slots.max] };
+    save();
   }
 
   // ---- demo seed --------------------------------------------------------------
@@ -1568,6 +1655,23 @@ export function createDemoApi(): Api {
       save();
     },
     importSrd,
+
+    saveSpell: async (s) => {
+      const id = s.id ?? uuid();
+      const existing = data.spells.find((x) => x.id === id);
+      data.spells = [
+        ...data.spells.filter((x) => x.id !== id),
+        { ...existing, ...s, id, source: existing?.source ?? s.source ?? 'manual' } as Spell,
+      ];
+      save();
+    },
+    deleteSpell: async (id) => {
+      data.spells = data.spells.filter((s) => s.id !== id);
+      save();
+    },
+    importSrdSpells,
+    castSpell: async (pcId, spellName, slotLevel) => castSpellInner(pcId, spellName, slotLevel),
+    longRest: async (pcId) => longRestInner(pcId),
 
     saveTemplate: async (t) => {
       const id = t.id ?? uuid();

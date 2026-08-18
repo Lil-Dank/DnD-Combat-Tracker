@@ -8,6 +8,7 @@ import type {
   MonsterTemplate,
   PC,
   Settings,
+  Spell,
 } from '../shared/types';
 
 /** A phone-initiated save-based attack awaiting DM adjudication. */
@@ -52,6 +53,14 @@ const api = {
     ipcRenderer.invoke('monster:save', m),
   deleteMonster: (id: string) => ipcRenderer.invoke('monster:delete', id),
   importSrd: (): Promise<{ imported: number }> => ipcRenderer.invoke('monster:importSrd'),
+
+  saveSpell: (s: Omit<Spell, 'id'> & { id?: string }) => ipcRenderer.invoke('spell:save', s),
+  deleteSpell: (id: string) => ipcRenderer.invoke('spell:delete', id),
+  importSrdSpells: (): Promise<{ imported: number }> => ipcRenderer.invoke('spell:importSrd'),
+  /** Spend a slot (null = cantrip, log only). False when no slot is left. */
+  castSpell: (pcId: string, spellName: string, slotLevel: number | null): Promise<boolean> =>
+    ipcRenderer.invoke('pc:castSpell', { pcId, spellName, slotLevel }),
+  longRest: (pcId: string) => ipcRenderer.invoke('pc:longRest', pcId),
 
   saveTemplate: (t: Omit<EncounterTemplate, 'id'> & { id?: string }) =>
     ipcRenderer.invoke('template:save', t),

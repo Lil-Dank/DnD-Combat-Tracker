@@ -57,6 +57,11 @@ export interface AttackRollInfo {
 export interface SaveInfo {
   ability: string;
   dc: number;
+  /**
+   * Damage dealt on a successful save. Absent = 'half' — the legacy default
+   * every monster action was written against; many spells deal 'none'.
+   */
+  onSuccess?: 'half' | 'none';
 }
 
 export interface MonsterAction {
@@ -95,6 +100,20 @@ export interface MonsterAction {
     damage: string | null;
     text: string;
   };
+  /**
+   * Present when this action is a spell snapshot attached from the Spellbook.
+   * Drives the slot prompt, upcast dice, heal polarity — and keeps the action
+   * off the Stream Deck (no slot UI there this release).
+   */
+  spell?: {
+    spellId: string;
+    /** Base spell level; 0 = cantrip (casts free, no slot prompt). */
+    level: number;
+    upcast: SpellUpcast | null;
+    upcastText: string | null;
+    /** The rolled dice apply as healing to an ally instead of damage. */
+    healing: boolean;
+  } | null;
 }
 
 export interface PC {
@@ -114,9 +133,75 @@ export interface PC {
   abilities?: AbilityScores | null;
   /** Free-text notes (class/level, passive perception, whatever the table wants). */
   notes?: string;
+  /**
+   * Spell slots, copied off the character sheet — no class/level rules on
+   * purpose. Lives only on the PC (never snapshotted into combatants), so
+   * casting mid-combat decrements one authoritative place.
+   */
+  spellSlots?: SpellSlots | null;
+}
+
+/** Index 0 = slot level 1 … index 8 = slot level 9. */
+export interface SpellSlots {
+  max: number[];
+  current: number[];
 }
 
 export type MonsterSource = 'manual' | 'srd';
+
+// ---- Spells ----------------------------------------------------------------
+
+export const SPELL_SCHOOLS = [
+  'abjuration',
+  'conjuration',
+  'divination',
+  'enchantment',
+  'evocation',
+  'illusion',
+  'necromancy',
+  'transmutation',
+] as const;
+export type SpellSchool = (typeof SPELL_SCHOOLS)[number];
+
+/** Parsed "+NdM per slot level above the base" upcast rule. */
+export interface SpellUpcast {
+  count: number;
+  die: number;
+}
+
+/**
+ * One spellbook entry. The structured layer covers only what gets rolled at
+ * the table — attack, save (with its damage-on-success rule), damage dice,
+ * healing dice, linear upcasts. Everything else lives in `text`, shown to DM
+ * and players at a glance. To-hit bonus and save DC are per-caster and are
+ * supplied when a spell is attached to a PC's action list.
+ */
+export interface Spell {
+  id: string;
+  name: string;
+  /** 0 = cantrip. */
+  level: number;
+  school: SpellSchool;
+  castingTime: string;
+  range: string;
+  components: string;
+  duration: string;
+  concentration: boolean;
+  ritual: boolean;
+  classes: string[];
+  /** Full rules text incl. the higher-level paragraph — the safety net. */
+  text: string;
+  /** True when casting makes a spell attack roll. */
+  attack: boolean;
+  save: { ability: string; onSuccess: 'half' | 'none' } | null;
+  damage: DamageInstance[];
+  healing: { dice: string; count: number; die: number } | null;
+  upcast: SpellUpcast | null;
+  /** Raw higher-level text for the cast prompt when upcast isn't linear. */
+  upcastText: string | null;
+  source: MonsterSource;
+  l10n?: { de?: { name: string; text: string } } | null;
+}
 
 /** Ability scores; modifiers are derived (floor((score − 10) / 2)). */
 export interface AbilityScores {
@@ -231,6 +316,7 @@ export type LogKind =
   | 'heal'
   | 'attackRoll'
   | 'save'
+  | 'cast'
   | 'conditionAdded'
   | 'conditionRemoved'
   | 'down'
@@ -260,8 +346,10 @@ export interface LogEntry {
   /** Adv/dis attack rolls: both d20s thrown (`die` is the kept one). */
   dice?: number[];
   outcome?: 'crit' | 'hit' | 'miss' | 'saved' | 'failed';
-  /** attackRoll entries: the action's name (e.g. "Scimitar"). */
+  /** attackRoll entries: the action's name; cast entries: the spell name. */
   attackName?: string;
+  /** cast entries: the slot level spent (absent for cantrips). */
+  slotLevel?: number;
   /** damage entries: the dice composition ("2d6 [3+5] +4 = 12"), DM-only. */
   math?: string;
   /** Damage type per bracket group of `math`, for type-tinted rendering. */
@@ -406,6 +494,7 @@ export interface CampaignsFile {
 export interface AppState {
   pcs: PC[];
   monsters: MonsterTemplate[];
+  spells: Spell[];
   encounterTemplates: EncounterTemplate[];
   combat: Combat | null;
   settings: Settings;

@@ -19,6 +19,8 @@ import type {
   PC,
   PlayerClaimInfo,
   Settings,
+  Spell,
+  SpellSlots,
 } from '../shared/types';
 import { DEFAULT_SETTINGS } from '../shared/types';
 import { monsterName } from '../shared/i18n';
@@ -45,6 +47,21 @@ const DM_CTX: ActionContext = { source: 'dm' };
 const d20 = () => Math.floor(Math.random() * 20) + 1;
 
 /**
+ * Clamps spell slots into shape: 9 non-negative integer levels, current never
+ * above max. Undefined/null (PC has no slots configured) stays null.
+ */
+function normalizeSlots(slots: SpellSlots | null | undefined): SpellSlots | null {
+  if (!slots || !Array.isArray(slots.max)) return null;
+  const clean = (v: unknown) => Math.max(0, Math.floor(Number(v) || 0));
+  const max = Array.from({ length: 9 }, (_, i) => clean(slots.max[i]));
+  const current = Array.from({ length: 9 }, (_, i) =>
+    Math.min(clean((slots.current ?? [])[i] ?? max[i]), max[i]),
+  );
+  if (max.every((v) => v === 0)) return null;
+  return { max, current };
+}
+
+/**
  * Canonical application state. All mutations flow through this store in the
  * main process; every change persists to disk and notifies listeners
  * (renderer windows + the Stream Deck bridge).
@@ -52,6 +69,7 @@ const d20 = () => Math.floor(Math.random() * 20) + 1;
 export class AppStore {
   private pcs!: JsonCollection<PC>;
   private monsters!: JsonCollection<MonsterTemplate>;
+  private spells!: JsonCollection<Spell>;
   private templates!: JsonCollection<EncounterTemplate>;
   private settings!: JsonValue<Settings>;
   private combat!: JsonValue<Combat | null>;
@@ -74,12 +92,18 @@ export class AppStore {
   async init(userDataDir: string): Promise<void> {
     this.dataDir = path.join(userDataDir, 'data');
     this.monsters = new JsonCollection<MonsterTemplate>(path.join(this.dataDir, 'monsters.json'));
+    this.spells = new JsonCollection<Spell>(path.join(this.dataDir, 'spells.json'));
     this.settings = new JsonValue<Settings>(path.join(this.dataDir, 'settings.json'), DEFAULT_SETTINGS);
     this.campaignsIndex = new JsonValue<CampaignsFile>(path.join(this.dataDir, 'campaigns.json'), {
       campaigns: [],
       activeId: '',
     });
-    await Promise.all([this.monsters.load(), this.settings.load(), this.campaignsIndex.load()]);
+    await Promise.all([
+      this.monsters.load(),
+      this.spells.load(),
+      this.settings.load(),
+      this.campaignsIndex.load(),
+    ]);
     // Fill in any settings keys added after the file was first written.
     // Nested sections (kenku, playerWeb) merge sub-keys explicitly - a stored
     // file from before a new sub-key was added must still pick up its default.
@@ -209,6 +233,7 @@ export class AppStore {
     return {
       pcs: this.pcs.list().sort((a, b) => a.name.localeCompare(b.name)),
       monsters: this.monsters.list().sort((a, b) => a.name.localeCompare(b.name)),
+      spells: this.spells.list().sort((a, b) => a.level - b.level || a.name.localeCompare(b.name)),
       encounterTemplates: this.templates.list().sort((a, b) => a.name.localeCompare(b.name)),
       combat: this.combat.get(),
       settings: this.settings.get(),
@@ -286,7 +311,12 @@ export class AppStore {
 
   async savePc(pc: Omit<PC, 'id'> & { id?: string }): Promise<void> {
     // Defensive: IPC callers predating the attacks field may omit it.
-    await this.pcs.put({ ...pc, attacks: pc.attacks ?? [], id: pc.id ?? randomUUID() });
+    await this.pcs.put({
+      ...pc,
+      attacks: pc.attacks ?? [],
+      spellSlots: normalizeSlots(pc.spellSlots),
+      id: pc.id ?? randomUUID(),
+    });
     this.notify();
   }
 
@@ -328,6 +358,53 @@ export class AppStore {
     if (!c) return;
     c.attacks = attacks.map((a) => ({ ...a }));
     await this.combat.set(combat);
+  }
+
+  // ---- Spell slots ----
+
+  /**
+   * Spend one slot and log the cast. slotLevel null = cantrip / slotless cast:
+   * nothing is spent, only logged. Returns false (and changes nothing) when
+   * the PC has no slot of that level left — callers surface that as an error.
+   * The cast is logged immediately, before any roll reveal delay: the slot
+   * spend is announced at the table the moment the words are spoken.
+   */
+  async castSpell(
+    pcId: string,
+    spellName: string,
+    slotLevel: number | null,
+    ctx: ActionContext = DM_CTX,
+  ): Promise<boolean> {
+    const pc = this.pcs.get(pcId);
+    if (!pc) return false;
+    if (slotLevel !== null) {
+      const idx = slotLevel - 1;
+      const slots = normalizeSlots(pc.spellSlots);
+      if (!slots || idx < 0 || idx > 8 || slots.current[idx] <= 0) return false;
+      const current = [...slots.current];
+      current[idx] -= 1;
+      await this.pcs.put({ ...pc, spellSlots: { ...slots, current } });
+    }
+    await this.appendLog({
+      kind: 'cast',
+      actorName: pc.name,
+      actorType: 'pc',
+      attackName: spellName,
+      ...(slotLevel !== null ? { slotLevel } : {}),
+      source: ctx.source,
+      sourceName: ctx.sourceName,
+    });
+    this.notify();
+    return true;
+  }
+
+  /** Long Rest: every expended slot returns. */
+  async longRest(pcId: string): Promise<void> {
+    const pc = this.pcs.get(pcId);
+    const slots = normalizeSlots(pc?.spellSlots);
+    if (!pc || !slots) return;
+    await this.pcs.put({ ...pc, spellSlots: { ...slots, current: [...slots.max] } });
+    this.notify();
   }
 
   // ---- Monsters ----
@@ -378,6 +455,46 @@ export class AppStore {
       id: existingByName.get(m.name.toLowerCase()) ?? randomUUID(),
     }));
     await this.monsters.putMany(toPut);
+    this.notify();
+    return toPut.length;
+  }
+
+  // ---- Spells (global library, like monsters) ----
+
+  /**
+   * Attaches German localization to imported spells that predate the l10n
+   * field. Manual spells are never touched.
+   */
+  async backfillSpellL10n(map: Record<string, { name: string; text: string }>): Promise<void> {
+    for (const s of this.spells.list()) {
+      if (s.source !== 'srd' || s.l10n?.de) continue;
+      const entry = map[s.name];
+      if (entry) await this.spells.put({ ...s, l10n: { de: entry } });
+    }
+  }
+
+  async saveSpell(s: Omit<Spell, 'id'> & { id?: string }): Promise<void> {
+    await this.spells.put({ ...s, id: s.id ?? randomUUID() });
+    this.notify();
+  }
+
+  async deleteSpell(id: string): Promise<void> {
+    await this.spells.delete(id);
+    this.notify();
+  }
+
+  async importSpells(list: Omit<Spell, 'id'>[]): Promise<number> {
+    const existingByName = new Map(
+      this.spells
+        .list()
+        .filter((s) => s.source === 'srd')
+        .map((s) => [s.name.toLowerCase(), s.id]),
+    );
+    const toPut = list.map((s) => ({
+      ...s,
+      id: existingByName.get(s.name.toLowerCase()) ?? randomUUID(),
+    }));
+    await this.spells.putMany(toPut);
     this.notify();
     return toPut.length;
   }

@@ -1,6 +1,8 @@
 import { app, BrowserWindow } from 'electron';
-import { cpSync, existsSync } from 'fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'fs';
+import { randomUUID } from 'crypto';
 import * as path from 'path';
+import type { CampaignsFile } from '../shared/types';
 import { store } from './state';
 import { registerIpc, broadcastPlayerViewStatus } from './ipc';
 import { createDmWindow, initWindowState, onPlayerViewChanged } from './windows';
@@ -28,9 +30,54 @@ function migrateLegacyUserData(userData: string): void {
   }
 }
 
+/** The five stores that scope per campaign; everything else stays global. */
+const CAMPAIGN_FILES = [
+  'pcs.json',
+  'encounter-templates.json',
+  'combat.json',
+  'combat-archive.json',
+  'player-claims.json',
+];
+
+/**
+ * One-time migration to the campaign layout: existing flat data/ files move
+ * into data/campaigns/<id>/ as "Main Campaign". Fresh installs take the same
+ * path (nothing to move) so the app always boots with one campaign and never
+ * prompts. Move, not copy — stale root duplicates would shadow the layout.
+ */
+function migrateToCampaigns(userData: string): void {
+  const dataDir = path.join(userData, 'data');
+  const indexFile = path.join(dataDir, 'campaigns.json');
+  if (existsSync(indexFile)) return;
+  const id = randomUUID();
+  const campaignDir = path.join(dataDir, 'campaigns', id);
+  try {
+    mkdirSync(campaignDir, { recursive: true });
+    for (const file of CAMPAIGN_FILES) {
+      const from = path.join(dataDir, file);
+      if (!existsSync(from)) continue;
+      const to = path.join(campaignDir, file);
+      try {
+        renameSync(from, to);
+      } catch {
+        copyFileSync(from, to);
+      }
+    }
+    const index: CampaignsFile = {
+      campaigns: [{ id, name: 'Main Campaign', createdAt: Date.now() }],
+      activeId: id,
+    };
+    writeFileSync(indexFile, JSON.stringify(index, null, 2));
+    console.log(`Campaign layout ready at ${campaignDir}`);
+  } catch (err) {
+    console.error('Campaign migration failed', err);
+  }
+}
+
 app.whenReady().then(async () => {
   const userData = app.getPath('userData');
   migrateLegacyUserData(userData);
+  migrateToCampaigns(userData);
   await store.init(userData);
   await initWindowState(userData);
   const l10nDe = await loadGermanMonsterNames();
@@ -39,7 +86,7 @@ app.whenReady().then(async () => {
   registerIpc();
   onPlayerViewChanged(() => broadcastPlayerViewStatus());
   startBridge();
-  startPlayerServer(userData);
+  startPlayerServer();
   store.onCombatEvent(handleCombatEvent);
   startKenkuStatusPolling();
   createDmWindow();

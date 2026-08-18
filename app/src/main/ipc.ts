@@ -6,6 +6,7 @@ import { logAttackEvent, type AttackRollDetails } from './combatLog';
 import {
   dismissPendingSave,
   getPlayerWebUrls,
+  handleCampaignSwitch,
   kickPlayer,
   onPlayerSavePending,
   resolvePendingSave,
@@ -83,6 +84,11 @@ export function registerIpc(): void {
   // ---- Combat archive ----
   ipcMain.handle('archive:list', () => store.listArchive());
   ipcMain.handle('archive:delete', (_e, id: string) => store.deleteArchivedCombat(id));
+
+  ipcMain.handle('campaign:create', (_e, { name }) => store.createCampaign(name));
+  ipcMain.handle('campaign:switch', (_e, { id }) => handleCampaignSwitch(id));
+  ipcMain.handle('campaign:rename', (_e, { id, name }) => store.renameCampaign(id, name));
+  ipcMain.handle('campaign:delete', (_e, { id }) => store.deleteCampaign(id));
 
   ipcMain.handle('playerView:toggle', () => togglePlayerView());
   ipcMain.handle('playerView:fullscreen', () => togglePlayerFullscreen());

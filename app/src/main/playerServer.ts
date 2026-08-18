@@ -941,14 +941,37 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
 
 // ---- lifecycle ---------------------------------------------------------------
 
-export function startPlayerServer(userDataDir: string): void {
-  if (!claims) {
-    claims = new JsonValue<Record<string, Claim>>(
-      path.join(userDataDir, 'data', 'player-claims.json'),
-      {},
-    );
-    void claims.load().then(() => publishClaims());
+/**
+ * (Re)points the claims store at a campaign's player-claims.json and
+ * re-identifies every live socket against it via its token. Tokens are
+ * deliberately KEPT - that is what re-attaches a phone when the DM switches
+ * back to a campaign it claimed in. Only kickPlayer clears tokens.
+ */
+export async function remountClaims(filePath: string): Promise<void> {
+  claims = new JsonValue<Record<string, Claim>>(filePath, {});
+  await claims.load();
+  for (const info of sockets.values()) {
+    info.pcId = tokenPcId(info.token);
   }
+}
+
+/**
+ * The campaign hot-swap, ordered so phones never see mixed state: stale
+ * pending saves are dismissed, the new campaign's claims are loaded and
+ * sockets re-identified BEFORE the store mount broadcasts the new state.
+ */
+export async function handleCampaignSwitch(id: string): Promise<void> {
+  if (id === store.activeCampaignId || !store.hasCampaign(id)) return;
+  for (const pid of [...pendingSaves.keys()]) dismissPendingSave(pid);
+  await remountClaims(store.campaignFilePath(id, 'player-claims.json'));
+  await store.mountCampaign(id);
+  publishClaims();
+}
+
+export function startPlayerServer(): void {
+  void remountClaims(store.campaignFilePath(store.activeCampaignId, 'player-claims.json')).then(
+    () => publishClaims(),
+  );
 
   if (!listenersRegistered) {
     listenersRegistered = true;

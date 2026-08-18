@@ -1,10 +1,13 @@
 import * as path from 'path';
+import { promises as fs } from 'fs';
 import { randomUUID } from 'crypto';
 import { JsonCollection, JsonValue } from './storage';
 import type {
   KenkuEventId,
   AppState,
   ArchivedCombat,
+  CampaignInfo,
+  CampaignsFile,
   Combat,
   Combatant,
   Condition,
@@ -53,6 +56,9 @@ export class AppStore {
   private settings!: JsonValue<Settings>;
   private combat!: JsonValue<Combat | null>;
   private archive!: JsonCollection<ArchivedCombat>;
+  private campaignsIndex!: JsonValue<CampaignsFile>;
+  private dataDir = '';
+  activeCampaignId = '';
   private listeners = new Set<ChangeListener>();
   bridgeClientCount = 0;
   kenkuConnected = false;
@@ -60,22 +66,20 @@ export class AppStore {
   /** Combat happenings for side-effect listeners (Kenku sounds); see index.ts. */
   private combatEventListener: ((event: KenkuEventId) => void) | null = null;
 
+  /**
+   * Global boot: settings, monster library and the campaign index (all
+   * campaign-independent), then mounts the active campaign. Campaign switches
+   * later go straight to mountCampaign.
+   */
   async init(userDataDir: string): Promise<void> {
-    const dataDir = path.join(userDataDir, 'data');
-    this.pcs = new JsonCollection<PC>(path.join(dataDir, 'pcs.json'));
-    this.monsters = new JsonCollection<MonsterTemplate>(path.join(dataDir, 'monsters.json'));
-    this.templates = new JsonCollection<EncounterTemplate>(path.join(dataDir, 'encounter-templates.json'));
-    this.settings = new JsonValue<Settings>(path.join(dataDir, 'settings.json'), DEFAULT_SETTINGS);
-    this.combat = new JsonValue<Combat | null>(path.join(dataDir, 'combat.json'), null);
-    this.archive = new JsonCollection<ArchivedCombat>(path.join(dataDir, 'combat-archive.json'));
-    await Promise.all([
-      this.pcs.load(),
-      this.monsters.load(),
-      this.templates.load(),
-      this.settings.load(),
-      this.combat.load(),
-      this.archive.load(),
-    ]);
+    this.dataDir = path.join(userDataDir, 'data');
+    this.monsters = new JsonCollection<MonsterTemplate>(path.join(this.dataDir, 'monsters.json'));
+    this.settings = new JsonValue<Settings>(path.join(this.dataDir, 'settings.json'), DEFAULT_SETTINGS);
+    this.campaignsIndex = new JsonValue<CampaignsFile>(path.join(this.dataDir, 'campaigns.json'), {
+      campaigns: [],
+      activeId: '',
+    });
+    await Promise.all([this.monsters.load(), this.settings.load(), this.campaignsIndex.load()]);
     // Fill in any settings keys added after the file was first written.
     // Nested sections (kenku, playerWeb) merge sub-keys explicitly - a stored
     // file from before a new sub-key was added must still pick up its default.
@@ -86,27 +90,52 @@ export class AppStore {
       kenku: { ...DEFAULT_SETTINGS.kenku, ...(stored.kenku ?? {}) },
       playerWeb: { ...DEFAULT_SETTINGS.playerWeb, ...(stored.playerWeb ?? {}) },
     });
-    // PCs stored before the attacks field / combats before the log field.
-    for (const pc of this.pcs.list()) {
-      if (!Array.isArray(pc.attacks)) await this.pcs.put({ ...pc, attacks: [] });
-    }
-    const combat = this.combat.get();
-    if (combat && !Array.isArray(combat.log)) {
-      combat.log = [];
-      await this.combat.set(combat);
-    }
-    await this.migrateLegacyAttacks();
-  }
-
-  /** Upgrade pre-schema attack records in the library and any saved combat. */
-  private async migrateLegacyAttacks(): Promise<void> {
+    // Legacy attack schema in the (global) monster library.
     for (const m of this.monsters.list()) {
       const migrated = migrateActions(m.attacks as unknown[]);
       if (migrated) await this.monsters.put({ ...m, attacks: migrated });
     }
+    // Repair a missing or hand-broken index so the app always has a campaign.
+    let index = this.campaignsIndex.get();
+    if (index.campaigns.length === 0) {
+      index = {
+        campaigns: [{ id: randomUUID(), name: 'Main Campaign', createdAt: Date.now() }],
+        activeId: '',
+      };
+    }
+    if (!index.campaigns.some((c) => c.id === index.activeId)) {
+      index = { ...index, activeId: index.campaigns[0].id };
+    }
+    if (index !== this.campaignsIndex.get()) await this.campaignsIndex.set(index);
+    await this.mountCampaign(index.activeId);
+  }
+
+  /**
+   * The hot-swap: constructs and loads the per-campaign stores. Store paths
+   * are fixed at construction, so a swap is always a fresh set of instances.
+   * Every mutation persists immediately, so the outgoing campaign needs no
+   * save step - an in-progress combat is simply left on disk and picked up
+   * again by the next mount.
+   */
+  async mountCampaign(id: string): Promise<void> {
+    const dir = this.campaignDir(id);
+    this.pcs = new JsonCollection<PC>(path.join(dir, 'pcs.json'));
+    this.templates = new JsonCollection<EncounterTemplate>(path.join(dir, 'encounter-templates.json'));
+    this.combat = new JsonValue<Combat | null>(path.join(dir, 'combat.json'), null);
+    this.archive = new JsonCollection<ArchivedCombat>(path.join(dir, 'combat-archive.json'));
+    await Promise.all([this.pcs.load(), this.templates.load(), this.combat.load(), this.archive.load()]);
+    // Per-campaign backfills: PCs stored before the attacks field, combats
+    // before the log field, and legacy attack schemas inside a saved combat.
+    for (const pc of this.pcs.list()) {
+      if (!Array.isArray(pc.attacks)) await this.pcs.put({ ...pc, attacks: [] });
+    }
     const combat = this.combat.get();
     if (combat) {
       let changed = false;
+      if (!Array.isArray(combat.log)) {
+        combat.log = [];
+        changed = true;
+      }
       for (const c of combat.combatants) {
         const migrated = migrateActions(c.attacks as unknown[]);
         if (migrated) {
@@ -116,6 +145,64 @@ export class AppStore {
       }
       if (changed) await this.combat.set(combat);
     }
+    this.activeCampaignId = id;
+    const index = this.campaignsIndex.get();
+    if (index.activeId !== id) await this.campaignsIndex.set({ ...index, activeId: id });
+    this.notify();
+  }
+
+  private campaignDir(id: string): string {
+    return path.join(this.dataDir, 'campaigns', id);
+  }
+
+  /** Absolute path of a per-campaign file (playerServer needs the claims). */
+  campaignFilePath(id: string, file: string): string {
+    return path.join(this.campaignDir(id), file);
+  }
+
+  // ---- Campaign CRUD ----
+
+  hasCampaign(id: string): boolean {
+    return this.campaignsIndex.get().campaigns.some((c) => c.id === id);
+  }
+
+  /** Creates without switching - the renderer chains a switch when wanted. */
+  async createCampaign(name: string): Promise<string> {
+    const trimmed = name.trim().slice(0, 60) || 'New Campaign';
+    const info: CampaignInfo = { id: randomUUID(), name: trimmed, createdAt: Date.now() };
+    const index = this.campaignsIndex.get();
+    await this.campaignsIndex.set({ ...index, campaigns: [...index.campaigns, info] });
+    this.notify();
+    return info.id;
+  }
+
+  async renameCampaign(id: string, name: string): Promise<void> {
+    const trimmed = name.trim().slice(0, 60);
+    if (!trimmed) return;
+    const index = this.campaignsIndex.get();
+    await this.campaignsIndex.set({
+      ...index,
+      campaigns: index.campaigns.map((c) => (c.id === id ? { ...c, name: trimmed } : c)),
+    });
+    this.notify();
+  }
+
+  /** Deletes a campaign and ALL its data. Refuses the active or last one. */
+  async deleteCampaign(id: string): Promise<boolean> {
+    const index = this.campaignsIndex.get();
+    if (id === this.activeCampaignId || index.campaigns.length <= 1) return false;
+    if (!index.campaigns.some((c) => c.id === id)) return false;
+    await this.campaignsIndex.set({
+      ...index,
+      campaigns: index.campaigns.filter((c) => c.id !== id),
+    });
+    try {
+      await fs.rm(this.campaignDir(id), { recursive: true, force: true });
+    } catch (err) {
+      console.error('Failed to remove campaign dir', err);
+    }
+    this.notify();
+    return true;
   }
 
   getState(): AppState {
@@ -125,6 +212,8 @@ export class AppStore {
       encounterTemplates: this.templates.list().sort((a, b) => a.name.localeCompare(b.name)),
       combat: this.combat.get(),
       settings: this.settings.get(),
+      campaigns: this.campaignsIndex.get().campaigns,
+      activeCampaignId: this.activeCampaignId,
       bridgeClientCount: this.bridgeClientCount,
       kenkuConnected: this.kenkuConnected,
       playerClients: this.playerClients,

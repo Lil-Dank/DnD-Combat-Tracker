@@ -19,6 +19,7 @@ import type {
   Combatant,
   Condition,
   ArchivedCombat,
+  CampaignInfo,
   EncounterTemplate,
   KenkuEventId,
   LogEntry,
@@ -47,21 +48,35 @@ import {
   demoKenkuStopSound,
 } from './demo-kenku';
 
-// Key bump reseeds returning visitors — this one brings the Deck of Many
-// Turns rebrand plus PC stat blocks and colorized log targets.
-const LS_KEY = 'deck-of-many-turns-demo-v1';
+// Key bump reseeds returning visitors — this one brings campaigns (two are
+// seeded so the selector has something to show off).
+const LS_KEY = 'deck-of-many-turns-demo-v2';
 const uuid = () => crypto.randomUUID();
 const d20 = () => 1 + Math.floor(Math.random() * 20);
 
-interface DemoData {
+/** The per-campaign slice, mirroring main's data/campaigns/<id>/ files. */
+interface CampaignData {
   pcs: PC[];
-  monsters: MonsterTemplate[];
   templates: EncounterTemplate[];
-  settings: Settings;
   combat: Combat | null;
   archive: ArchivedCombat[];
+}
+
+interface DemoData {
+  campaigns: CampaignInfo[];
+  activeId: string;
+  byCampaign: Record<string, CampaignData>;
+  monsters: MonsterTemplate[];
+  settings: Settings;
   seeded: boolean;
 }
+
+const emptyCampaignData = (): CampaignData => ({
+  pcs: [],
+  templates: [],
+  combat: null,
+  archive: [],
+});
 
 /** Who performed a mutation, for the demo combat log. */
 interface ActionCtx {
@@ -107,15 +122,20 @@ interface BridgeCommand {
 }
 
 export function createDemoApi(): Api {
-  let data: DemoData = load() ?? {
-    pcs: [],
-    monsters: [],
-    templates: [],
-    settings: { ...DEFAULT_SETTINGS },
-    combat: null,
-    archive: [],
-    seeded: false,
+  const freshData = (): DemoData => {
+    const id = uuid();
+    return {
+      campaigns: [{ id, name: 'Main Campaign', createdAt: Date.now() }],
+      activeId: id,
+      byCampaign: { [id]: emptyCampaignData() },
+      monsters: [],
+      settings: { ...DEFAULT_SETTINGS },
+      seeded: false,
+    };
   };
+  let data: DemoData = load() ?? freshData();
+  /** The active campaign's slice — the demo's analogue of the mounted stores. */
+  const cur = (): CampaignData => data.byCampaign[data.activeId];
 
   const stateListeners = new Set<(s: AppState) => void>();
   const pvListeners = new Set<(open: boolean) => void>();
@@ -128,13 +148,24 @@ export function createDemoApi(): Api {
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return null;
       const stored = JSON.parse(raw) as DemoData;
-      if (!Array.isArray(stored.archive)) stored.archive = [];
-      if (stored.combat && !Array.isArray(stored.combat.log)) stored.combat.log = [];
+      // Unknown shape (pre-campaign blob under a reused key) → reseed.
+      if (!stored.byCampaign || !Array.isArray(stored.campaigns) || stored.campaigns.length === 0) {
+        return null;
+      }
+      if (!stored.campaigns.some((c) => c.id === stored.activeId)) {
+        stored.activeId = stored.campaigns[0].id;
+      }
+      for (const c of stored.campaigns) {
+        const slice = stored.byCampaign[c.id] ?? (stored.byCampaign[c.id] = emptyCampaignData());
+        if (!Array.isArray(slice.archive)) slice.archive = [];
+        if (slice.combat && !Array.isArray(slice.combat.log)) slice.combat.log = [];
+      }
       // Same deep-merge as main/state.ts: settings gain new sections over time.
       stored.settings = {
         ...DEFAULT_SETTINGS,
         ...stored.settings,
         kenku: { ...DEFAULT_SETTINGS.kenku, ...(stored.settings?.kenku ?? {}) },
+        playerWeb: { ...DEFAULT_SETTINGS.playerWeb, ...(stored.settings?.playerWeb ?? {}) },
       };
       return stored;
     } catch {
@@ -144,15 +175,17 @@ export function createDemoApi(): Api {
 
   function appState(): AppState {
     return {
-      pcs: [...data.pcs].sort((a, b) => a.name.localeCompare(b.name)),
+      pcs: [...cur().pcs].sort((a, b) => a.name.localeCompare(b.name)),
       monsters: [...data.monsters].sort((a, b) => a.name.localeCompare(b.name)),
-      encounterTemplates: [...data.templates].sort((a, b) => a.name.localeCompare(b.name)),
-      combat: data.combat,
+      encounterTemplates: [...cur().templates].sort((a, b) => a.name.localeCompare(b.name)),
+      combat: cur().combat,
       settings: data.settings,
+      campaigns: data.campaigns,
+      activeCampaignId: data.activeId,
       // The simulated deck on this page counts as a connected client.
       bridgeClientCount: 1,
       kenkuConnected,
-      playerClients: [...playerClaims.entries()].map(([pcId, claim]) => ({
+      playerClients: [...playerClaims().entries()].map(([pcId, claim]) => ({
         pcId,
         playerName: claim.playerName,
         connected: [...playerSessions].some((s) => s.pcId === pcId),
@@ -223,7 +256,7 @@ export function createDemoApi(): Api {
     if (event === 'combatStart') {
       kenkuEvent(event);
       if (!k.enabled) return;
-      const tpl = data.templates.find((t) => t.id === data.combat?.sourceTemplateId);
+      const tpl = cur().templates.find((t) => t.id === cur().combat?.sourceTemplateId);
       if (tpl?.kenkuPlaylistId) void demoKenkuPlayPlaylist(tpl.kenkuPlaylistId);
       return;
     }
@@ -232,7 +265,7 @@ export function createDemoApi(): Api {
       kenkuPending.clear();
       kenkuEvent(event);
       if (!k.enabled) return;
-      const tpl = data.templates.find((t) => t.id === data.combat?.sourceTemplateId);
+      const tpl = cur().templates.find((t) => t.id === cur().combat?.sourceTemplateId);
       if (tpl?.kenkuPlaylistId) void demoKenkuPausePlayback();
       return;
     }
@@ -317,7 +350,7 @@ export function createDemoApi(): Api {
   }
 
   function applyDamage(combatantId: string, amount: number, ctx: ActionCtx = DM_CTX): void {
-    const combat = data.combat;
+    const combat = cur().combat;
     if (!combat || amount <= 0) return;
     const idx = combat.combatants.findIndex((c) => c.id === combatantId);
     if (idx === -1) return;
@@ -365,7 +398,7 @@ export function createDemoApi(): Api {
   }
 
   function applyHeal(combatantId: string, amount: number, ctx: ActionCtx = DM_CTX): void {
-    const combat = data.combat;
+    const combat = cur().combat;
     if (!combat || amount <= 0) return;
     const c = combat.combatants.find((x) => x.id === combatantId);
     if (!c) return;
@@ -390,7 +423,7 @@ export function createDemoApi(): Api {
     condition: Condition,
     ctx: ActionCtx = DM_CTX,
   ): void {
-    const combat = data.combat;
+    const combat = cur().combat;
     if (!combat) return;
     const c = combat.combatants.find((x) => x.id === combatantId);
     if (!c) return;
@@ -409,7 +442,7 @@ export function createDemoApi(): Api {
   }
 
   function nextTurn(ctx: ActionCtx = DM_CTX): void {
-    const combat = data.combat;
+    const combat = cur().combat;
     if (!combat || combat.phase !== 'active' || combat.combatants.length === 0) return;
     combat.currentIndex += 1;
     if (combat.currentIndex >= combat.combatants.length) {
@@ -422,7 +455,7 @@ export function createDemoApi(): Api {
   }
 
   function prevTurn(ctx: ActionCtx = DM_CTX): void {
-    const combat = data.combat;
+    const combat = cur().combat;
     if (!combat || combat.phase !== 'active' || combat.combatants.length === 0) return;
     if (combat.currentIndex === 0) {
       if (combat.round <= 1) return;
@@ -438,13 +471,13 @@ export function createDemoApi(): Api {
 
   /** End combat, archiving the log like main/state.ts does. */
   function endCombatShared(ctx: ActionCtx = DM_CTX): void {
-    const combat = data.combat;
+    const combat = cur().combat;
     if (combat) {
       kenkuCombatEvent('combatEnd');
       if (combat.phase === 'active') {
         pushLog(combat, { kind: 'combatEnd', source: ctx.source });
-        const template = data.templates.find((t) => t.id === combat.sourceTemplateId);
-        data.archive.unshift({
+        const template = cur().templates.find((t) => t.id === combat.sourceTemplateId);
+        cur().archive.unshift({
           id: combat.id,
           templateName: template?.name ?? '?',
           endedAt: Date.now(),
@@ -453,13 +486,13 @@ export function createDemoApi(): Api {
         });
       }
     }
-    data.combat = null;
+    cur().combat = null;
     save();
   }
 
   /** Log an attack roll reported by the deck sim (verdict phases only). */
   function logAttackRoll(cmd: BridgeCommand): void {
-    const combat = data.combat;
+    const combat = cur().combat;
     const roll = cmd.roll;
     const outcome =
       cmd.phase === 'attackCrit' ? 'crit' : cmd.phase === 'attackHit' ? 'hit' : cmd.phase === 'attackMiss' ? 'miss' : null;
@@ -569,7 +602,7 @@ export function createDemoApi(): Api {
         attacks: [pcAttack('Sacred Flame', null, { ability: 'DEX', dc: 13 }, '1d8', 1, 8, 0, 4, 'radiant')],
       },
     ]) {
-      data.pcs.push({ id: uuid(), ...p });
+      cur().pcs.push({ id: uuid(), ...p });
     }
 
     const byName = (n: string) => data.monsters.find((m) => m.name === n);
@@ -577,7 +610,7 @@ export function createDemoApi(): Api {
       const resolved = entries
         .map(([n, q]) => ({ monsterTemplateId: byName(n)?.id ?? '', quantity: q }))
         .filter((e) => e.monsterTemplateId !== '');
-      data.templates.push({ id: uuid(), name, entries: resolved });
+      cur().templates.push({ id: uuid(), name, entries: resolved });
     };
     tpl('Ambush on the Old Road', [
       ['Goblin Warrior', 4],
@@ -603,8 +636,8 @@ export function createDemoApi(): Api {
         healApplied: { soundId: 'demo-chime', title: 'Healing Chime' },
       },
     };
-    data.templates[0].kenkuPlaylistId = 'demo-pl-battle';
-    data.templates[0].kenkuPlaylistTitle = 'Battle Drums';
+    cur().templates[0].kenkuPlaylistId = 'demo-pl-battle';
+    cur().templates[0].kenkuPlaylistTitle = 'Battle Drums';
     const attachSound = (
       monsterName: string,
       attackName: string,
@@ -622,7 +655,7 @@ export function createDemoApi(): Api {
 
     // A combat already in progress, so the first thing a visitor sees is the
     // tracker doing its job rather than an empty screen.
-    const ambush = data.templates[0];
+    const ambush = cur().templates[0];
     const combatants: Combatant[] = [];
     for (const entry of ambush.entries) {
       const m = data.monsters.find((x) => x.id === entry.monsterTemplateId);
@@ -631,7 +664,7 @@ export function createDemoApi(): Api {
         combatants.push(combatantFrom(m, entry.quantity > 1 ? `${m.name} ${i}` : m.name));
       }
     }
-    for (const pc of data.pcs) {
+    for (const pc of cur().pcs) {
       combatants.push({
         id: uuid(),
         displayName: pc.name,
@@ -660,7 +693,7 @@ export function createDemoApi(): Api {
     sortCombatants(combat);
     combat.phase = 'active';
     combat.round = 2;
-    data.combat = combat;
+    cur().combat = combat;
 
     // Mid-fight state: a bloodied monster, a hurt PC, a couple of conditions.
     const monsters = combat.combatants.filter((c) => c.type === 'monster');
@@ -739,13 +772,50 @@ export function createDemoApi(): Api {
       { kind: 'kill', targetName: 'Owlbear 1', targetType: 'monster', source: 'player', round: 2 },
       { kind: 'combatEnd', source: 'dm', round: 2 },
     ].map((e, i) => ({ ...e, id: uuid(), ts: Date.now() - 86400000 + i * 60000 }) as LogEntry);
-    data.archive.push({
+    cur().archive.push({
       id: uuid(),
       templateName: 'Owlbear Den',
       endedAt: Date.now() - 86400000 + archivedLog.length * 60000,
       rounds: 2,
       log: archivedLog,
     });
+
+    // A second small campaign so the selector has something to switch to.
+    const westmarchId = uuid();
+    data.campaigns.push({ id: westmarchId, name: 'Westmarch Wednesdays', createdAt: Date.now() });
+    const westmarch = emptyCampaignData();
+    const wm1: PC = {
+      id: uuid(),
+      name: 'Brynn Ashvale',
+      maxHp: 31,
+      ac: 16,
+      initMod: 2,
+      attacks: [],
+      abilities: { str: 16, dex: 14, con: 14, int: 10, wis: 12, cha: 8 },
+      notes: 'Human fighter 4. Shield-bearer of the Westmarch.',
+    };
+    const wm2: PC = {
+      id: uuid(),
+      name: 'Nix',
+      maxHp: 22,
+      ac: 13,
+      initMod: 3,
+      attacks: [],
+      abilities: { str: 8, dex: 16, con: 12, int: 15, wis: 10, cha: 14 },
+      notes: 'Gnome wizard 4. Owns exactly one spellbook and three backups.',
+    };
+    westmarch.pcs.push(wm1, wm2);
+    const wolf = data.monsters.find((m) => m.name === 'Wolf');
+    const bandit = data.monsters.find((m) => m.name === 'Bandit');
+    westmarch.templates.push({
+      id: uuid(),
+      name: 'Roadside Ambush',
+      entries: [
+        ...(bandit ? [{ monsterTemplateId: bandit.id, quantity: 3 }] : []),
+        ...(wolf ? [{ monsterTemplateId: wolf.id, quantity: 2 }] : []),
+      ],
+    });
+    data.byCampaign[westmarchId] = westmarch;
 
     data.seeded = true;
     save();
@@ -768,7 +838,7 @@ export function createDemoApi(): Api {
   // ---- the simulated Stream Deck hooks ----------------------------------------
 
   function bridgeState(): object {
-    const combat = data.combat;
+    const combat = cur().combat;
     const active = combat !== null && combat.phase === 'active';
     const lang = data.settings.language;
     const templates = new Map(data.monsters.map((m) => [m.id, m]));
@@ -854,7 +924,17 @@ export function createDemoApi(): Api {
   }
 
   const playerSessions = new Set<PlayerSession>();
-  const playerClaims = new Map<string, { token: string; playerName: string | null }>();
+  // Claims scope per campaign (mirror of per-campaign player-claims.json);
+  // in the demo they are session-only, never persisted.
+  const claimsByCampaign = new Map<string, Map<string, { token: string; playerName: string | null }>>();
+  const playerClaims = (): Map<string, { token: string; playerName: string | null }> => {
+    let m = claimsByCampaign.get(data.activeId);
+    if (!m) {
+      m = new Map();
+      claimsByCampaign.set(data.activeId, m);
+    }
+    return m;
+  };
   const savePendingListeners = new Set<(pending: object) => void>();
   interface PendingSave {
     id: string;
@@ -870,7 +950,7 @@ export function createDemoApi(): Api {
 
   function tokenPcId(token: string | null): string | null {
     if (!token) return null;
-    for (const [pcId, claim] of playerClaims) if (claim.token === token) return pcId;
+    for (const [pcId, claim] of playerClaims()) if (claim.token === token) return pcId;
     return null;
   }
 
@@ -892,9 +972,9 @@ export function createDemoApi(): Api {
 
   function playerStateMessage(session: PlayerSession): string {
     const lang = data.settings.language;
-    const combat = data.combat;
+    const combat = cur().combat;
     const active = combat !== null && combat.phase === 'active';
-    const ownPc = session.pcId ? data.pcs.find((p) => p.id === session.pcId) ?? null : null;
+    const ownPc = session.pcId ? cur().pcs.find((p) => p.id === session.pcId) ?? null : null;
     const ownCombatant = active
       ? combat.combatants.find((c) => c.type === 'pc' && c.sourceId === session.pcId) ?? null
       : null;
@@ -927,12 +1007,12 @@ export function createDemoApi(): Api {
       myTurn: ownCombatant
         ? combat!.combatants.indexOf(ownCombatant) === combat!.currentIndex
         : false,
-      claims: data.pcs.map((p) => ({
+      claims: cur().pcs.map((p) => ({
         pcId: p.id,
         name: p.name,
-        taken: playerClaims.has(p.id),
+        taken: playerClaims().has(p.id),
         mine: p.id === session.pcId,
-        playerName: playerClaims.get(p.id)?.playerName ?? null,
+        playerName: playerClaims().get(p.id)?.playerName ?? null,
       })),
       you: ownPc
         ? {
@@ -949,7 +1029,7 @@ export function createDemoApi(): Api {
         : null,
       combatants,
       log: active ? filterLogForPlayers(combat.log).slice(-200) : [],
-      archive: data.archive.map((a) => ({
+      archive: cur().archive.map((a) => ({
         id: a.id,
         templateName: a.templateName,
         endedAt: a.endedAt,
@@ -968,7 +1048,7 @@ export function createDemoApi(): Api {
   }
 
   function playerIsMyTurn(pcId: string): boolean {
-    const combat = data.combat;
+    const combat = cur().combat;
     if (!combat || combat.phase !== 'active') return false;
     const own = combat.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
     return own !== undefined && combat.combatants.indexOf(own) === combat.currentIndex;
@@ -977,7 +1057,7 @@ export function createDemoApi(): Api {
   function playerGateAllows(pcId: string, targets: string[], kind: 'hpChange' | 'attack'): boolean {
     if (playerIsMyTurn(pcId)) return true;
     if (data.settings.playerWeb.gating !== 'relaxed' || kind !== 'hpChange') return false;
-    const own = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+    const own = cur().combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
     return own !== undefined && targets.length === 1 && targets[0] === own.id;
   }
 
@@ -1013,11 +1093,11 @@ export function createDemoApi(): Api {
   }
 
   function sourceNameFor(pcId: string): string | undefined {
-    return playerClaims.get(pcId)?.playerName ?? undefined;
+    return playerClaims().get(pcId)?.playerName ?? undefined;
   }
 
   function playerCtx(pcId: string): ActionCtx {
-    const pc = data.pcs.find((p) => p.id === pcId);
+    const pc = cur().pcs.find((p) => p.id === pcId);
     return { source: 'player', actorName: pc?.name, actorType: 'pc', sourceName: sourceNameFor(pcId) };
   }
 
@@ -1035,20 +1115,20 @@ export function createDemoApi(): Api {
     if (type === 'claim') {
       const pcId = cmd.pcId as string;
       const token = cmd.token as string;
-      if (!data.pcs.some((p) => p.id === pcId)) {
+      if (!cur().pcs.some((p) => p.id === pcId)) {
         sendTo({ type: 'claimResult', ok: false, reason: 'unknownPc' });
         return;
       }
-      const existing = playerClaims.get(pcId);
+      const existing = playerClaims().get(pcId);
       if (existing && existing.token !== token) {
         sendTo({ type: 'claimResult', ok: false, reason: 'taken' });
         return;
       }
-      for (const [otherId, claim] of playerClaims) {
-        if (otherId !== pcId && claim.token === token) playerClaims.delete(otherId);
+      for (const [otherId, claim] of playerClaims()) {
+        if (otherId !== pcId && claim.token === token) playerClaims().delete(otherId);
       }
       const name = typeof cmd.playerName === 'string' ? cmd.playerName.trim().slice(0, 40) : '';
-      playerClaims.set(pcId, { token, playerName: name || null });
+      playerClaims().set(pcId, { token, playerName: name || null });
       session.token = token;
       session.pcId = pcId;
       sendTo({ type: 'claimResult', ok: true });
@@ -1057,7 +1137,7 @@ export function createDemoApi(): Api {
     }
 
     if (type === 'release') {
-      if (session.pcId) playerClaims.delete(session.pcId);
+      if (session.pcId) playerClaims().delete(session.pcId);
       session.pcId = null;
       session.token = null;
       publishPlayerClients();
@@ -1085,7 +1165,7 @@ export function createDemoApi(): Api {
 
     if (type === 'attackRollDigital') {
       // Mirror of the real server's split flow, stage 1: d20 only.
-      const pc = data.pcs.find((p) => p.id === pcId);
+      const pc = cur().pcs.find((p) => p.id === pcId);
       const action = pc?.attacks.find((a) => a.id === cmd.attackId);
       const targetIds = (cmd.targetIds as string[]) ?? [];
       if (!pc || !action || action.type === 'save' || action.save) {
@@ -1096,7 +1176,7 @@ export function createDemoApi(): Api {
         sendTo({ type: 'error', code: 'notYourTurn' });
         return;
       }
-      const combat = data.combat;
+      const combat = cur().combat;
       const target = combat?.combatants.find((c) => c.id === targetIds[0]);
       if (!combat || !target) {
         sendTo({ type: 'error', code: 'badTarget' });
@@ -1109,7 +1189,7 @@ export function createDemoApi(): Api {
         die === 20 ? 'crit' : die === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
       // The log waits for the roller's reveal, like the real server.
       setTimeout(() => {
-        const c = data.combat;
+        const c = cur().combat;
         if (!c) return;
         pushLog(c, {
           kind: 'attackRoll',
@@ -1146,7 +1226,7 @@ export function createDemoApi(): Api {
 
     if (type === 'damageRollDigital') {
       // Stage 2: roll and apply the damage.
-      const pc = data.pcs.find((p) => p.id === pcId);
+      const pc = cur().pcs.find((p) => p.id === pcId);
       const action = pc?.attacks.find((a) => a.id === cmd.attackId);
       const targetIds = (cmd.targetIds as string[]) ?? [];
       if (!pc || !action) {
@@ -1157,7 +1237,7 @@ export function createDemoApi(): Api {
         sendTo({ type: 'error', code: 'notYourTurn' });
         return;
       }
-      const combat = data.combat;
+      const combat = cur().combat;
       const target = combat?.combatants.find((c) => c.id === targetIds[0]);
       if (!combat || !target) {
         sendTo({ type: 'error', code: 'badTarget' });
@@ -1186,7 +1266,7 @@ export function createDemoApi(): Api {
     }
 
     if (type === 'attackDigital' || type === 'attackManual') {
-      const pc = data.pcs.find((p) => p.id === pcId);
+      const pc = cur().pcs.find((p) => p.id === pcId);
       const action = pc?.attacks.find((a) => a.id === cmd.attackId);
       const targetIds = (cmd.targetIds as string[]) ?? [];
       if (!pc || !action) {
@@ -1237,7 +1317,7 @@ export function createDemoApi(): Api {
         }
         return;
       }
-      const combat = data.combat;
+      const combat = cur().combat;
       const target = combat?.combatants.find((c) => c.id === targetIds[0]);
       if (!combat || !target) {
         sendTo({ type: 'error', code: 'badTarget' });
@@ -1256,7 +1336,7 @@ export function createDemoApi(): Api {
         die = natural === 20 ? 20 : natural === 1 ? 1 : null;
         outcome = natural === 20 ? 'crit' : natural === 1 ? 'miss' : total >= target.ac ? 'hit' : 'miss';
       }
-      const combatForLog = data.combat;
+      const combatForLog = cur().combat;
       if (combatForLog) {
         pushLog(combatForLog, {
           kind: 'attackRoll',
@@ -1305,29 +1385,29 @@ export function createDemoApi(): Api {
 
     if (type === 'saveAttack') {
       const action = cmd.action as MonsterAction;
-      const pc = data.pcs.find((p) => p.id === pcId);
+      const pc = cur().pcs.find((p) => p.id === pcId);
       if (!pc || !action || typeof action.id !== 'string') return;
       const idx = pc.attacks.findIndex((a) => a.id === action.id);
       if (idx === -1) pc.attacks.push(action);
       else pc.attacks[idx] = action;
-      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      const live = cur().combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
       if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
       save();
       return;
     }
 
     if (type === 'deleteAttack') {
-      const pc = data.pcs.find((p) => p.id === pcId);
+      const pc = cur().pcs.find((p) => p.id === pcId);
       if (!pc) return;
       pc.attacks = pc.attacks.filter((a) => a.id !== cmd.actionId);
-      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      const live = cur().combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
       if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
       save();
       return;
     }
 
     if (type === 'getArchive') {
-      const found = data.archive.find((a) => a.id === cmd.archiveId);
+      const found = cur().archive.find((a) => a.id === cmd.archiveId);
       if (!found) return;
       sendTo({
         type: 'archiveEntry',
@@ -1348,7 +1428,7 @@ export function createDemoApi(): Api {
     const pending = pendingSaves.get(id);
     if (!pending) return;
     pendingSaves.delete(id);
-    const combat = data.combat;
+    const combat = cur().combat;
     const half = Math.floor(pending.damage / 2);
     const applied: Array<{ targetId: string; targetName: string; saved: boolean; amount: number }> = [];
     for (const r of results) {
@@ -1445,28 +1525,28 @@ export function createDemoApi(): Api {
 
     savePc: async (pc) => {
       const id = pc.id ?? uuid();
-      data.pcs = [...data.pcs.filter((p) => p.id !== id), { ...pc, id }];
+      cur().pcs = [...cur().pcs.filter((p) => p.id !== id), { ...pc, id }];
       save();
     },
     deletePc: async (id) => {
-      data.pcs = data.pcs.filter((p) => p.id !== id);
+      cur().pcs = cur().pcs.filter((p) => p.id !== id);
       save();
     },
     savePcAttack: async (pcId, action) => {
-      const pc = data.pcs.find((p) => p.id === pcId);
+      const pc = cur().pcs.find((p) => p.id === pcId);
       if (!pc) return;
       const idx = pc.attacks.findIndex((a) => a.id === action.id);
       if (idx === -1) pc.attacks.push(action);
       else pc.attacks[idx] = action;
-      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      const live = cur().combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
       if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
       save();
     },
     deletePcAttack: async (pcId, actionId) => {
-      const pc = data.pcs.find((p) => p.id === pcId);
+      const pc = cur().pcs.find((p) => p.id === pcId);
       if (!pc) return;
       pc.attacks = pc.attacks.filter((a) => a.id !== actionId);
-      const live = data.combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
+      const live = cur().combat?.combatants.find((c) => c.type === 'pc' && c.sourceId === pcId);
       if (live) live.attacks = pc.attacks.map((a) => ({ ...a }));
       save();
     },
@@ -1482,7 +1562,7 @@ export function createDemoApi(): Api {
     },
     deleteMonster: async (id) => {
       data.monsters = data.monsters.filter((m) => m.id !== id);
-      for (const t of data.templates) {
+      for (const t of cur().templates) {
         t.entries = t.entries.filter((e) => e.monsterTemplateId !== id);
       }
       save();
@@ -1491,17 +1571,17 @@ export function createDemoApi(): Api {
 
     saveTemplate: async (t) => {
       const id = t.id ?? uuid();
-      data.templates = [...data.templates.filter((x) => x.id !== id), { ...t, id }];
+      cur().templates = [...cur().templates.filter((x) => x.id !== id), { ...t, id }];
       save();
     },
     deleteTemplate: async (id) => {
-      data.templates = data.templates.filter((t) => t.id !== id);
+      cur().templates = cur().templates.filter((t) => t.id !== id);
       save();
     },
     duplicateTemplate: async (id) => {
-      const t = data.templates.find((x) => x.id === id);
+      const t = cur().templates.find((x) => x.id === id);
       if (!t) return;
-      data.templates.push({
+      cur().templates.push({
         ...t,
         id: uuid(),
         name: `${t.name} (copy)`,
@@ -1511,7 +1591,7 @@ export function createDemoApi(): Api {
     },
 
     startCombatSetup: async (templateId, pcIds, rollMode) => {
-      const template = data.templates.find((t) => t.id === templateId);
+      const template = cur().templates.find((t) => t.id === templateId);
       if (!template) return;
       const combatants: Combatant[] = [];
       for (const entry of template.entries) {
@@ -1522,7 +1602,7 @@ export function createDemoApi(): Api {
         }
       }
       for (const pcId of pcIds) {
-        const pc = data.pcs.find((p) => p.id === pcId);
+        const pc = cur().pcs.find((p) => p.id === pcId);
         if (!pc) continue;
         combatants.push({
           id: uuid(),
@@ -1550,11 +1630,11 @@ export function createDemoApi(): Api {
         log: [],
       };
       sortCombatants(combat);
-      data.combat = combat;
+      cur().combat = combat;
       save();
     },
     setInitiative: async (combatantId, value) => {
-      const combat = data.combat;
+      const combat = cur().combat;
       if (!combat || combat.phase !== 'setup') return;
       const c = combat.combatants.find((x) => x.id === combatantId);
       if (!c) return;
@@ -1563,7 +1643,7 @@ export function createDemoApi(): Api {
       save();
     },
     rerollInitiative: async (id) => {
-      const combat = data.combat;
+      const combat = cur().combat;
       if (!combat || combat.phase !== 'setup') return;
       const c = combat.combatants.find((x) => x.id === id);
       if (!c) return;
@@ -1572,7 +1652,7 @@ export function createDemoApi(): Api {
       save();
     },
     reorderCombatant: async (fromIndex, toIndex) => {
-      const combat = data.combat;
+      const combat = cur().combat;
       if (!combat || combat.phase !== 'setup') return;
       const list = combat.combatants;
       if (fromIndex < 0 || fromIndex >= list.length || toIndex < 0 || toIndex >= list.length) return;
@@ -1581,7 +1661,7 @@ export function createDemoApi(): Api {
       save();
     },
     beginCombat: async () => {
-      const combat = data.combat;
+      const combat = cur().combat;
       if (!combat || combat.phase !== 'setup') return;
       if (combat.combatants.some((c) => c.initiative === null)) return;
       combat.phase = 'active';
@@ -1599,7 +1679,7 @@ export function createDemoApi(): Api {
     applyHeal: async (id, amount) => applyHeal(id, amount),
     toggleCondition: async (id, condition) => toggleCondition(id, condition),
     removeCombatant: async (id) => {
-      const combat = data.combat;
+      const combat = cur().combat;
       if (!combat) return;
       const idx = combat.combatants.findIndex((c) => c.id === id);
       if (idx === -1) return;
@@ -1614,7 +1694,7 @@ export function createDemoApi(): Api {
       save();
     },
     addMonsterToCombat: async (monsterTemplateId, quantity) => {
-      const combat = data.combat;
+      const combat = cur().combat;
       const monster = data.monsters.find((m) => m.id === monsterTemplateId);
       if (!combat || !monster || quantity < 1) return;
       const baseName = monster.name;
@@ -1677,7 +1757,7 @@ export function createDemoApi(): Api {
     // Player web: backed by the in-page fake player server (phone-sim iframe).
     getPlayerWebQr: async () => ({ urls: [], port: 0, error: null, dataUrls: [] }),
     kickPlayer: async (pcId) => {
-      playerClaims.delete(pcId);
+      playerClaims().delete(pcId);
       for (const s of playerSessions) {
         if (s.pcId === pcId) {
           s.pcId = null;
@@ -1694,10 +1774,49 @@ export function createDemoApi(): Api {
       savePendingListeners.add(wrapped);
       return () => savePendingListeners.delete(wrapped);
     },
-    listArchive: async () => data.archive,
+    listArchive: async () => cur().archive,
     deleteArchivedCombat: async (id) => {
-      data.archive = data.archive.filter((a) => a.id !== id);
+      cur().archive = cur().archive.filter((a) => a.id !== id);
       save();
+    },
+
+    // ---- Campaigns (mirror of main's hot-swap ordering) ----
+    createCampaign: async (name) => {
+      const info: CampaignInfo = {
+        id: uuid(),
+        name: name.trim().slice(0, 60) || 'New Campaign',
+        createdAt: Date.now(),
+      };
+      data.campaigns.push(info);
+      data.byCampaign[info.id] = emptyCampaignData();
+      save();
+      return info.id;
+    },
+    switchCampaign: async (id) => {
+      if (id === data.activeId || !data.campaigns.some((c) => c.id === id)) return;
+      // Same order as the real server: dismiss stale saves, swap, then
+      // re-identify the phone session against the new campaign's claims.
+      for (const pid of [...pendingSaves.keys()]) dismissPlayerSave(pid);
+      data.activeId = id;
+      for (const session of playerSessions) {
+        session.pcId = tokenPcId(session.token);
+      }
+      save();
+    },
+    renameCampaign: async (id, name) => {
+      const trimmed = name.trim().slice(0, 60);
+      if (!trimmed) return;
+      data.campaigns = data.campaigns.map((c) => (c.id === id ? { ...c, name: trimmed } : c));
+      save();
+    },
+    deleteCampaign: async (id) => {
+      if (id === data.activeId || data.campaigns.length <= 1) return false;
+      if (!data.campaigns.some((c) => c.id === id)) return false;
+      data.campaigns = data.campaigns.filter((c) => c.id !== id);
+      delete data.byCampaign[id];
+      claimsByCampaign.delete(id);
+      save();
+      return true;
     },
   } as Api;
 }

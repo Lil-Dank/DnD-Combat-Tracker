@@ -1,6 +1,26 @@
 import type { DamageInstance, MonsterAction, Spell } from './types';
 
 /**
+ * The slice of a spell the attach conversion needs — structural, so the
+ * phone's WireSpell (pre-localized, no classes/source) qualifies too.
+ */
+export type CastableSpell = Pick<
+  Spell,
+  | 'id'
+  | 'name'
+  | 'level'
+  | 'castingTime'
+  | 'range'
+  | 'text'
+  | 'attack'
+  | 'save'
+  | 'damage'
+  | 'healing'
+  | 'upcast'
+  | 'upcastText'
+>;
+
+/**
  * Snapshots a spellbook entry into a PC action ("attach"). The copy is a
  * plain MonsterAction — editable like any attack afterwards (that is how
  * cantrip dice scale: the player bumps them as they level) — plus `spell`
@@ -12,7 +32,7 @@ import type { DamageInstance, MonsterAction, Spell } from './types';
  * and the demo.
  */
 export function spellToAction(
-  spell: Spell,
+  spell: CastableSpell,
   opts: { toHit?: number; dc?: number },
   id: string,
   order: number,

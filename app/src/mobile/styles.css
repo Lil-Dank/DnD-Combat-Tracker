@@ -951,3 +951,112 @@ h3 {
   align-items: center;
   gap: 8px;
 }
+
+/* ---- spellbook & casting ----------------------------------------------- */
+
+.verdict.heal {
+  color: var(--good);
+}
+
+.char-card {
+  padding: 14px 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-idle {
+  text-align: center;
+  margin: 4px 0 2px;
+}
+
+.card-stats {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  font-size: 16px;
+}
+
+.card-stats b {
+  color: var(--muted);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.card-abilities {
+  justify-content: center;
+}
+
+.card-notes {
+  text-align: center;
+}
+
+.card-slots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.card-slot b {
+  letter-spacing: 0;
+  margin-right: 3px;
+}
+
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.spell-search {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.spell-list .spell-detail {
+  padding: 4px 10px 12px;
+}
+
+.spell-detail-head {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.spell-detail-text {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.spell-note {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+  max-height: 34vh;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.slot-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.slot-btn {
+  text-align: center;
+}
+
+.spell-chip-mob {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}

@@ -11,6 +11,7 @@ app/demo-dist/
 # The bundled plugin.js is produced by scripts/build.mjs; the packed
 # .streamDeckPlugin by `streamdeck pack`. Both ship as GitHub Release assets.
 plugin/com.dmtools.dnd-combat-tracker.sdPlugin/bin/
+plugin/com.dmtools.dnd-combat-tracker.streamDeckPlugin
 plugin/dist/
 plugin/.test/
 # Intermediate HTML/bundle for the README deck previews; the PNGs are committed

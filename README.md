@@ -23,7 +23,7 @@ already in progress.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v3.1.2-success)
+![Release](https://img.shields.io/badge/release-v3.2.0-success)
 
 </div>
 
@@ -53,7 +53,7 @@ name, and the combat log keeps the story on the right.</i>
 - [Live demo](#live-demo)
 - [Install](#install)
 - [Using the app](#using-the-app)
-  - [Party](#party) · [Monsters](#monsters) · [Encounters](#encounters) · [Combat](#combat) · [Player View](#player-view--and-the-chroma-key-setup)
+  - [Campaigns](#campaigns) · [Party](#party) · [Monsters](#monsters) · [Encounters](#encounters) · [Combat](#combat) · [Player View](#player-view--and-the-chroma-key-setup)
   - [Combat log & archive](#combat-log--archive)
   - [Themes](#themes) · [Language](#language)
 - [Player phone companion](#player-phone-companion)
@@ -72,6 +72,7 @@ name, and the combat log keeps the story on the right.</i>
 
 |  | |
 | --- | --- |
+| 🗂️ **Campaigns** | Run several tables from one install: party, encounters, combat and archive are scoped per campaign and [hot-swap from the sidebar](#campaigns) — even mid-combat. The monster library and settings stay shared. |
 | 🧙 **Party & monster libraries** | PCs with HP/AC/initiative and their own attacks; 331 SRD 5.2.1 monsters importable in one click, with ability scores and fully structured attacks. Add your own too. |
 | 📋 **Encounter templates** | Reusable monster + quantity sets (4× Goblin Warrior, 1× Bugbear). Start combat straight from a card. |
 | ⚔️ **Combat engine** | Initiative rolling (all, or monsters-only), drag-to-settle ties, live HP and conditions in an aligned table, mid-combat monster adds, attack resolution vs AC with crits and save-for-half. |
@@ -89,8 +90,8 @@ name, and the combat log keeps the story on the right.</i>
 ## Live demo
 
 **https://lil-dank.github.io/deck-of-many-turns/** — the real renderer built for the
-browser, seeded with characters, encounters, the full SRD library and a combat
-mid-fight. The sidebar carries two simulators that are not mock-ups: the **player
+browser, seeded with two campaigns — characters, encounters, the full SRD library and
+a combat mid-fight. The sidebar carries two simulators that are not mock-ups: the **player
 phone** is the real mobile app, and the **Stream Deck** runs the plugin's actual picker
 state machine and key renderer — claim a character on the phone, roll from the deck,
 and watch the DM window and combat log react.
@@ -106,7 +107,7 @@ for anyone integrating their own hardware or overlays.
 
 Grab both files from the [**latest release**](../../releases/latest):
 
-1. **App** — run `Deck of Many Turns Setup 3.1.2.exe` (NSIS installer, choose your own directory).
+1. **App** — run `Deck of Many Turns Setup 3.2.0.exe` (NSIS installer, choose your own directory).
 2. **Stream Deck plugin** — double-click `com.dmtools.dnd-combat-tracker.streamDeckPlugin`;
    the Stream Deck app installs it and registers the bundled picker profiles.
 3. Start the app. The plugin connects within a few seconds — the DM window's sidebar
@@ -131,6 +132,22 @@ The app works standalone; the plugin needs the app running to do anything.
 ---
 
 ## Using the app
+
+### Campaigns
+
+The selector under the logo switches the whole table: **Party, Encounters, Combat and
+Archive belong to the active campaign**, while the monster library, settings and Player
+View stay global. Switching is a hot-swap — an in-progress combat is simply left where
+it stands and resumes the moment its campaign is mounted again, so you can end a session
+mid-fight, run a different group all evening, and pick the first fight back up next week.
+
+Connected player phones follow along: on a switch they drop back to the claim screen of
+the new campaign, and a PC claimed earlier re-attaches automatically when you switch
+back — no re-scanning QR codes. The ✎ button opens the manager for creating, renaming
+and deleting campaigns (the active and the last one are protected from deletion).
+
+Existing installs migrate on first launch: everything you had becomes **Main Campaign**,
+unchanged.
 
 ### Party
 
@@ -640,7 +657,7 @@ npm install
 npm run dev        # live-reload dev session
 npm run dev:mobile # (second terminal) rebuild the player web bundle on change
 npm run build      # compile main/preload/renderer + player web bundle to out/
-npm run dist       # → release/Deck of Many Turns Setup 3.1.2.exe (NSIS)
+npm run dist       # → release/Deck of Many Turns Setup 3.2.0.exe (NSIS)
 ```
 
 The player web page is served as plain static files from `out/mobile` in dev and
@@ -803,10 +820,13 @@ Project code is MIT-licensed (see `app/package.json`).
 
 - **In-progress combat persists across restarts:** the live combat is saved on every
   change and restored on launch.
-- **Location:** `%APPDATA%/deck-of-many-turns/data/*.json` — one file per store (PCs,
-  monsters, templates, settings, active combat, combat archive, player claims), loaded
+- **Location:** `%APPDATA%/deck-of-many-turns/data/` — one JSON file per store, loaded
   into id-indexed maps in the main process and written back atomically (temp file +
-  rename) on every change. First launch after the rename copies existing data from
-  the old `%APPDATA%/dnd-combat-tracker` location (the old folder stays as a backup).
+  rename) on every change. Global stores (monsters, settings, the campaign index) sit
+  at the root; each campaign keeps its own PCs, templates, active combat, archive and
+  player claims under `data/campaigns/<id>/`. First launch after the campaign update
+  moves existing data into a "Main Campaign" folder; first launch after the app rename
+  copies data from the old `%APPDATA%/dnd-combat-tracker` location (the old folder
+  stays as a backup).
 
 </details>

@@ -423,21 +423,19 @@ as the name needs more lines — with a heavy outline for readability at a glanc
 
 ```mermaid
 flowchart LR
-    A["🟣 Actor select<br/>multi-toggle, ▶ current, 💀 downed"] -->|"✓ Next"| N["🔢 Numpad<br/>digits · C clear"]
+    K["⚔ Damage / ✚ Heal key"] --> A["🟣 Actor select<br/>multi-toggle, ▶ current, 💀 downed"]
+    A -->|"✓ Next"| N["🔢 Numpad<br/>digits · C clear"]
     N -->|"✓ Enter"| Y["Amount applied to<br/><b>every selected actor</b>"]
-    N -->|"← Back<br/>selection kept"| A
     Y --> X["Back to your profile"]
-    A -->|"✕ Cancel"| X
-    N -->|"✕ Cancel"| X
 ```
 
 #### Condition flow
 
 ```mermaid
 flowchart LR
-    A["🟣 Actor select<br/>multi-toggle"] -->|"✓ Next"| C["☰ Condition grid<br/>✓ all have it · ~ only some"]
-    C -->|"press a condition:<br/>toggles it for the whole selection"| C
-    C -->|"← Back<br/>selection kept"| A
+    K["☰ Condition key"] --> A["🟣 Actor select<br/>multi-toggle"]
+    A -->|"✓ Next"| C["☰ Condition grid<br/>✓ all have it · ~ only some"]
+    C -->|"toggle another condition<br/>for the whole selection"| C
     C -->|"✓ Done"| X["Back to your profile"]
 ```
 
@@ -445,30 +443,28 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    P["🟣 Pick an attack<br/>of the current monster"] --> T["🎯 Pick target(s)<br/>attack roll: one · save/AoE: many"]
-    T --> R["Roll screen<br/>read-outs: attack + target AC"]
+    K["🎲 Monster Attack key"] --> P["🟣 Pick an attack<br/>of the current monster"]
+    P --> T["🎯 Pick target(s)<br/>attack roll: one · save/AoE: many"]
+    T --> R["Roll screen<br/>read-outs: attack + target AC · ⬆ ADV / ⬇ DIS"]
     R -->|"🎲 Attack"| V["d20 + to-hit vs AC<br/>✔ HIT / ✘ MISS · CRIT! / NAT 1"]
-    V --> R
-    R -->|"🎲 Damage"| D["Damage dice rolled<br/>multi-part summed"]
+    V -->|"🎲 Damage"| D["Damage dice rolled<br/>multi-part summed"]
     D -->|"save-based action"| S["Who saved?<br/>✓½ marked targets take half"]
     D -->|"attack roll"| CD["⏳ 5 s countdown"]
     S -->|"⚔ Apply"| CD
     CD -->|"auto-apply"| X["Damage applied →<br/>back to your profile"]
-    CD -->|"← Back cancels<br/>(re-roll safely)"| R
 ```
 
 #### Dice Roller flow
 
 ```mermaid
 flowchart LR
-    N1["🔢 How many dice"] --> D1["🎲 Which die<br/>d4 … d100"]
+    K["🎲 Dice Roller key"] --> N1["🔢 How many dice"]
+    N1 --> D1["🎲 Which die<br/>d4 … d100"]
     D1 --> M["± Modifier"]
-    M --> Q{"More dice?"}
-    Q -->|"Yes — build pools<br/>like 2d8+1 +1d4"| N1
-    Q -->|No| S["Summary<br/>🎲 Roll, repeat freely"]
+    M --> S["Summary<br/>🎲 Roll, repeat freely"]
+    S -->|"＋ more dice — build pools<br/>like 2d8+1 +1d4"| N1
     S -->|"⚔ Damage / ✚ Heal"| A["🟣 Actor select → Apply"]
-    S -->|"✕ Cancel"| X["Back to your profile"]
-    A --> X
+    A --> X["Back to your profile"]
 ```
 
 Rolling works even without the app connected; applying needs it. The same roller lives

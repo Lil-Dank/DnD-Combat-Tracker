@@ -129,6 +129,13 @@ const api = {
   // ---- Combat archive ----
   listArchive: (): Promise<ArchivedCombat[]> => ipcRenderer.invoke('archive:list'),
   deleteArchivedCombat: (id: string): Promise<void> => ipcRenderer.invoke('archive:delete', id),
+
+  // ---- Campaigns ----
+  createCampaign: (name: string): Promise<string> => ipcRenderer.invoke('campaign:create', { name }),
+  switchCampaign: (id: string): Promise<void> => ipcRenderer.invoke('campaign:switch', { id }),
+  renameCampaign: (id: string, name: string): Promise<void> =>
+    ipcRenderer.invoke('campaign:rename', { id, name }),
+  deleteCampaign: (id: string): Promise<boolean> => ipcRenderer.invoke('campaign:delete', { id }),
 };
 
 export type Api = typeof api;

@@ -385,6 +385,23 @@ export const DEFAULT_SETTINGS: Settings = {
   playerWeb: DEFAULT_PLAYER_WEB_SETTINGS,
 };
 
+/**
+ * A campaign scopes party, encounter templates, active combat, archive and
+ * phone claims; the monster library and settings are global. Data lives in
+ * data/campaigns/<id>/.
+ */
+export interface CampaignInfo {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+/** data/campaigns.json — the campaign index plus which one is mounted. */
+export interface CampaignsFile {
+  campaigns: CampaignInfo[];
+  activeId: string;
+}
+
 /** Full snapshot pushed to every window on any change. */
 export interface AppState {
   pcs: PC[];
@@ -392,6 +409,8 @@ export interface AppState {
   encounterTemplates: EncounterTemplate[];
   combat: Combat | null;
   settings: Settings;
+  campaigns: CampaignInfo[];
+  activeCampaignId: string;
   bridgeClientCount: number;
   /** Whether Kenku Remote answered the most recent connection check. */
   kenkuConnected: boolean;

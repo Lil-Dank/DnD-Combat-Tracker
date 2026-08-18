@@ -8,6 +8,7 @@ import { CombatScreen } from './screens/CombatScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ArchiveScreen } from './screens/ArchiveScreen';
 import { PlayerView } from './screens/PlayerView';
+import { CampaignSelector } from './CampaignSelector';
 import { ConfirmProvider } from './Confirm';
 import { I18nProvider } from './i18n';
 import { KenkuSoundboardModal } from './KenkuSoundboardModal';
@@ -50,6 +51,14 @@ export function App() {
     // only — the Player View has its own fixed styling + background color).
     if (state) document.documentElement.dataset.theme = state.settings.theme;
   }, [state?.settings.theme]);
+
+  useEffect(() => {
+    // A campaign switch invalidates cross-screen leftovers: a preselected
+    // encounter template and any save-adjudication modal belong to the
+    // previous campaign (its pending saves were dismissed server-side).
+    setCombatTemplateId(null);
+    setPendingSave(null);
+  }, [state?.activeCampaignId]);
 
   useEffect(() => {
     let mounted = true;
@@ -100,6 +109,7 @@ export function App() {
           <img className="app-title-logo" src={logoUrl} alt="" />
           <span>{translate(lang, 'app.title')}</span>
         </div>
+        <CampaignSelector state={state} />
         {TABS.map((t) => {
           const [icon, ...words] = translate(lang, t.key).split(' ');
           return (
@@ -158,7 +168,7 @@ export function App() {
           />
         )}
         {tab === 'combat' && <CombatScreen state={state} preselectedTemplateId={combatTemplateId} />}
-        {tab === 'archive' && <ArchiveScreen />}
+        {tab === 'archive' && <ArchiveScreen key={state.activeCampaignId} />}
         {tab === 'settings' && <SettingsScreen state={state} />}
         {showSoundboard && <KenkuSoundboardModal onClose={() => setShowSoundboard(false)} />}
         {showQr && <PlayerWebQrModal onClose={() => setShowQr(false)} />}

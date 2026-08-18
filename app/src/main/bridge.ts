@@ -62,9 +62,14 @@ function stateMessage(state: AppState): string {
           isDowned: c.isDowned,
           conditions: c.conditions,
           // Rollable actions for the deck's Attack flow (attack rolls, plus
-          // save actions that deal damage — e.g. breath weapons).
+          // save actions that deal damage — e.g. breath weapons). Spell
+          // snapshots stay off the deck: no slot UI there this release.
           attacks: c.attacks
-            .filter((a) => a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0))
+            .filter(
+              (a) =>
+                !a.spell &&
+                (a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0)),
+            )
             .map((a) => ({
               id: a.id,
               // Deck labels use the German SRD action name when the template

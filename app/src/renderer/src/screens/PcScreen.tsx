@@ -6,6 +6,7 @@ import { api } from '../api';
 import { useConfirm } from '../Confirm';
 import { useI18n } from '../i18n';
 import { PcAttackEditor } from '../PcAttackEditor';
+import { SlotPips } from '../SlotPips';
 
 interface PcFormData {
   id?: string;
@@ -15,6 +16,8 @@ interface PcFormData {
   initMod: string;
   abilities: AbilitiesForm;
   notes: string;
+  /** Max spell slots per level 1–9, as typed. */
+  slots: string[];
 }
 
 const emptyForm = (): PcFormData => ({
@@ -24,6 +27,7 @@ const emptyForm = (): PcFormData => ({
   initMod: '0',
   abilities: abilitiesToForm(null),
   notes: '',
+  slots: Array.from({ length: 9 }, () => ''),
 });
 
 export function PcScreen({ state }: { state: AppState }) {
@@ -40,11 +44,16 @@ export function PcScreen({ state }: { state: AppState }) {
       initMod: String(pc.initMod),
       abilities: abilitiesToForm(pc.abilities),
       notes: pc.notes ?? '',
+      slots: Array.from({ length: 9 }, (_, i) => {
+        const v = pc.spellSlots?.max[i] ?? 0;
+        return v > 0 ? String(v) : '';
+      }),
     });
 
   const submit = async () => {
     if (!form || !form.name.trim()) return;
     const existing = form.id ? state.pcs.find((p) => p.id === form.id) : undefined;
+    const max = form.slots.map((v) => Math.max(0, parseInt(v, 10) || 0));
     await api.savePc({
       id: form.id,
       name: form.name.trim(),
@@ -54,6 +63,10 @@ export function PcScreen({ state }: { state: AppState }) {
       abilities: formToAbilities(form.abilities),
       notes: form.notes.trim() || undefined,
       attacks: existing?.attacks ?? [],
+      // Current slots carry over; the store clamps them to the new max.
+      spellSlots: max.some((v) => v > 0)
+        ? { max, current: existing?.spellSlots?.current ?? [...max] }
+        : null,
     });
     setForm(null);
   };
@@ -86,11 +99,23 @@ export function PcScreen({ state }: { state: AppState }) {
         <tbody>
           {state.pcs.map((pc) => (
             <tr key={pc.id}>
-              <td className="name-cell">{pc.name}</td>
+              <td className="name-cell">
+                {pc.name}
+                <SlotPips slots={pc.spellSlots} />
+              </td>
               <td>{pc.maxHp}</td>
               <td>{pc.ac}</td>
               <td>{pc.initMod >= 0 ? `+${pc.initMod}` : pc.initMod}</td>
               <td className="row-actions">
+                {pc.spellSlots && (
+                  <button
+                    className="btn small"
+                    title={t('pcs.longRestNote')}
+                    onClick={() => void api.longRest(pc.id)}
+                  >
+                    {t('pcs.longRest')}
+                  </button>
+                )}
                 <button className="btn small" onClick={() => startEdit(pc)}>{t('common.edit')}</button>
                 <button
                   className="btn small danger"
@@ -165,6 +190,28 @@ export function PcScreen({ state }: { state: AppState }) {
               ))}
             </div>
 
+            <h3>
+              {t('pcs.slots')} <span className="muted">{t('pcs.slotsNote')}</span>
+            </h3>
+            <div className="form-row slot-row">
+              {form.slots.map((v, i) => (
+                <label key={i}>
+                  L{i + 1}
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    value={v}
+                    onChange={(e) => {
+                      const slots = [...form.slots];
+                      slots[i] = e.target.value;
+                      setForm({ ...form, slots });
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+
             <label>
               {t('pcs.notes')} <span className="muted">{t('pcs.notesNote')}</span>
               <textarea
@@ -177,7 +224,11 @@ export function PcScreen({ state }: { state: AppState }) {
             {(() => {
               const savedPc = form.id ? state.pcs.find((p) => p.id === form.id) : undefined;
               return savedPc ? (
-                <PcAttackEditor pc={savedPc} kenkuOn={state.settings.kenku.enabled} />
+                <PcAttackEditor
+                  pc={savedPc}
+                  kenkuOn={state.settings.kenku.enabled}
+                  spells={state.spells}
+                />
               ) : null;
             })()}
             <div className="modal-actions">

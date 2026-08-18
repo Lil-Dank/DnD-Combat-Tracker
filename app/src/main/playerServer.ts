@@ -53,6 +53,8 @@ interface PendingSave {
   dc: number;
   targetIds: string[];
   damage: number;
+  /** Damage on a successful save: legacy default half; some spells deal none. */
+  onSuccess: 'half' | 'none';
   /** Dice composition of the rolled damage, for the log (digital rolls). */
   math?: string;
   mathTypes?: (string | null)[];
@@ -80,6 +82,7 @@ let savePendingListener:
       ability: string;
       dc: number;
       damage: number;
+      onSuccess: 'half' | 'none';
       targetIds: string[];
     }) => void)
   | null = null;
@@ -597,6 +600,7 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
     dc: ctx.action.save.dc,
     targetIds,
     damage,
+    onSuccess: ctx.action.save.onSuccess ?? 'half',
     math: damageMath,
     mathTypes: damageMathTypes,
     socket,
@@ -619,11 +623,12 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
     ability: pending.ability,
     dc: pending.dc,
     damage: pending.damage,
+    onSuccess: pending.onSuccess,
     targetIds: pending.targetIds,
   });
 }
 
-/** DM modal resolution: apply full damage on failure, half on success. */
+/** DM modal resolution: full damage on failure; half or none on success. */
 export async function resolvePendingSave(
   id: string,
   results: Array<{ targetId: string; saved: boolean; total?: number }>,
@@ -632,7 +637,7 @@ export async function resolvePendingSave(
   if (!pending) return;
   pendingSaves.delete(id);
   const combat = store.getState().combat;
-  const half = Math.floor(pending.damage / 2);
+  const half = pending.onSuccess === 'none' ? 0 : Math.floor(pending.damage / 2);
   const applied: Array<{ targetId: string; targetName: string; saved: boolean; amount: number }> = [];
   for (const r of results) {
     const target = combat?.combatants.find((c) => c.id === r.targetId);

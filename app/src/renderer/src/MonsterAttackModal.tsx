@@ -162,9 +162,13 @@ export function MonsterAttackModal({
 
   const apply = async () => {
     if (!dmgRoll || !attacker) return;
-    const half = Math.floor(dmgRoll.total / 2);
+    // Damage on a successful save: legacy default is half; some spells deal
+    // nothing (Acid Splash).
+    const onSuccess = attack?.save?.onSuccess ?? 'half';
+    const half = onSuccess === 'none' ? 0 : Math.floor(dmgRoll.total / 2);
     for (const id of targets) {
       const halved = saved.has(id);
+      if (halved && half === 0) continue;
       await api.applyDamage(id, halved ? half : dmgRoll.total, {
         actorName: mon(attacker.displayName),
         actorType: attacker.type,
@@ -351,7 +355,9 @@ export function MonsterAttackModal({
                 dc: attack.save!.dc,
               })}{' '}
               <span className="muted">
-                {t('attack.savedTakeHalf', { half: Math.floor(dmgRoll.total / 2), full: dmgRoll.total })}
+                {(attack.save?.onSuccess ?? 'half') === 'none'
+                  ? t('attack.savedTakeNone', { full: dmgRoll.total })
+                  : t('attack.savedTakeHalf', { half: Math.floor(dmgRoll.total / 2), full: dmgRoll.total })}
               </span>
             </h3>
             <div className="monster-pick-list">
@@ -374,7 +380,8 @@ export function MonsterAttackModal({
               <button className="btn" onClick={() => setStep('roll')}>{t('common.back')}</button>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button className="btn danger" onClick={() => void apply()}>
-                ⚔ Apply ({targets.length - saved.size}×{dmgRoll.total}, {saved.size}×{Math.floor(dmgRoll.total / 2)})
+                ⚔ Apply ({targets.length - saved.size}×{dmgRoll.total}, {saved.size}×
+                {(attack.save?.onSuccess ?? 'half') === 'none' ? 0 : Math.floor(dmgRoll.total / 2)})
               </button>
             </div>
           </>

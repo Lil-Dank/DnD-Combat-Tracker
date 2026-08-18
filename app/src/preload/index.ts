@@ -19,6 +19,8 @@ export interface PlayerSavePendingInfo {
   ability: string;
   dc: number;
   damage: number;
+  /** Damage on a successful save (half = legacy default, none = e.g. Acid Splash). */
+  onSuccess: 'half' | 'none';
   targetIds: string[];
 }
 

@@ -1030,6 +1030,8 @@ export function createDemoApi(): Api {
     attackId: string;
     attackName: string;
     damage: number;
+    /** Damage on a successful save (mirror of playerServer.ts). */
+    onSuccess: 'half' | 'none';
     targetIds: string[];
     session: PlayerSession;
   }
@@ -1377,6 +1379,7 @@ export function createDemoApi(): Api {
           attackId: action.id,
           attackName: action.name,
           damage,
+          onSuccess: action.save?.onSuccess ?? 'half',
           targetIds,
           session,
         };
@@ -1399,6 +1402,7 @@ export function createDemoApi(): Api {
             ability: action.save?.ability ?? 'DEX',
             dc: action.save?.dc ?? 10,
             damage: pending.damage,
+            onSuccess: action.save?.onSuccess ?? 'half',
             targetIds: pending.targetIds,
           });
         }
@@ -1516,7 +1520,7 @@ export function createDemoApi(): Api {
     if (!pending) return;
     pendingSaves.delete(id);
     const combat = cur().combat;
-    const half = Math.floor(pending.damage / 2);
+    const half = pending.onSuccess === 'none' ? 0 : Math.floor(pending.damage / 2);
     const applied: Array<{ targetId: string; targetName: string; saved: boolean; amount: number }> = [];
     for (const r of results) {
       const target = combat?.combatants.find((c) => c.id === r.targetId);

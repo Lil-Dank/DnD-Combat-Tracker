@@ -10,6 +10,7 @@ import { DiceRollerModal } from '../DiceRoller';
 import { MonsterAttackModal, hasRollableAttacks } from '../MonsterAttackModal';
 import { useI18n } from '../i18n';
 import { CombatLogPanel } from '../CombatLogPanel';
+import { SlotPips } from '../SlotPips';
 
 export function CombatScreen({
   state,
@@ -493,6 +494,13 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                 <AttackPanel
                   combatant={c}
                   l10n={state.monsters.find((m) => m.id === c.sourceId)?.l10n?.de}
+                  // Slots live on the PC record, not the combat snapshot —
+                  // casting decrements there and these pips follow live.
+                  slots={
+                    c.type === 'pc'
+                      ? state.pcs.find((p) => p.id === c.sourceId)?.spellSlots
+                      : null
+                  }
                 />
               )}
             </li>
@@ -602,14 +610,22 @@ function AddMonsterModal({ state, onClose }: { state: AppState; onClose: () => v
 function AttackPanel({
   combatant,
   l10n,
+  slots,
 }: {
   combatant: Combatant;
   l10n?: import('../../../shared/i18n').MonsterL10n;
+  slots?: import('../../../shared/types').SpellSlots | null;
 }) {
   const { t, abilityCode, locAction, fmtRange } = useI18n();
   return (
     <div className="attack-panel">
       {combatant.abilities && <AbilityTable abilities={combatant.abilities} />}
+      {slots && (
+        <div className="attack-panel-row">
+          <strong>{t('pcs.slots')}</strong>
+          <SlotPips slots={slots} />
+        </div>
+      )}
       {combatant.attacks.map((a) => {
         const loc = locAction(l10n, a);
         // Attack rolls render compactly; save/other actions live in their text.

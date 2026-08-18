@@ -280,6 +280,20 @@ select.campaign-select {
   padding: 4px 8px;
 }
 
+/* Spellbook: expanded row header + compact roll summary */
+.spell-header-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.spell-roll-summary {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
 /* Manage modal rows */
 .campaign-list {
   display: flex;

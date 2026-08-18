@@ -57,6 +57,110 @@ export const DAMAGE_TYPE_DE: Record<string, string> = {
   thunder: 'Donner',
 };
 
+/** Schools of magic, as named in the German SRD 5.2.1. */
+export const SPELL_SCHOOL_DE: Record<string, string> = {
+  abjuration: 'Bannmagie',
+  conjuration: 'Beschwörung',
+  divination: 'Erkenntnismagie',
+  enchantment: 'Verzauberung',
+  evocation: 'Hervorrufung',
+  illusion: 'Illusion',
+  necromancy: 'Nekromantie',
+  transmutation: 'Verwandlung',
+};
+
+/**
+ * German words for the enumerable parts of a spell header (casting times,
+ * range keywords, duration keywords, component letters). Free-text values
+ * (manual spells, material descriptions) pass through untranslated — the
+ * same split the monster library makes.
+ */
+const SPELL_WORD_DE: Record<string, string> = {
+  Action: 'Aktion',
+  'Bonus Action': 'Bonusaktion',
+  Reaction: 'Reaktion',
+  '1 Minute': '1 Minute',
+  '10 Minutes': '10 Minuten',
+  '1 Hour': '1 Stunde',
+  'or Ritual': 'oder Ritual',
+  Touch: 'Berührung',
+  Self: 'Selbst',
+  Instantaneous: 'Unmittelbar',
+  Concentration: 'Konzentration',
+  'up to': 'bis zu',
+  round: 'Runde',
+  rounds: 'Runden',
+  minute: 'Minute',
+  minutes: 'Minuten',
+  hour: 'Stunde',
+  hours: 'Stunden',
+  day: 'Tag',
+  days: 'Tage',
+  'until dispelled': 'bis zur Bannung',
+  'until dispelled or triggered': 'bis zur Bannung oder Auslösung',
+  special: 'besonders',
+};
+
+/** Class names as in the German SRD 5.2.1. */
+const SPELL_CLASS_DE: Record<string, string> = {
+  Barbarian: 'Barbar',
+  Bard: 'Barde',
+  Cleric: 'Kleriker',
+  Druid: 'Druide',
+  Fighter: 'Kämpfer',
+  Monk: 'Mönch',
+  Paladin: 'Paladin',
+  Ranger: 'Waldläufer',
+  Rogue: 'Schurke',
+  Sorcerer: 'Zauberer',
+  Warlock: 'Hexenmeister',
+  Wizard: 'Magier',
+};
+
+export function spellClassLabel(lang: Lang, cls: string): string {
+  return lang === 'de' ? (SPELL_CLASS_DE[cls] ?? cls) : cls;
+}
+
+export function spellSchoolLabel(lang: Lang, school: string): string {
+  return lang === 'de' ? (SPELL_SCHOOL_DE[school] ?? school) : school.charAt(0).toUpperCase() + school.slice(1);
+}
+
+/** "Cantrip" / "Level 3" — DE "Zaubertrick" / "3. Grad". */
+export function spellLevelLabel(lang: Lang, level: number): string {
+  if (level === 0) return lang === 'de' ? 'Zaubertrick' : 'Cantrip';
+  return lang === 'de' ? `${level}. Grad` : `Level ${level}`;
+}
+
+// Longest phrases first, so "until dispelled or triggered" wins over
+// "until dispelled" and "up to" is replaced as a unit.
+const SPELL_WORD_ENTRIES = Object.entries(SPELL_WORD_DE)
+  .sort((a, b) => b[0].length - a[0].length)
+  .map(([enWord, deWord]) => ({
+    re: new RegExp(`\\b${enWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'),
+    de: deWord,
+  }));
+
+/**
+ * Translates a spell header value (casting time, range, duration) phrase by
+ * phrase using SPELL_WORD_DE; unknown words pass through untranslated.
+ * Distances convert to meters like the German SRD (5 ft = 1,5 m).
+ */
+export function spellField(lang: Lang, value: string): string {
+  if (lang !== 'de' || !value) return value;
+  let out = value.replace(/(\d+)[ -](?:feet|foot)/g, (_, n) => {
+    const meters = (Number(n) / 5) * 1.5;
+    return `${String(meters).replace('.', ',')} Meter`;
+  });
+  for (const { re, de } of SPELL_WORD_ENTRIES) out = out.replace(re, de);
+  return out;
+}
+
+/** Component string for display: German swaps S (Somatic) for G (Gestik). */
+export function spellComponents(lang: Lang, components: string): string {
+  if (lang !== 'de') return components;
+  return components.replace(/\bS\b/, 'G');
+}
+
 type Dict = Record<string, string>;
 
 const en: Dict = {
@@ -66,6 +170,7 @@ const en: Dict = {
   'nav.combat': '⚔ Combat',
   'nav.party': '🛡 Party',
   'nav.monsters': '🐉 Monsters',
+  'nav.spellbook': '🕮 Spellbook',
   'nav.encounters': '🗺 Encounters',
   'nav.settings': '⚙ Settings',
   'nav.openPlayerView': 'Open Player View',
@@ -107,6 +212,38 @@ const en: Dict = {
   'monsters.range': 'range',
   'monsters.save': 'save',
   'monsters.dc': 'DC',
+
+  'spellbook.title': 'Spellbook',
+  'spellbook.import': '⤓ Import SRD Spells',
+  'spellbook.add': '+ Add Spell',
+  'spellbook.search': 'Search spells…',
+  'spellbook.empty': 'No spells yet. Import the SRD set or add your own.',
+  'spellbook.deleteConfirm': 'Delete {name}? PCs keep any copies already attached to their actions.',
+  'spellbook.imported': 'Imported {n} spells from the SRD 5.2.1 dataset.',
+  'spellbook.level': 'Level',
+  'spellbook.school': 'School',
+  'spellbook.castingTime': 'Casting Time',
+  'spellbook.range': 'Range',
+  'spellbook.components': 'Components',
+  'spellbook.duration': 'Duration',
+  'spellbook.classes': 'Classes',
+  'spellbook.concentration': 'Concentration',
+  'spellbook.ritual': 'Ritual',
+  'spellbook.editSpell': 'Edit Spell',
+  'spellbook.addSpell': 'Add Spell',
+  'spellbook.rollLayer': 'Rolls',
+  'spellbook.rollLayerNote': '(what gets rolled at the table — everything else stays in the text)',
+  'spellbook.attackRoll': 'Spell attack roll',
+  'spellbook.saveAbility': 'Save',
+  'spellbook.onSuccess': 'On success',
+  'spellbook.onSuccessHalf': 'Half damage',
+  'spellbook.onSuccessNone': 'No damage',
+  'spellbook.damage': 'Damage',
+  'spellbook.healing': 'Healing dice',
+  'spellbook.upcast': 'Upcast',
+  'spellbook.upcastPerLevel': '+{dice} per slot level above {level}',
+  'spellbook.text': 'Rules text',
+  'spellbook.noSave': 'None',
 
   'templates.title': 'Encounter Templates',
   'templates.new': '+ New Template',
@@ -503,6 +640,7 @@ const de: Dict = {
   'nav.combat': '⚔ Kampf',
   'nav.party': '🛡 Gruppe',
   'nav.monsters': '🐉 Monster',
+  'nav.spellbook': '🕮 Zauberbuch',
   'nav.encounters': '🗺 Begegnungen',
   'nav.settings': '⚙ Einstellungen',
   'nav.openPlayerView': 'Spieleransicht öffnen',
@@ -545,6 +683,39 @@ const de: Dict = {
   'monsters.range': 'Distanz',
   'monsters.save': 'Rettungswurf',
   'monsters.dc': 'SG',
+
+  'spellbook.title': 'Zauberbuch',
+  'spellbook.import': '⤓ SRD-Zauber importieren',
+  'spellbook.add': '+ Zauber hinzufügen',
+  'spellbook.search': 'Zauber suchen…',
+  'spellbook.empty': 'Noch keine Zauber. Importiere das SRD-Set oder lege eigene an.',
+  'spellbook.deleteConfirm':
+    '{name} löschen? Bereits an Charaktere angehängte Kopien bleiben erhalten.',
+  'spellbook.imported': '{n} Zauber aus dem SRD-5.2.1-Datensatz importiert.',
+  'spellbook.level': 'Grad',
+  'spellbook.school': 'Schule',
+  'spellbook.castingTime': 'Zeitaufwand',
+  'spellbook.range': 'Reichweite',
+  'spellbook.components': 'Komponenten',
+  'spellbook.duration': 'Wirkungsdauer',
+  'spellbook.classes': 'Klassen',
+  'spellbook.concentration': 'Konzentration',
+  'spellbook.ritual': 'Ritual',
+  'spellbook.editSpell': 'Zauber bearbeiten',
+  'spellbook.addSpell': 'Zauber hinzufügen',
+  'spellbook.rollLayer': 'Würfe',
+  'spellbook.rollLayerNote': '(was am Tisch gewürfelt wird — alles andere bleibt im Text)',
+  'spellbook.attackRoll': 'Zauberangriffswurf',
+  'spellbook.saveAbility': 'Rettungswurf',
+  'spellbook.onSuccess': 'Bei Erfolg',
+  'spellbook.onSuccessHalf': 'Halber Schaden',
+  'spellbook.onSuccessNone': 'Kein Schaden',
+  'spellbook.damage': 'Schaden',
+  'spellbook.healing': 'Heilungswürfel',
+  'spellbook.upcast': 'Hochstufen',
+  'spellbook.upcastPerLevel': '+{dice} je Zauberplatzgrad über {level}',
+  'spellbook.text': 'Regeltext',
+  'spellbook.noSave': 'Keiner',
 
   'templates.title': 'Begegnungsvorlagen',
   'templates.new': '+ Neue Vorlage',

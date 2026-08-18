@@ -743,6 +743,11 @@ The tag is derived from `app/package.json`, so bump the version there (and the p
 manifest's four-part `Version`) before publishing. The script refuses to run with
 uncommitted changes, or if a release for that tag already exists.
 
+Each release also gets an entry at the top of [CHANGELOG.md](CHANGELOG.md)
+([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format) covering the shipped
+app and plugin changes — the same content the GitHub release notes carry, with install
+steps at the bottom of the notes.
+
 ---
 
 ## Monster data & license

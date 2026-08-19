@@ -2279,7 +2279,6 @@ select.campaign-select {
 }
 
 .log-block + .log-block { border-top: 1px solid var(--border-soft); }
-.log-block:hover { background: var(--row-hover); }
 
 /* The action headline: what happened, bigger than who it hit. */
 .lb-action {
@@ -2549,6 +2548,8 @@ select.campaign-select {
 
 .archive-log {
   font-size: 14px;
+  /* Card column reads best at the mockup's width, not the full pane. */
+  max-width: 460px;
 }
 
 /* ---- Shared damage editor (desktop sizing) ---- */

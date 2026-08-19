@@ -188,7 +188,9 @@ export function MonsterAttackModal({
         if (!d.condition) {
           const bonus = d.bonus ?? 0;
           const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
-          mathParts.push(`${d.dice} [${roll.perPart[0].join('+')}]${bonusStr}`);
+          // Canonical "1d4", not d.dice — the raw string may already contain
+          // the bonus ("1d4+2"), which bonusStr would then repeat.
+          mathParts.push(`${d.count}d${d.die} [${roll.perPart[0].join('+')}]${bonusStr}`);
           mathTypes.push(d.type ?? null);
         }
       } else {

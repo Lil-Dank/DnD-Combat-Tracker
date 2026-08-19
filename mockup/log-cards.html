@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Log Cards — Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ---- app-ish dark palette -------------------------------------------- */
+  :root {
+    --bg: #16181d;
+    --bg-panel: #1d2026;
+    --bg-panel-2: #23262e;
+    --border: #33373f;
+    --border-soft: #2a2d34;
+    --text: #e8eaed;
+    --text-muted: #9aa0aa;
+    --row-hover: #262a33;
+    --pc-color: #3b82f6;
+    --monster-color: #d97706;
+    --danger: #e0623c;
+    --success: #4caf7d;
+    --warn: #d4af37;
+    --miss: #8a7f7f;
+    --accent: #c05050;
+    --conc: #9370db;
+    --dt-fire: #e0623c; --dt-cold: #58a6d8; --dt-slashing: #c08878;
+    --dt-radiant: #e0c060; --dt-piercing: #93a8bc; --dt-healing: #4caf7d;
+    --radius: 9px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: Inter, 'Segoe UI', system-ui, sans-serif; font-size: 13px;
+    display: flex; gap: 28px; padding: 24px; align-items: flex-start;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+  /* Synthetic small caps from Inter itself — visually consistent with the app font. */
+  .sc { font-variant-caps: all-small-caps; letter-spacing: .45px; }
+
+  .col { flex-shrink: 0; }
+  .col h4 { margin: 0 0 8px; color: var(--text-muted); font-weight: 600; font-size: 12px; }
+  .panel {
+    background: var(--bg-panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 8px 10px 12px; overflow-y: auto; height: 92vh;
+  }
+  .w320 .panel { width: 320px; }
+  .w460 .panel { width: 460px; }
+
+  .controls { position: fixed; right: 18px; bottom: 14px; display: flex; gap: 8px; }
+  .controls button {
+    font: inherit; background: var(--bg-panel-2); color: var(--text-muted);
+    border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px; cursor: pointer;
+  }
+  .controls button.on { color: var(--text); border-color: var(--warn); }
+
+  /* ---- separators ------------------------------------------------------- */
+  .log-sep-round {
+    display: flex; align-items: center; gap: 10px;
+    margin: 14px 0 8px; color: var(--warn); font-weight: 700; font-size: 12.5px;
+  }
+  .log-sep-round::before, .log-sep-round::after {
+    content: ''; flex: 1; border-top: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  }
+  .log-sep-bound {
+    display: flex; align-items: center; gap: 10px;
+    margin: 12px 0 8px; color: var(--text-muted); font-weight: 600; font-size: 12px;
+  }
+  .log-sep-bound::before, .log-sep-bound::after {
+    content: ''; flex: 1; border-top: 1px dashed var(--border);
+  }
+  .log-sep-turn {
+    margin: 8px 0 4px 2px; color: var(--text-muted); font-size: 11.5px; opacity: .8;
+  }
+  .log-sep-turn b { font-weight: 600; }
+  .log-sep-turn.pc b { color: var(--pc-color); }
+  .log-sep-turn.monster b { color: var(--monster-color); }
+  body.dense .log-sep-turn { display: none; }
+
+  /* ---- card ------------------------------------------------------------- */
+  .log-card {
+    background: var(--bg-panel-2); border: 1px solid var(--border-soft);
+    border-left: 3px solid var(--border);
+    border-radius: var(--radius); margin: 6px 0; overflow: hidden;
+  }
+  .log-card.pc { border-left-color: var(--pc-color); }
+  .log-card.monster { border-left-color: var(--monster-color); }
+
+  .log-card-header {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 6px 10px 5px; border-bottom: 1px solid var(--border-soft);
+  }
+  .log-card-name { font-weight: 700; font-size: 13.5px; font-variant-caps: all-small-caps; letter-spacing: .45px; }
+  .log-card.pc .log-card-name { color: var(--pc-color); }
+  .log-card.monster .log-card-name { color: var(--monster-color); }
+  .log-card-meta { margin-left: auto; color: var(--text-muted); font-size: 10.5px; opacity: .8; flex-shrink: 0; }
+
+  /* ---- blocks ------------------------------------------------------------ */
+  .log-block { position: relative; padding: 6px 10px 7px; }
+  .log-block + .log-block { border-top: 1px solid var(--border-soft); }
+  .log-block:hover { background: var(--row-hover); }
+
+  .lb-action {
+    font-variant-caps: all-small-caps; letter-spacing: .5px;
+    font-weight: 700; font-size: 15.5px; color: var(--text);
+  }
+  .lb-action .to { color: var(--text-muted); font-weight: 400; font-size: 12.5px; }
+  .lb-action .to b { font-weight: 600; }
+  .to b.pc { color: var(--pc-color); } .to b.monster { color: var(--monster-color); }
+  .lb-src { color: var(--text-muted); font-size: 10px; opacity: .75; float: right; margin-top: 2px; }
+
+  /* attack roll row */
+  .lb-roll {
+    display: flex; align-items: center; gap: 8px; margin-top: 5px;
+    background: var(--bg-panel); border: 1px solid var(--border-soft);
+    border-radius: 7px; padding: 4px 8px; cursor: pointer;
+  }
+  .lb-roll .lbl { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; width: 46px; flex-shrink: 0; }
+  .lb-roll .die { font-size: 13px; color: var(--text-muted); }
+  .lb-roll .die.dropped { text-decoration: line-through; opacity: .45; }
+  .lb-roll .total { margin-left: auto; font-size: 19px; font-weight: 800; }
+  .lb-roll .total.hit { color: var(--text); }
+  .lb-roll .total.crit { color: var(--success); }
+  .lb-roll .total.miss { color: var(--miss); text-decoration: line-through; }
+  .lb-roll .verdict { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .lb-roll .verdict.hit { color: var(--danger); }
+  .lb-roll .verdict.crit { color: var(--success); }
+  .lb-roll .verdict.miss { color: var(--miss); }
+  .lb-roll .adv { font-size: 10px; font-weight: 700; color: var(--success); }
+  .lb-roll .dis { font-size: 10px; font-weight: 700; color: var(--danger); }
+  .lb-roll .chev { color: var(--text-muted); font-size: 10px; transition: transform .15s; }
+  .lb-roll.open .chev { transform: rotate(90deg); }
+
+  /* damage roll row */
+  .lb-dmg { margin-top: 5px; }
+  .lb-dmg .dmg-label { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+  .lb-dmg .dmg-label .type { font-weight: 700; }
+  .lb-dmg-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 2px;
+    background: var(--bg-panel); border: 1px solid var(--border-soft);
+    border-radius: 7px; padding: 4px 8px; cursor: pointer;
+  }
+  .lb-dmg-row .formula { color: var(--text-muted); font-size: 12px; }
+  .lb-dmg-row .total { margin-left: auto; font-size: 17px; font-weight: 800; }
+  .lb-dmg-row .chev { color: var(--text-muted); font-size: 10px; transition: transform .15s; }
+  .lb-dmg-row.open .chev { transform: rotate(90deg); }
+
+  /* expandable breakdown */
+  .lb-breakdown {
+    display: none; margin-top: 3px; padding: 3px 8px 1px;
+    font-size: 11.5px; color: var(--text-muted);
+  }
+  .lb-breakdown.open { display: block; }
+  .lb-breakdown .dice-n { color: var(--accent); }
+  .lb-breakdown .rolls { color: var(--warn); }
+
+  /* effect lines (target cards) */
+  .lb-effect { font-size: 12.5px; }
+  .lb-effect .amount.dmg { color: var(--danger); font-weight: 800; font-size: 15px; }
+  .lb-effect .amount.heal { color: var(--success); font-weight: 800; font-size: 15px; }
+  .lb-effect .from { color: var(--text-muted); font-size: 12.5px; }
+  .lb-effect .from b { font-weight: 600; font-variant-caps: all-small-caps; letter-spacing: .45px; font-size: 13.5px; }
+  .lb-effect .from b.pc { color: var(--pc-color); }
+  .lb-effect .from b.monster { color: var(--monster-color); }
+  .lb-effect .cond-chip {
+    display: inline-block; background: color-mix(in srgb, var(--accent) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    border-radius: 999px; padding: 0 8px; font-size: 11.5px; font-weight: 600;
+  }
+  .lb-effect.removed { opacity: .6; }
+  .lb-effect.removed .cond-chip { text-decoration: line-through; }
+  .lb-down {
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    font-weight: 700; font-size: 13px;
+  }
+  .lb-cast .spell-name { font-size: 16px; font-weight: 800; }
+  .lb-cast .chips { display: flex; gap: 5px; margin-top: 4px; }
+  .lb-cast .slot-chip {
+    display: inline-block; background: color-mix(in srgb, var(--conc) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--conc) 50%, transparent);
+    border-radius: 999px; padding: 0 8px; font-size: 11px; font-weight: 600;
+  }
+  .lb-save .save-label { font-variant-caps: all-small-caps; letter-spacing: .45px; font-weight: 700; font-size: 13.5px; }
+  .lb-roll.save { cursor: default; }
+  .lb-roll.save .mod { font-size: 12px; color: var(--text-muted); }
+  .lb-roll.save .vs { font-size: 11px; color: var(--text-muted); }
+  .lb-roll.save .total.ok { color: var(--success); }
+  .lb-roll.save .total.fail { color: var(--danger); }
+  .lb-roll.save .verdict.ok { color: var(--success); }
+  .lb-roll.save .verdict.fail { color: var(--danger); }
+  .type.fire { color: var(--dt-fire); } .type.cold { color: var(--dt-cold); }
+  .type.slashing { color: var(--dt-slashing); } .type.radiant { color: var(--dt-radiant); }
+  .type.piercing { color: var(--dt-piercing); }
+
+  /* ---- hover toolbar + editor ------------------------------------------- */
+  .log-block-tools {
+    position: absolute; top: 4px; right: 6px; display: flex; gap: 3px;
+    opacity: 0; transition: opacity .12s; z-index: 2;
+  }
+  .log-block:hover .log-block-tools { opacity: 1; }
+  .log-block-tools button {
+    font: inherit; font-size: 11px; line-height: 1;
+    background: var(--bg-panel); color: var(--text-muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 6px; cursor: pointer;
+  }
+  .log-block-tools button:hover { color: var(--text); border-color: var(--text-muted); }
+  .log-block-tools button.del:hover { color: var(--danger); border-color: var(--danger); }
+
+  .log-edit-form {
+    margin-top: 6px; padding: 7px 8px; background: var(--bg-panel);
+    border: 1px solid var(--warn); border-radius: 7px;
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  }
+  .log-edit-form label { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--text-muted); }
+  .log-edit-form select, .log-edit-form input {
+    font: inherit; font-size: 12px; background: var(--bg-panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px;
+  }
+  .log-edit-form input.num { width: 52px; }
+  .log-edit-form .buttons { margin-left: auto; display: flex; gap: 5px; }
+  .log-edit-form button {
+    font: inherit; font-size: 11.5px; border-radius: 6px; padding: 4px 9px; cursor: pointer;
+    background: var(--bg-panel-2); color: var(--text-muted); border: 1px solid var(--border);
+  }
+  .log-edit-form button.save { color: #fff; background: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="col w320">
+  <h4>Sidebar width (320px — the live combat panel)</h4>
+  <div class="panel" id="p1"></div>
+</div>
+<div class="col w460">
+  <h4>Wide (460px — archive / phone landscape feel)</h4>
+  <div class="panel" id="p2"></div>
+</div>
+
+<div class="controls">
+  <button id="denseBtn">Hide turn markers</button>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Data model of the mockup — mirrors what the real component will receive.
+// Every field is optional; the renderer only draws what exists.
+// ---------------------------------------------------------------------------
+const NOW = Date.now();
+const STREAM = [
+  { sep: 'bound', label: '⚔ Combat started' },
+  { sep: 'round', n: 1 },
+  { sep: 'turn', name: 'Goblin Warrior 2', type: 'monster' },
+
+  { card: { name: 'Goblin Warrior 2', type: 'monster', ts: NOW - 240000, src: 'Deck' }, blocks: [
+    { kind: 'attack', action: 'Scimitar', target: { name: 'Seraphina Dawnbringer', type: 'pc' },
+      roll: { dice: [15], kept: 15, mod: 4, total: 19, verdict: 'hit' },
+      dmg: { type: 'slashing', formula: '1d6+2', total: 5, breakdown: '1d6 [3] +2' } },
+  ]},
+  { card: { name: 'Seraphina Dawnbringer', type: 'pc', ts: NOW - 240000, src: 'Deck' }, blocks: [
+    { kind: 'take', amount: 5, dmgType: 'slashing', from: { name: 'Goblin Warrior 2', type: 'monster' } },
+  ]},
+
+  { sep: 'turn', name: 'Aria Windwhisper', type: 'pc' },
+
+  { card: { name: 'Aria Windwhisper', type: 'pc', ts: NOW - 180000, src: 'Phone (Alex)' }, blocks: [
+    { kind: 'attack', action: 'Rapier', target: { name: 'Goblin Warrior 2', type: 'monster' },
+      adv: 'adv',
+      roll: { dice: [17, 6], kept: 17, mod: 5, total: 22, verdict: 'hit' },
+      dmg: { type: 'piercing', formula: '1d8+3', total: 8, breakdown: '1d8 [5] +3' } },
+    { kind: 'attack', action: 'Shortbow', target: { name: 'Goblin Warrior 3', type: 'monster' },
+      roll: { dice: [20], kept: 20, mod: 5, total: 25, verdict: 'crit' },
+      dmg: { type: 'piercing', formula: '1d6+3 ×2', total: 16, breakdown: '1d6 [5] ×2 +3 · crit doubles the dice' } },
+  ]},
+  { card: { name: 'Goblin Warrior 3', type: 'monster', ts: NOW - 180000, src: 'Phone (Alex)' }, blocks: [
+    { kind: 'take', amount: 16, dmgType: 'piercing', from: { name: 'Aria Windwhisper', type: 'pc' } },
+    { kind: 'kill' },
+  ]},
+
+  { sep: 'turn', name: 'Bartholomew Quill', type: 'pc' },
+
+  { card: { name: 'Bartholomew Quill', type: 'pc', ts: NOW - 120000, src: 'Phone' }, blocks: [
+    { kind: 'cast', spell: 'Fireball', slot: 3 },
+    { kind: 'attack', action: 'Fire Bolt', target: { name: 'Worg 1', type: 'monster' },
+      adv: 'dis',
+      roll: { dice: [8, 14], kept: 8, mod: 5, total: 13, verdict: 'miss' } },
+  ]},
+  { card: { name: 'Worg 1', type: 'monster', ts: NOW - 120000, src: 'DM' }, blocks: [
+    { kind: 'save', label: 'DEX save vs Fireball', die: 5, mod: 1, total: 6, dc: 14, ok: false },
+    { kind: 'take', amount: 24, dmgType: 'fire', from: { name: 'Bartholomew Quill', type: 'pc' } },
+    { kind: 'cond', condition: 'Prone', added: true },
+  ]},
+
+  // bare damage from the dice roller — no actor, no type: the enrich case
+  { card: { name: 'Bugbear Warrior', type: 'monster', ts: NOW - 90000, src: 'DM' }, blocks: [
+    { kind: 'take', amount: 6 },
+  ]},
+
+  { sep: 'round', n: 2 },
+  { sep: 'turn', name: 'Seraphina Dawnbringer', type: 'pc' },
+
+  { card: { name: 'Seraphina Dawnbringer', type: 'pc', ts: NOW - 60000, src: 'Phone (Mia)' }, blocks: [
+    { kind: 'cast', spell: 'Bless', slot: 1, conc: true },
+    { kind: 'save', label: 'Concentration (Bless)', die: 12, mod: 2, total: 14, dc: 11, ok: true },
+  ]},
+  { card: { name: 'Seraphina Dawnbringer', type: 'pc', ts: NOW - 40200, src: 'DM' }, blocks: [
+    { kind: 'take', amount: 19, dmgType: 'slashing', from: { name: 'Bugbear Warrior', type: 'monster' } },
+    { kind: 'down' },
+  ]},
+  { card: { name: 'Thorin Oakenshield', type: 'pc', ts: NOW - 31800, src: 'Phone' }, blocks: [
+    { kind: 'heal', amount: 12, from: { name: 'Seraphina Dawnbringer', type: 'pc' }, via: 'Cure Wounds' },
+  ]},
+  { card: { name: 'Worg 1', type: 'monster', ts: NOW - 19800, src: 'Deck' }, blocks: [
+    { kind: 'cond', condition: 'Prone', added: false },
+  ]},
+
+  { sep: 'bound', label: '🏁 Combat ended' },
+
+  // archive feel: entries older than 12h show a datetime instead of "x ago"
+  { card: { name: 'Thorin Oakenshield', type: 'pc', ts: NOW - 14 * 3_600_000, src: 'DM' }, blocks: [
+    { kind: 'take', amount: 9, dmgType: 'cold', from: { name: 'Worg 1', type: 'monster' } },
+  ]},
+];
+
+const COMBATANTS = ['Aria Windwhisper', 'Seraphina Dawnbringer', 'Thorin Oakenshield',
+  'Bartholomew Quill', 'Goblin Warrior 2', 'Goblin Warrior 3', 'Bugbear Warrior', 'Worg 1'];
+const DMG_TYPES = ['—', 'slashing', 'piercing', 'bludgeoning', 'fire', 'cold', 'radiant', 'necrotic', 'poison', 'acid', 'lightning', 'thunder', 'force', 'psychic'];
+
+// ---------------------------------------------------------------------------
+// Renderer — one function per block kind; only draws fields that exist.
+// ---------------------------------------------------------------------------
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const nameSpan = (p) => `<b class="sc ${p.type}">${esc(p.name)}</b>`;
+
+// relative below 12h, absolute datetime after
+function fmtTime(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return `${Math.max(1, Math.round(diff / 1000))}s ago`;
+  if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`;
+  if (diff < 12 * 3_600_000) return `${Math.round(diff / 3_600_000)}h ago`;
+  const d = new Date(ts);
+  return d.toLocaleString(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function blockHtml(b, cardName) {
+  const tools = `<span class="log-block-tools"><button class="edit" title="Edit">✎</button><button class="del" title="Delete">🗑</button></span>`;
+  if (b.kind === 'attack') {
+    const r = b.roll;
+    const diceHtml = r.dice.map((d) => `<span class="die tnum ${d === r.kept && r.dice.length > 1 ? '' : r.dice.length > 1 ? 'dropped' : ''}">${d}</span>`).join(' ');
+    const advTag = b.adv === 'adv' ? '<span class="adv">ADV</span>' : b.adv === 'dis' ? '<span class="dis">DIS</span>' : '';
+    const dmg = b.dmg ? `
+      <div class="lb-dmg">
+        <span class="dmg-label sc">Damage — <span class="type ${b.dmg.type}">${esc(b.dmg.type)}</span></span>
+        <div class="lb-dmg-row" data-x="bd">
+          <span class="formula tnum">${esc(b.dmg.formula)} =</span>
+          <span class="total type ${b.dmg.type} tnum">${b.dmg.total}</span>
+          <span class="chev">▶</span>
+        </div>
+        <div class="lb-breakdown tnum">${esc(b.dmg.breakdown).replace(/\[(.*?)\]/g, '<span class="rolls">[$1]</span>').replace(/(\d+d\d+)/g, '<span class="dice-n">$1</span>')}</div>
+      </div>` : '';
+    return `<div class="log-block" data-kind="attack">${tools}
+      <div class="lb-action">${esc(b.action)} <span class="to">→ ${nameSpan(b.target)}</span></div>
+      <div class="lb-roll" data-x="roll">
+        <span class="lbl">Attack</span>
+        ${advTag} ${diceHtml}
+        <span class="total ${r.verdict} tnum">${r.total}</span>
+        <span class="verdict ${r.verdict}">${r.verdict}</span>
+        <span class="chev">▶</span>
+      </div>
+      <div class="lb-breakdown tnum"><span class="dice-n">d20</span> <span class="rolls">${r.dice.join(' · ')}</span>${r.dice.length > 1 ? ` → keep ${r.kept}` : ''} ${r.mod >= 0 ? '+' : ''}${r.mod} = ${r.total}</div>
+      ${dmg}</div>`;
+  }
+  if (b.kind === 'take') {
+    const type = b.dmgType ? ` <span class="type sc ${b.dmgType}">${esc(b.dmgType)}</span>` : '';
+    const from = b.from ? ` <span class="from">— from ${nameSpan(b.from)}</span>` : '';
+    return `<div class="log-block" data-kind="take">${tools}
+      <div class="lb-effect">takes <span class="amount dmg tnum">${b.amount}</span>${type} <span class="sc">damage</span>${from}</div></div>`;
+  }
+  if (b.kind === 'heal') {
+    const from = b.from ? ` <span class="from">— from ${nameSpan(b.from)}${b.via ? ` (${esc(b.via)})` : ''}</span>` : '';
+    return `<div class="log-block" data-kind="heal">${tools}
+      <div class="lb-effect">heals <span class="amount heal tnum">${b.amount}</span>${from}</div></div>`;
+  }
+  if (b.kind === 'cast') {
+    const slot = b.slot ? `<span class="slot-chip">Level ${b.slot} slot</span>` : `<span class="slot-chip">Cantrip</span>`;
+    const conc = b.conc ? `<span class="slot-chip">Ⓒ Concentration</span>` : '';
+    return `<div class="log-block lb-cast" data-kind="cast">${tools}
+      <div class="lb-action">✨ casts <span class="spell-name sc">${esc(b.spell)}</span></div>
+      <div class="chips">${slot}${conc}</div></div>`;
+  }
+  if (b.kind === 'save') {
+    const mod = b.mod >= 0 ? `+${b.mod}` : `${b.mod}`;
+    return `<div class="log-block lb-save" data-kind="save">${tools}
+      <div class="save-label">🛡 ${esc(b.label)}</div>
+      <div class="lb-roll save">
+        <span class="lbl">Save</span>
+        <span class="die tnum">${b.die}</span>
+        <span class="mod tnum">${mod}</span>
+        <span class="total ${b.ok ? 'ok' : 'fail'} tnum">${b.total}</span>
+        <span class="vs tnum">vs DC ${b.dc}</span>
+        <span class="verdict ${b.ok ? 'ok' : 'fail'}">${b.ok ? 'held' : 'failed'}</span>
+      </div></div>`;
+  }
+  if (b.kind === 'cond') {
+    return `<div class="log-block" data-kind="cond">${tools}
+      <div class="lb-effect ${b.added ? '' : 'removed'}">${b.added ? 'is' : 'no longer'} <span class="cond-chip">${esc(b.condition)}</span></div></div>`;
+  }
+  if (b.kind === 'down') {
+    return `<div class="log-block lb-down" data-kind="down">${tools}💀 goes down</div>`;
+  }
+  if (b.kind === 'kill') {
+    return `<div class="log-block lb-down" data-kind="kill">${tools}💀 slain</div>`;
+  }
+  return '';
+}
+
+function render(el) {
+  el.innerHTML = STREAM.map((item) => {
+    if (item.sep === 'round') return `<div class="log-sep-round">Round ${item.n}</div>`;
+    if (item.sep === 'bound') return `<div class="log-sep-bound">${esc(item.label)}</div>`;
+    if (item.sep === 'turn') return `<div class="log-sep-turn ${item.type}">▶ <b class="sc">${esc(item.name)}</b>'s turn</div>`;
+    const c = item.card;
+    return `<div class="log-card ${c.type}">
+      <div class="log-card-header">
+        <span class="log-card-name">${esc(c.name)}</span>
+        <span class="log-card-meta">${esc(c.src)} · ${fmtTime(c.ts)}</span>
+      </div>
+      ${item.blocks.map((b) => blockHtml(b, c.name)).join('')}
+    </div>`;
+  }).join('');
+
+  // interactions -----------------------------------------------------------
+  el.querySelectorAll('.lb-roll, .lb-dmg-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      const bd = row.nextElementSibling;
+      if (bd?.classList.contains('lb-breakdown')) {
+        bd.classList.toggle('open');
+        row.classList.toggle('open');
+      }
+    });
+  });
+  el.querySelectorAll('.log-block-tools .del').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const block = btn.closest('.log-block');
+      const card = block.closest('.log-card');
+      block.remove();
+      if (!card.querySelector('.log-block')) card.remove();
+    });
+  });
+  el.querySelectorAll('.log-block-tools .edit').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const block = btn.closest('.log-block');
+      if (block.querySelector('.log-edit-form')) return;
+      const kind = block.dataset.kind;
+      const sel = (opts, v) => `<select>${opts.map((o) => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('')}</select>`;
+      let fields = '';
+      if (kind === 'take') fields = `
+        <label>Amount<input class="num" type="number" value="${block.querySelector('.amount')?.textContent ?? ''}"></label>
+        <label>Type${sel(DMG_TYPES, block.querySelector('.type')?.textContent ?? '—')}</label>
+        <label>From${sel(['—', ...COMBATANTS], block.querySelector('.from b')?.textContent ?? '—')}</label>`;
+      else if (kind === 'heal') fields = `
+        <label>Amount<input class="num" type="number" value="${block.querySelector('.amount')?.textContent ?? ''}"></label>
+        <label>From${sel(['—', ...COMBATANTS], block.querySelector('.from b')?.textContent ?? '—')}</label>`;
+      else if (kind === 'attack') fields = `
+        <label>Target${sel(COMBATANTS, block.querySelector('.to b')?.textContent)}</label>
+        <label>d20<input class="num" type="number" value="${block.querySelector('.lb-roll .die')?.textContent ?? ''}"></label>
+        <label>Total<input class="num" type="number" value="${block.querySelector('.lb-roll .total')?.textContent ?? ''}"></label>
+        <label>Verdict${sel(['hit', 'miss', 'crit'], block.querySelector('.verdict')?.textContent)}</label>
+        <label>Dmg<input class="num" type="number" value="${block.querySelector('.lb-dmg-row .total')?.textContent ?? ''}"></label>`;
+      else if (kind === 'cond') fields = `
+        <label>Condition${sel(['Prone', 'Poisoned', 'Frightened', 'Stunned', 'Restrained'], block.querySelector('.cond-chip')?.textContent)}</label>`;
+      else fields = `<label>Amount / value<input class="num" type="number"></label>`;
+      const form = document.createElement('div');
+      form.className = 'log-edit-form';
+      form.innerHTML = `${fields}<span class="buttons"><button class="cancel">Cancel</button><button class="save">Save</button></span>`;
+      block.appendChild(form);
+      form.querySelector('.cancel').addEventListener('click', () => form.remove());
+      form.querySelector('.save').addEventListener('click', () => {
+        // Mockup: just reflect a couple of fields back so the flow feels real.
+        const amt = form.querySelector('input[type=number]');
+        const target = block.querySelector('.amount, .lb-roll .total');
+        if (amt && target && amt.value) target.textContent = amt.value;
+        form.remove();
+      });
+    });
+  });
+}
+
+render(document.getElementById('p1'));
+render(document.getElementById('p2'));
+
+document.getElementById('denseBtn').addEventListener('click', (e) => {
+  document.body.classList.toggle('dense');
+  e.target.classList.toggle('on');
+  e.target.textContent = document.body.classList.contains('dense') ? 'Show turn markers' : 'Hide turn markers';
+});
+</script>
+</body>
+</html>

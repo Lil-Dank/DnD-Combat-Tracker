@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { LogEntry } from '../../shared/types';
-import { LogEntries } from './LogEntries';
+import type { Combatant, LogEntry } from '../../shared/types';
+import { LogCards } from '../../components/LogCards';
+import { api } from './api';
+import { useConfirm } from './Confirm';
 import { useI18n } from './i18n';
+import { monsterName } from '../../shared/i18n';
 
 const COLLAPSE_KEY = 'dct-log-collapsed';
 
@@ -9,18 +12,25 @@ const COLLAPSE_KEY = 'dct-log-collapsed';
  * The Combat screen's right-hand log sidebar. Always recording, costs nothing
  * when unwanted: the full-width button at the bottom collapses it to a slim
  * strip (remembered in localStorage). Newest entries at the bottom,
- * auto-scrolled.
+ * auto-scrolled — but not while an entry is being edited. The DM edits and
+ * deletes entries here; every other log surface is read-only.
  */
-export function CombatLogPanel({ log }: { log: LogEntry[] }) {
-  const { t } = useI18n();
+export function CombatLogPanel({ log, combatants }: { log: LogEntry[]; combatants: Combatant[] }) {
+  const { t, lang } = useI18n();
+  const confirm = useConfirm();
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(COLLAPSE_KEY) === '1',
   );
+  const [editing, setEditing] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const prevLen = useRef(log.length);
 
   useEffect(() => {
-    if (!collapsed) endRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [log.length, collapsed]);
+    // Follow new entries only — edits in place must not yank the view down.
+    const grew = log.length > prevLen.current;
+    prevLen.current = log.length;
+    if (!collapsed && !editing && grew) endRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [log.length, collapsed, editing]);
 
   const toggle = () => {
     setCollapsed((c) => {
@@ -47,7 +57,25 @@ export function CombatLogPanel({ log }: { log: LogEntry[] }) {
       </header>
       <div className="log-panel-body">
         {log.length === 0 && <p className="muted">{t('logPanel.empty')}</p>}
-        <LogEntries log={log} />
+        <LogCards
+          log={log}
+          lang={lang}
+          t={t}
+          showSource
+          editable
+          options={combatants.map((c) => ({
+            // Localized like the log's own snapshots, so dropdown and entry agree.
+            name: monsterName(lang, c.displayName),
+            type: c.type,
+          }))}
+          onEditEntry={(id, patch) => api.editLogEntry(id, patch)}
+          onDeleteEntry={async (id) => {
+            if (await confirm(t('log.card.deleteConfirm'), t('common.delete'))) {
+              await api.deleteLogEntry(id);
+            }
+          }}
+          onEditingChange={setEditing}
+        />
         <div ref={endRef} />
       </div>
       <button className="log-panel-toggle" onClick={toggle} title={t('logPanel.collapse')}>

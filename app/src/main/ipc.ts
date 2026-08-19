@@ -74,6 +74,8 @@ export function registerIpc(): void {
     store.toggleCondition(combatantId, condition),
   );
   ipcMain.handle('combat:removeCombatant', (_e, id) => store.removeCombatant(id));
+  ipcMain.handle('log:edit', (_e, { id, patch }) => store.editLogEntry(id, patch));
+  ipcMain.handle('log:delete', (_e, id) => store.deleteLogEntry(id));
   ipcMain.handle('combat:addMonster', (_e, { monsterTemplateId, quantity }) =>
     store.addMonsterToCombat(monsterTemplateId, quantity),
   );

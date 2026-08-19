@@ -13,6 +13,7 @@ import type {
   Condition,
   EncounterTemplate,
   LogEntry,
+  LogEntryPatch,
   LogSource,
   MonsterAction,
   MonsterTemplate,
@@ -24,6 +25,7 @@ import type {
 } from '../shared/types';
 import { DEFAULT_SETTINGS } from '../shared/types';
 import { monsterName } from '../shared/i18n';
+import { applyLogEntryDelete, applyLogEntryEdit } from '../shared/logEdit';
 import { migrateActions } from './migrate';
 
 export type ChangeListener = (state: AppState) => void;
@@ -410,6 +412,7 @@ export class AppStore {
       actorType: 'pc',
       attackName: spellName,
       ...(slotLevel !== null ? { slotLevel } : {}),
+      ...(concentration ? { conc: true } : {}),
       source: ctx.source,
       sourceName: ctx.sourceName,
     });
@@ -862,6 +865,20 @@ export class AppStore {
     });
     await this.setCombat(combat);
     this.emitCombatEvent('healApplied');
+  }
+
+  /** DM corrects a log entry; damage/heal edits shift the target's HP too. */
+  async editLogEntry(id: string, patch: LogEntryPatch): Promise<void> {
+    const combat = this.getActiveCombat();
+    if (!combat) return;
+    if (applyLogEntryEdit(combat, id, patch)) await this.setCombat(combat);
+  }
+
+  /** DM removes a log entry; a deleted damage/heal un-happens (HP refunded). */
+  async deleteLogEntry(id: string): Promise<void> {
+    const combat = this.getActiveCombat();
+    if (!combat) return;
+    if (applyLogEntryDelete(combat, id)) await this.setCombat(combat);
   }
 
   async toggleCondition(

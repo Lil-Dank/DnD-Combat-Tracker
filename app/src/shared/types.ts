@@ -361,15 +361,48 @@ export interface LogEntry {
   attackName?: string;
   /** cast entries: the slot level spent (absent for cantrips). */
   slotLevel?: number;
+  /** cast entries: the spell starts Concentration (renders the Ⓒ chip). */
+  conc?: boolean;
+  /** save entries: the DC rolled against (written since the card log). */
+  dc?: number;
   /** damage entries: the dice composition ("2d6 [3+5] +4 = 12"), DM-only. */
   math?: string;
   /** Damage type per bracket group of `math`, for type-tinted rendering. */
   mathTypes?: (string | null)[];
+  /**
+   * Explicit damage type for display/edit when mathTypes can't answer
+   * (bare dice-roller damage the DM enriched, edited entries).
+   */
+  damageType?: string;
   condition?: Condition;
   source: LogSource;
   /** Player-sourced entries: the claim's player name or a device label. */
   sourceName?: string;
 }
+
+/**
+ * DM-editable log-entry fields. id/ts/round/kind/source/sourceName stay
+ * immutable, and so do math/mathTypes — the player redaction keys on them.
+ */
+export type LogEntryPatch = Partial<
+  Pick<
+    LogEntry,
+    | 'actorName'
+    | 'actorType'
+    | 'targetName'
+    | 'targetType'
+    | 'amount'
+    | 'die'
+    | 'dice'
+    | 'total'
+    | 'outcome'
+    | 'attackName'
+    | 'slotLevel'
+    | 'dc'
+    | 'condition'
+    | 'damageType'
+  >
+>;
 
 /** An ended combat's log, kept until the DM deletes it. */
 export interface ArchivedCombat {

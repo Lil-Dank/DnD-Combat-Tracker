@@ -4,6 +4,7 @@ import type {
   ArchivedCombat,
   Condition,
   EncounterTemplate,
+  LogEntryPatch,
   MonsterAction,
   MonsterTemplate,
   PC,
@@ -105,6 +106,9 @@ const api = {
   toggleCondition: (combatantId: string, condition: Condition) =>
     ipcRenderer.invoke('combat:toggleCondition', { combatantId, condition }),
   removeCombatant: (id: string) => ipcRenderer.invoke('combat:removeCombatant', id),
+  editLogEntry: (id: string, patch: LogEntryPatch) =>
+    ipcRenderer.invoke('log:edit', { id, patch }),
+  deleteLogEntry: (id: string) => ipcRenderer.invoke('log:delete', id),
   addMonsterToCombat: (monsterTemplateId: string, quantity: number) =>
     ipcRenderer.invoke('combat:addMonster', { monsterTemplateId, quantity }),
 

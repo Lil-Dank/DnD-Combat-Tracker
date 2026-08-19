@@ -33,8 +33,9 @@ import type {
 } from '../../../shared/types';
 import { DEFAULT_SETTINGS, abilityMod } from '../../../shared/types';
 import { translate } from '../../../shared/i18n';
-import { rollD20, type RollMode } from '../../../shared/dice';
+import { rollD20, stripDiceResults, type RollMode } from '../../../shared/dice';
 import { spellToAction, spellActionName } from '../../../shared/spellAction';
+import { applyLogEntryDelete, applyLogEntryEdit } from '../../../shared/logEdit';
 import {
   abilityCodeLabel,
   monsterName,
@@ -649,6 +650,7 @@ export function createDemoApi(): Api {
         actorType: 'pc',
         attackName: spellName,
         ...(slotLevel !== null ? { slotLevel } : {}),
+        ...(concentration ? { conc: true } : {}),
         source: ctx.source,
         sourceName: ctx.sourceName,
       });
@@ -1116,6 +1118,7 @@ export function createDemoApi(): Api {
     attackId: string;
     attackName: string;
     damage: number;
+    dc: number | undefined;
     /** Damage on a successful save (mirror of playerServer.ts). */
     onSuccess: 'half' | 'none';
     targetIds: string[];
@@ -1152,7 +1155,9 @@ export function createDemoApi(): Api {
         actorName: pc?.name ?? '?',
         actorType: 'pc',
         attackName: label,
+        die: die ?? undefined,
         total,
+        dc: pending.dc,
         outcome: saved ? 'saved' : 'failed',
         source: 'player',
         sourceName: sourceNameFor(pending.pcId),
@@ -1184,7 +1189,9 @@ export function createDemoApi(): Api {
   }
 
   function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
-    // Mirror of the real server: no dice compositions on player surfaces.
+    // Mirror of the real server: live rolls keep their thrown composition
+    // ("2d6 +4") but lose the per-die results; attack-roll numbers stay
+    // DM-side. Archived fights skip the filter entirely.
     return log.map((e) =>
       e.kind === 'attackRoll' || e.math !== undefined
         ? {
@@ -1192,8 +1199,8 @@ export function createDemoApi(): Api {
             die: undefined,
             dice: undefined,
             total: e.kind === 'attackRoll' ? undefined : e.total,
-            math: undefined,
-            // mathTypes stays: damage type is table knowledge.
+            math: e.math === undefined ? undefined : stripDiceResults(e.math),
+            // mathTypes stays: damage type is table knowledge too.
           }
         : e,
     );
@@ -1314,7 +1321,9 @@ export function createDemoApi(): Api {
         const bonus = d.bonus ?? 0;
         total += rolls.reduce((a, b) => a + b, 0) + bonus;
         const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
-        mathParts.push(`${d.dice ?? `${d.count}d${d.die}`} [${rolls.join('+')}]${bonusStr}`);
+        // Canonical "1d4", not d.dice — the raw string may already contain
+        // the bonus ("1d4+2"), which bonusStr would then repeat.
+        mathParts.push(`${d.count}d${d.die} [${rolls.join('+')}]${bonusStr}`);
         mathTypes.push(d.type ?? null);
       } else {
         const value = d.average ?? 0;
@@ -1568,6 +1577,7 @@ export function createDemoApi(): Api {
           attackId: action.id,
           attackName: action.name,
           damage,
+          dc: action.save?.dc,
           onSuccess: action.save?.onSuccess ?? 'half',
           targetIds,
           session,
@@ -1814,7 +1824,8 @@ export function createDemoApi(): Api {
         templateName: found.templateName,
         endedAt: found.endedAt,
         rounds: found.rounds,
-        log: filterLogForPlayers(found.log),
+        // Unredacted, like the real server: Past Combats show everything.
+        log: found.log,
       });
       return;
     }
@@ -1843,6 +1854,7 @@ export function createDemoApi(): Api {
           targetType: 'pc',
           attackName: pending.attackName,
           total: r.total,
+          dc: pending.dc,
           outcome: r.saved ? 'saved' : 'failed',
           source: 'dm',
         });
@@ -2109,6 +2121,25 @@ export function createDemoApi(): Api {
         combat.currentIndex = 0;
       }
       save();
+    },
+    editLogEntry: async (id, patch) => {
+      const combat = cur().combat;
+      if (!combat) return;
+      if (applyLogEntryEdit(combat, id, patch)) {
+        // Fresh array identity: unlike the real app (fresh objects over IPC),
+        // the demo hands React the live objects, and LogCards memoizes on the
+        // log array.
+        combat.log = [...combat.log];
+        save();
+      }
+    },
+    deleteLogEntry: async (id) => {
+      const combat = cur().combat;
+      if (!combat) return;
+      if (applyLogEntryDelete(combat, id)) {
+        combat.log = [...combat.log];
+        save();
+      }
     },
     addMonsterToCombat: async (monsterTemplateId, quantity) => {
       const combat = cur().combat;

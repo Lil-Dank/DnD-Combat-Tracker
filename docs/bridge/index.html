@@ -157,6 +157,8 @@
       "isCurrentTurn": true,
       "isDowned": false,          // PCs at 0 HP stay listed, downed
       "conditions": ["Poisoned"], // canonical English values (see below)
+      "concentration": null,      // spell name being concentrated on
+                                  // (localized to `language`), or null
       "attacks": [                // rollable actions only
         {
           "id": "srd-2024_goblin.scimitar",
@@ -236,6 +238,13 @@
  "actorId":"6f0c…",
  "condition":"Poisoned"}</code></td>
         <td>Adds or removes the condition (canonical English value).</td>
+      </tr>
+      <tr>
+        <td><code>clearConcentration</code></td>
+        <td><code>{"type":"clearConcentration",
+ "actorId":"6f0c…"}</code></td>
+        <td>Ends the actor's Concentration (clears the
+          <code>concentration</code> tag). No-op when not concentrating.</td>
       </tr>
       <tr>
         <td><code>attackEvent</code></td>

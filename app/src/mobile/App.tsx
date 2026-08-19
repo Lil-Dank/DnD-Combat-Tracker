@@ -611,7 +611,7 @@ function CharacterCard({
           📝 {t('mob.myAttacks')}
         </button>
         <button className="big" onClick={onSpellbook}>
-          🕮 {t('spellbook.title')}
+          📖 {t('spellbook.title')}
         </button>
         {you.spellSlots && (
           <button
@@ -669,7 +669,7 @@ function SpellbookSheet({
   );
 
   return (
-    <Sheet title={`🕮 ${t('spellbook.title')}`} onClose={onClose} t={t}>
+    <Sheet title={`📖 ${t('spellbook.title')}`} onClose={onClose} t={t}>
       {!spellList ? (
         <p className="muted">{t('mob.connecting')}</p>
       ) : spellList.length === 0 ? (
@@ -1692,7 +1692,7 @@ function MyAttacks({
             {t('pcs.fromSpellbook')}
           </button>
           <button className="linkish archive-link" onClick={onSpellbook}>
-            🕮 {t('spellbook.title')}
+            📖 {t('spellbook.title')}
           </button>
           <button className="linkish archive-link" onClick={onArchive}>
             📜 {t('mob.archive')}

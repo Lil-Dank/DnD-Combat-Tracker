@@ -1013,6 +1013,10 @@ export function createDemoApi(): Api {
             isCurrentTurn: i === combat.currentIndex,
             isDowned: c.isDowned,
             conditions: c.conditions,
+            // Mirror of bridge.ts: pre-localized concentration label.
+            concentration: c.concentration
+              ? (lang === 'de' && c.concentration.deName) || c.concentration.name
+              : null,
             attacks: c.attacks
               // Mirror of bridge.ts: spell snapshots stay off the deck.
               .filter(
@@ -1068,6 +1072,14 @@ export function createDemoApi(): Api {
       case 'toggleCondition':
         if (cmd.actorId && cmd.condition) toggleCondition(cmd.actorId, cmd.condition as Condition, DECK_CTX);
         break;
+      case 'clearConcentration': {
+        const c = cur().combat?.combatants.find((x) => x.id === cmd.actorId);
+        if (c) {
+          c.concentration = null;
+          save();
+        }
+        break;
+      }
     }
     // A real deck press pulls the DM window to the Combat screen.
     for (const cb of focusListeners) cb();

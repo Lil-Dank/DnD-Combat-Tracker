@@ -19,6 +19,9 @@ export const CONDITIONS = [
   'Restrained', 'Stunned', 'Unconscious',
 ] as const;
 
+/** Sentinel item on the conditions grid: end the actor's Concentration. */
+const CONC_ITEM = '__concentration__';
+
 export type PickerOp = 'damage' | 'heal' | 'condition';
 type Mode =
   | 'actorSelect'
@@ -175,6 +178,12 @@ class Picker {
   private lastRoll = '';
   /** Selected target ids (one for attack rolls, several for AoE saves). */
   private targets: string[] = [];
+  /**
+   * Concentration entry on the conditions screen: snapshotted once when the
+   * screen opens, only when exactly one actor is selected and it is
+   * concentrating. Pressing the key clears the spell and the key with it.
+   */
+  private concEntry: { actorId: string; label: string } | null = null;
   // Custom dice roller state
   private diceCount = 1;
   private dieFaces = 20;
@@ -839,10 +848,14 @@ class Picker {
       if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
       if (slot === this.doneSlot) return K(L('doneKey'), 'confirm');
       // multi=true only reserves the Done key's slot for the layout.
-      const { map, paged, pageSlot } = this.listLayout([...CONDITIONS], true);
+      const { map, paged, pageSlot } = this.listLayout(this.conditionItems(), true);
       if (paged && slot === pageSlot) return K(L('more'), 'page');
       const cond = map.get(slot);
       if (!cond) return BLANK;
+      if (cond === CONC_ITEM) {
+        // Active concentration: pressing it ends the spell.
+        return K(`Ⓒ\n${wrapTitle(this.concEntry?.label ?? '', 7, 2)}`, 'selected');
+      }
       const selected = this.selectedTargetCombatants();
       const haveCount = selected.filter((c) => c.conditions.includes(cond)).length;
       // ✓ = all selected actors have it; ~ = only some (mixed).
@@ -893,6 +906,13 @@ class Picker {
       if (this.op === 'condition') {
         this.mode = 'conditions';
         this.page = 0;
+        // Checked once, on open: a single selected actor that is
+        // concentrating gets an extra key to drop the spell. Groups never do.
+        const sel = this.selectedTargetCombatants();
+        this.concEntry =
+          sel.length === 1 && sel[0].concentration
+            ? { actorId: sel[0].id, label: sel[0].concentration }
+            : null;
         return this.render();
       }
       if (!numpadLayout(this.cols, this.rows)) {
@@ -1353,6 +1373,11 @@ class Picker {
     }
   }
 
+  /** The conditions grid, plus the one-shot concentration key when present. */
+  private conditionItems(): string[] {
+    return this.concEntry ? [...CONDITIONS, CONC_ITEM] : [...CONDITIONS];
+  }
+
   private async pressConditions(slot: number, action: KeyAction): Promise<void> {
     if (slot === 0) {
       // Back to actor select (selection kept) to adjust who's affected.
@@ -1364,13 +1389,24 @@ class Picker {
       // Done/Cancel: return to the profile the Condition key was pressed on.
       return this.exit();
     }
-    const { map, paged, pageSlot } = this.listLayout([...CONDITIONS], true);
+    const { map, paged, pageSlot } = this.listLayout(this.conditionItems(), true);
     if (paged && slot === pageSlot) {
       this.page += 1;
       return this.render();
     }
     const cond = map.get(slot);
     if (!cond) return;
+    if (cond === CONC_ITEM) {
+      // Drop the spell; the key disappears with the entry.
+      if (this.concEntry) {
+        if (!bridge.send({ type: 'clearConcentration', actorId: this.concEntry.actorId })) {
+          await action.showAlert();
+          return;
+        }
+        this.concEntry = null;
+      }
+      return this.render();
+    }
     const selected = this.selectedTargetCombatants();
     if (selected.length === 0) return;
     // Uniform group toggle: if every selected actor has it → remove from all;

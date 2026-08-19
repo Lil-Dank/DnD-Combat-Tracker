@@ -1321,7 +1321,9 @@ export function createDemoApi(): Api {
         const bonus = d.bonus ?? 0;
         total += rolls.reduce((a, b) => a + b, 0) + bonus;
         const bonusStr = bonus === 0 ? '' : bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
-        mathParts.push(`${d.dice ?? `${d.count}d${d.die}`} [${rolls.join('+')}]${bonusStr}`);
+        // Canonical "1d4", not d.dice — the raw string may already contain
+        // the bonus ("1d4+2"), which bonusStr would then repeat.
+        mathParts.push(`${d.count}d${d.die} [${rolls.join('+')}]${bonusStr}`);
         mathTypes.push(d.type ?? null);
       } else {
         const value = d.average ?? 0;

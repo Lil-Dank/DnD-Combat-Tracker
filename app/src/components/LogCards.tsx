@@ -149,6 +149,8 @@ export function LogCards({
       dice.length > 1 ? (r.die === Math.max(...dice) ? 'adv' : 'dis') : null;
     const rollKey = `roll-${r.id}`;
     const rollBreakdown = logRollSegments(lang, r);
+    // Die-less manual totals have no composition to reveal ("= 18").
+    const rollExpands = !!rollBreakdown && r.die !== undefined;
     const d = b.damage;
     const dmgType = d ? entryDamageType(d) : null;
     const dmgKey = d ? `dmg-${d.id}` : '';
@@ -171,8 +173,8 @@ export function LogCards({
         {hasNumbers ? (
           <>
             <div
-              className={`lb-roll ${open.has(rollKey) ? 'open' : ''}`}
-              onClick={() => rollBreakdown && toggle(rollKey)}
+              className={`lb-roll ${open.has(rollKey) ? 'open' : ''} ${rollExpands ? '' : 'noclick'}`}
+              onClick={() => rollExpands && toggle(rollKey)}
             >
               <span className="lbl">{t('log.card.attack')}</span>
               {advMode === 'adv' && <span className="adv">ADV</span>}
@@ -187,11 +189,11 @@ export function LogCards({
               ))}
               <span className={`total tnum ${r.outcome ?? 'hit'}`}>{r.total}</span>
               <span className={`verdict ${r.outcome ?? 'hit'}`}>
-                {t(`log.outcome.${r.outcome ?? 'hit'}`)}
+                {t(`log.card.outcome.${r.outcome ?? 'hit'}`)}
               </span>
-              {rollBreakdown && <span className="chev">▶</span>}
+              {rollExpands && <span className="chev">▶</span>}
             </div>
-            {rollBreakdown && open.has(rollKey) && (
+            {rollExpands && rollBreakdown && open.has(rollKey) && (
               <div className="lb-breakdown tnum">
                 <SegText segs={rollBreakdown} />
               </div>
@@ -202,7 +204,7 @@ export function LogCards({
           <div className="lb-roll noclick">
             <span className="lbl">{t('log.card.attack')}</span>
             <span className={`verdict solo ${r.outcome ?? 'hit'}`}>
-              {t(`log.outcome.${r.outcome ?? 'hit'}`)}
+              {t(`log.card.outcome.${r.outcome ?? 'hit'}`)}
             </span>
           </div>
         )}
@@ -288,12 +290,21 @@ export function LogCards({
   const renderTextBlock = (b: CardBlock & { kind: 'take' | 'heal' | 'condition' | 'downkill' }) => {
     const e = b.entry;
     const cls = b.kind === 'downkill' ? 'log-block lb-down' : 'log-block';
+    // Unpaired damage with math (AoE spells, dice-roller hits): this line is
+    // the roll's only home, so show the composition here. Paired damage
+    // already renders its math on the attacker's card.
+    const showMath = b.kind === 'take' && !b.paired && !!e.math;
     return (
       <div key={b.key} className={cls} data-kind={b.kind}>
         {tools(e)}
         <div className="lb-effect">
           <SegText segs={logCardSegments(lang, e)} />
         </div>
+        {showMath && (
+          <div className="lb-breakdown tnum">
+            <SegText segs={rollMathSegments(displayDice(lang, e.math!), e.mathTypes)} />
+          </div>
+        )}
         {editor(e)}
       </div>
     );

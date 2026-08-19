@@ -20,7 +20,8 @@ export type CardBlock =
   | { kind: 'attack'; key: string; roll: LogEntry; damage?: LogEntry }
   | { kind: 'cast'; key: string; entry: LogEntry }
   | { kind: 'save'; key: string; entry: LogEntry }
-  | { kind: 'take'; key: string; entry: LogEntry }
+  /** `paired`: the roll math already renders on the attacker's card. */
+  | { kind: 'take'; key: string; entry: LogEntry; paired?: boolean }
   | { kind: 'heal'; key: string; entry: LogEntry }
   | { kind: 'condition'; key: string; entry: LogEntry }
   | { kind: 'downkill'; key: string; entry: LogEntry };
@@ -163,9 +164,13 @@ export function buildLogCards(log: LogEntry[]): CardItem[] {
     // Paired damage: attach the roll math to the attacker's block, then let
     // the application line fall through to the target's card as usual.
     const attackId = e.kind === 'damage' ? damageToAttack.get(e.id) : undefined;
+    let paired = false;
     if (attackId) {
       const ab = attackBlocks.get(attackId);
-      if (ab) ab.damage = e;
+      if (ab) {
+        ab.damage = e;
+        paired = true;
+      }
     }
 
     const subject = subjectOf(e);
@@ -199,6 +204,7 @@ export function buildLogCards(log: LogEntry[]): CardItem[] {
     }
     const block = blockOf(e);
     if (block.kind === 'attack') attackBlocks.set(e.id, block);
+    if (block.kind === 'take' && paired) block.paired = true;
     current.blocks.push(block);
     current.ts = e.ts; // the card's clock follows its latest entry
   }

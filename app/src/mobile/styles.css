@@ -980,6 +980,7 @@ h3 {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 .lb-roll .verdict.solo { margin-left: auto; }
@@ -1088,7 +1089,7 @@ h3 {
 
 .lb-save .save-label { font-weight: 700; font-size: 14.5px; }
 .lb-roll.save .mod { font-size: 13px; color: var(--muted); }
-.lb-roll.save .vs { font-size: 12px; color: var(--muted); }
+.lb-roll.save .vs { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .lb-roll.save .total.ok { color: var(--good); }
 .lb-roll.save .total.fail { color: var(--bad); }
 .lb-roll.save .verdict.ok { color: var(--good); }

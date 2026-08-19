@@ -1691,12 +1691,16 @@ function MyAttacks({
           >
             {t('pcs.fromSpellbook')}
           </button>
-          <button className="linkish archive-link" onClick={onSpellbook}>
-            📖 {t('spellbook.title')}
-          </button>
-          <button className="linkish archive-link" onClick={onArchive}>
-            📜 {t('mob.archive')}
-          </button>
+          {/* Navigation, not actions: real buttons, but in the lighter
+              outline style so they read apart from the editor buttons. */}
+          <div className="sheet-nav-row">
+            <button className="big ghost" onClick={onSpellbook}>
+              📖 {t('spellbook.title')}
+            </button>
+            <button className="big ghost" onClick={onArchive}>
+              📜 {t('mob.archive')}
+            </button>
+          </div>
         </>
       )}
 

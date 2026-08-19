@@ -70,6 +70,8 @@ cpSync(join(app, 'scripts', 'demo-player', 'player-shim.js'), join(dist, 'player
 // 4. SRD data + script tag
 mkdirSync(join(dist, 'srd'), { recursive: true });
 cpSync(join(app, 'resources', 'srd', 'monsters.json'), join(dist, 'srd', 'monsters.json'));
+cpSync(join(app, 'resources', 'srd', 'spells.json'), join(dist, 'srd', 'spells.json'));
+cpSync(join(app, 'resources', 'srd', 'spells.de.json'), join(dist, 'srd', 'spells.de.json'));
 
 // Bridge protocol docs ride along at /bridge/ on the same Pages site.
 cpSync(join(app, '..', 'docs', 'bridge'), join(dist, 'bridge'), { recursive: true });

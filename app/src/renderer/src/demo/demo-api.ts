@@ -33,6 +33,7 @@ import type {
 } from '../../../shared/types';
 import { DEFAULT_SETTINGS } from '../../../shared/types';
 import { rollD20, type RollMode } from '../../../shared/dice';
+import { spellToAction } from '../../../shared/spellAction';
 import {
   abilityCodeLabel,
   monsterName,
@@ -683,7 +684,12 @@ export function createDemoApi(): Api {
         notes: 'Dwarf fighter 5 · speed 25 ft',
         attacks: [pcAttack('Warhammer', 6, null, '1d10+4', 1, 10, 4, 9, 'bludgeoning')],
       },
-      { name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2, attacks: [] },
+      {
+        name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2,
+        abilities: { str: 8, dex: 14, con: 12, int: 17, wis: 12, cha: 10 },
+        notes: 'Human wizard 5 · Arcane Recovery · speed 30 ft',
+        attacks: [],
+      },
       {
         name: 'Seraphina Dawnbringer', maxHp: 45, ac: 17, initMod: 1,
         attacks: [pcAttack('Sacred Flame', null, { ability: 'DEX', dc: 13 }, '1d8', 1, 8, 0, 4, 'radiant')],
@@ -691,6 +697,28 @@ export function createDemoApi(): Api {
     ]) {
       cur().pcs.push({ id: uuid(), ...p });
     }
+
+    // The casters carry spellbook snapshots + slots, so the demo shows the
+    // whole cast flow (slot prompt, upcast, healing) out of the box.
+    await importSrdSpells();
+    const spellByName = (n: string) => data.spells.find((s) => s.name === n);
+    const attachSpell = (pcName: string, spellName: string, opts: { toHit?: number; dc?: number }) => {
+      const pc = cur().pcs.find((p) => p.name === pcName);
+      const spell = spellByName(spellName);
+      if (!pc || !spell) return;
+      pc.attacks.push(spellToAction(spell, opts, `spell.${uuid()}`, pc.attacks.length));
+    };
+    attachSpell('Bartholomew Quill', 'Fire Bolt', { toHit: 5 });
+    attachSpell('Bartholomew Quill', 'Fireball', { dc: 14 });
+    attachSpell('Bartholomew Quill', 'Misty Step', {});
+    attachSpell('Seraphina Dawnbringer', 'Cure Wounds', {});
+    attachSpell('Seraphina Dawnbringer', 'Bless', {});
+    const slots = (pcName: string, current: number[]) => {
+      const pc = cur().pcs.find((p) => p.name === pcName);
+      if (pc) pc.spellSlots = { max: [4, 3, 2, 0, 0, 0, 0, 0, 0], current: [...current, 0, 0, 0, 0, 0, 0] };
+    };
+    slots('Bartholomew Quill', [4, 3, 2]);
+    slots('Seraphina Dawnbringer', [4, 2, 2]);
 
     const byName = (n: string) => data.monsters.find((m) => m.name === n);
     const tpl = (name: string, entries: Array<[string, number]>): void => {
@@ -1113,6 +1141,7 @@ export function createDemoApi(): Api {
             abilities: ownPc.abilities ?? null,
             notes: ownPc.notes ?? '',
             attacks: ownPc.attacks,
+            spellSlots: ownPc.spellSlots ?? null,
             combatantId: ownCombatant?.id ?? null,
           }
         : null,
@@ -1150,7 +1179,10 @@ export function createDemoApi(): Api {
     return own !== undefined && targets.length === 1 && targets[0] === own.id;
   }
 
-  function rollActionDamage(action: MonsterAction): {
+  function rollActionDamage(
+    action: MonsterAction,
+    extra?: { count: number; die: number } | null,
+  ): {
     total: number;
     math: string;
     mathTypes: (string | null)[];
@@ -1177,8 +1209,41 @@ export function createDemoApi(): Api {
         mathParts.push(`${value}`);
       }
     }
+    // Upcast dice as their own math bracket (mirror of playerServer.ts).
+    if (extra && extra.count > 0) {
+      const rolls: number[] = [];
+      for (let i = 0; i < extra.count; i++) rolls.push(1 + Math.floor(Math.random() * extra.die));
+      allRolls.push(...rolls);
+      total += rolls.reduce((a, b) => a + b, 0);
+      mathParts.push(`${extra.count}d${extra.die} [${rolls.join('+')}]`);
+      mathTypes.push(action.onHit.damage[0]?.type ?? null);
+    }
     total = Math.max(0, total);
     return { total, math: `${mathParts.join(' + ')} = ${total}`, mathTypes, rolls: allRolls };
+  }
+
+  /** The upcast dice a chosen slot level adds (mirror of playerServer.ts). */
+  function upcastExtraOf(
+    action: MonsterAction,
+    slotLevel: unknown,
+  ): { count: number; die: number } | null {
+    const meta = action.spell;
+    if (!meta?.upcast || typeof slotLevel !== 'number' || slotLevel <= meta.level) return null;
+    return { count: meta.upcast.count * (slotLevel - meta.level), die: meta.upcast.die };
+  }
+
+  /**
+   * Spends the slot for a spell cast + logs it (mirror of spendSlotForCast).
+   * Non-spell actions pass; cantrips log free; false = noSlot.
+   */
+  function playerSpendSlot(pcId: string, action: MonsterAction, slotLevelRaw: unknown): boolean {
+    const meta = action.spell;
+    if (!meta) return true;
+    const ctx = playerCtx(pcId);
+    if (meta.level === 0) return castSpellInner(pcId, action.name, null, ctx);
+    const lvl = typeof slotLevelRaw === 'number' && Number.isInteger(slotLevelRaw) ? slotLevelRaw : -1;
+    if (lvl < meta.level || lvl > 9) return false;
+    return castSpellInner(pcId, action.name, lvl, ctx);
   }
 
   function sourceNameFor(pcId: string): string | undefined {
@@ -1271,6 +1336,10 @@ export function createDemoApi(): Api {
         sendTo({ type: 'error', code: 'badTarget' });
         return;
       }
+      if (!playerSpendSlot(pcId, action, cmd.slotLevel)) {
+        sendTo({ type: 'error', code: 'noSlot' });
+        return;
+      }
       const mode = cmd.advantage === 'adv' || cmd.advantage === 'dis' ? cmd.advantage : 'normal';
       const { die, dice } = rollD20(mode as RollMode);
       const total = die + (action.attack?.toHit ?? 0);
@@ -1332,7 +1401,7 @@ export function createDemoApi(): Api {
         sendTo({ type: 'error', code: 'badTarget' });
         return;
       }
-      const rolled = rollActionDamage(action);
+      const rolled = rollActionDamage(action, upcastExtraOf(action, cmd.slotLevel));
       // Damage lands after the roller's reveal, like the real server.
       setTimeout(() => {
         applyDamage(target.id, rolled.total, {
@@ -1366,8 +1435,12 @@ export function createDemoApi(): Api {
         sendTo({ type: 'error', code: 'notYourTurn' });
         return;
       }
+      if (!playerSpendSlot(pcId, action, cmd.slotLevel)) {
+        sendTo({ type: 'error', code: 'noSlot' });
+        return;
+      }
       if (action.type === 'save' || action.save) {
-        const rolledSave = rollActionDamage(action);
+        const rolledSave = rollActionDamage(action, upcastExtraOf(action, cmd.slotLevel));
         const damage =
           type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0
             ? (cmd.damage as number)
@@ -1470,6 +1543,111 @@ export function createDemoApi(): Api {
         total,
         outcome,
         damage,
+      });
+      return;
+    }
+
+    if (type === 'castSpell') {
+      // Utility spells: spend the slot, log the cast, nothing to roll.
+      const pc = cur().pcs.find((p) => p.id === pcId);
+      const action = pc?.attacks.find((a) => a.id === cmd.attackId);
+      if (!pc || !action || !action.spell) {
+        sendTo({ type: 'error', code: 'badAttack' });
+        return;
+      }
+      if (!playerGateAllows(pcId, [], 'attack')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      if (!playerSpendSlot(pcId, action, cmd.slotLevel)) {
+        sendTo({ type: 'error', code: 'noSlot' });
+        return;
+      }
+      sendTo({ type: 'castResult', actionId: action.id, slotLevel: (cmd.slotLevel as number) ?? null });
+      return;
+    }
+
+    if (type === 'castHealDigital' || type === 'castHealManual') {
+      // Healing spells: rolled or typed, applied as healing (mirror of the server).
+      const pc = cur().pcs.find((p) => p.id === pcId);
+      const action = pc?.attacks.find((a) => a.id === cmd.attackId);
+      const targetIds = (cmd.targetIds as string[]) ?? [];
+      if (!pc || !action || !action.spell?.healing) {
+        sendTo({ type: 'error', code: 'badAttack' });
+        return;
+      }
+      if (!playerGateAllows(pcId, targetIds, 'attack')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      const combat = cur().combat;
+      const target = combat?.combatants.find((c) => c.id === targetIds[0]);
+      if (!combat || !target) {
+        sendTo({ type: 'error', code: 'badTarget' });
+        return;
+      }
+      if (!playerSpendSlot(pcId, action, cmd.slotLevel)) {
+        sendTo({ type: 'error', code: 'noSlot' });
+        return;
+      }
+      if (type === 'castHealManual') {
+        const amount = cmd.amount as number;
+        if (!Number.isInteger(amount) || amount < 1 || amount > 999) {
+          sendTo({ type: 'error', code: 'badTarget' });
+          return;
+        }
+        applyHeal(target.id, amount, playerCtx(pcId));
+        sendTo({ type: 'healResult', targetId: target.id, targetName: target.displayName, amount });
+        return;
+      }
+      const rolled = rollActionDamage(action, upcastExtraOf(action, cmd.slotLevel));
+      setTimeout(() => {
+        applyHeal(target.id, rolled.total, playerCtx(pcId));
+      }, 2900);
+      sendTo({
+        type: 'healResult',
+        targetId: target.id,
+        targetName: target.displayName,
+        amount: rolled.total,
+        rolls: rolled.rolls,
+        math: rolled.math,
+      });
+      return;
+    }
+
+    if (type === 'longRest') {
+      // Never turn-gated, like saveAttack.
+      if (pcId) longRestInner(pcId);
+      return;
+    }
+
+    if (type === 'getSpells') {
+      const de = data.settings.language === 'de';
+      sendTo({
+        type: 'spellList',
+        spells: data.spells
+          .slice()
+          .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+          .map((s) => ({
+            id: s.id,
+            name: de && s.l10n?.de?.name ? s.l10n.de.name : s.name,
+            englishName: s.name,
+            level: s.level,
+            school: s.school,
+            castingTime: s.castingTime,
+            range: s.range,
+            components: s.components,
+            duration: s.duration,
+            concentration: s.concentration,
+            ritual: s.ritual,
+            text: de && s.l10n?.de?.text ? s.l10n.de.text : s.text,
+            attack: s.attack,
+            save: s.save,
+            damage: s.damage,
+            healing: s.healing,
+            upcast: s.upcast,
+            upcastText: s.upcastText,
+          })),
       });
       return;
     }

@@ -23,7 +23,7 @@ already in progress.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v3.2.0-success)
+![Release](https://img.shields.io/badge/release-v3.3.0-success)
 
 </div>
 
@@ -53,7 +53,7 @@ name, and the combat log keeps the story on the right.</i>
 - [Live demo](#live-demo)
 - [Install](#install)
 - [Using the app](#using-the-app)
-  - [Campaigns](#campaigns) · [Party](#party) · [Monsters](#monsters) · [Encounters](#encounters) · [Combat](#combat) · [Player View](#player-view--and-the-chroma-key-setup)
+  - [Campaigns](#campaigns) · [Party](#party) · [Monsters](#monsters) · [Spellbook](#spellbook--spellcasting) · [Encounters](#encounters) · [Combat](#combat) · [Player View](#player-view--and-the-chroma-key-setup)
   - [Combat log & archive](#combat-log--archive)
   - [Themes](#themes) · [Language](#language)
 - [Player phone companion](#player-phone-companion)
@@ -74,6 +74,7 @@ name, and the combat log keeps the story on the right.</i>
 | --- | --- |
 | 🗂️ **Campaigns** | Run several tables from one install: party, encounters, combat and archive are scoped per campaign and [hot-swap from the sidebar](#campaigns) — even mid-combat. The monster library and settings stay shared. |
 | 🧙 **Party & monster libraries** | PCs with HP/AC/initiative and their own attacks; 331 SRD 5.2.1 monsters importable in one click, with ability scores and fully structured attacks. Add your own too. |
+| 📖 **Spellbook & spellcasting** | [All 339 SRD 5.2.1 spells](#spellbook--spellcasting) with full rules text in English *and* German. Spells attach to characters as castable actions; per-level spell slots with an upcast prompt, healing rolls, and Concentration tracking with automatic CON-save prompts. |
 | 📋 **Encounter templates** | Reusable monster + quantity sets (4× Goblin Warrior, 1× Bugbear). Start combat straight from a card. |
 | ⚔️ **Combat engine** | Initiative rolling (all, or monsters-only), drag-to-settle ties, live HP and conditions in an aligned table, mid-combat monster adds, attack resolution vs AC with crits and save-for-half. |
 | 📺 **Player View** | Display-only second-monitor window. Monsters show no numbers — just a progressive "bloodied" reddening. Auto-fits any actor count. **Styled for chroma keying.** |
@@ -107,7 +108,7 @@ for anyone integrating their own hardware or overlays.
 
 Grab both files from the [**latest release**](../../releases/latest):
 
-1. **App** — run `Deck of Many Turns Setup 3.2.0.exe` (NSIS installer, choose your own directory).
+1. **App** — run `Deck of Many Turns Setup 3.3.0.exe` (NSIS installer, choose your own directory).
 2. **Stream Deck plugin** — double-click `com.dmtools.dnd-combat-tracker.streamDeckPlugin`;
    the Stream Deck app installs it and registers the bundled picker profiles.
 3. Start the app. The plugin connects within a few seconds — the DM window's sidebar
@@ -182,6 +183,40 @@ annotated with its size in **battle-grid squares** for play on a 1-inch tabletop
 ![The monster library with a stat block expanded, showing its ability table, structured attacks and save DCs](docs/images/monsters.png)
 
 </div>
+
+### Spellbook & spellcasting
+
+![The Spellbook: a searchable table of SRD spells with Fireball expanded, showing its header line, a compact roll summary and the full rules text](docs/images/spellbook.png)
+
+The **📖 Spellbook** tab holds a global spell library, shared across campaigns like
+the monster library: **Import SRD Spells** loads all 339 SRD 5.2.1 spells — full rules
+text in English *and* German — and homebrew spells sit alongside them in the same
+editor. Each spell carries a minimal structured layer (spell attack, saving throw
+with its damage-on-success rule, damage or healing dice, linear upcast), and
+**everything else stays readable rules text** — visible to the DM and the players at
+a glance, played out at the table instead of simulated.
+
+- **Spells become character actions.** "✨ From Spellbook" in the Party editor (and on
+  the phone) attaches a spell to a PC, asking for the caster's spell attack bonus or
+  save DC. The copy is **editable like any attack** — that is also how cantrips scale:
+  bump 1d10 to 2d10 when you hit level 5. No class or level rules, on purpose.
+- **Spell slots** are a simple per-level row on the PC, straight off the character
+  sheet. Casting asks **which slot to use** — each level shows how many are left, with
+  the upcast bonus previewed — then spends it automatically. Cantrips cast free, a
+  **Long Rest** (Party screen or phone) restores everything.
+- **Casting rolls like attacking.** Attack spells use the normal attack flow (upcast
+  dice join the damage roll), save spells go through the DM's adjudication modal —
+  and spells like *Acid Splash* correctly deal **no** damage on a success, not half.
+  Healing spells roll and apply as healing. Utility spells just spend the slot and
+  land in the log: *"Aria casts Misty Step (level 2)"*.
+- **Concentration is tracked.** Casting a concentration spell tags the character —
+  a chip on the combat row, the phone and the Player View. Taking damage prompts the
+  claiming phone for the Constitution save (DC = half the damage, minimum 10); a
+  failed save drops the spell. Going down breaks it outright, and the DM can always
+  clear the chip by hand — also straight from the Stream Deck's condition flow.
+- The DM can run the whole flow from the attack modal too, for players without a
+  phone. The **Stream Deck deliberately gets no spell keys** — slots and upcasts
+  want a richer prompt than hardware keys offer.
 
 ### Encounters
 
@@ -398,6 +433,12 @@ accounts.
 - **Players build their own attacks** on the phone with structured pickers — a die
   selector, a +/− count stepper and a damage-type dropdown — saved straight onto the
   PC record, editable by the DM in the Party screen.
+- **Spellcasting on glass** — attach spells from the 📖 spellbook reference (all
+  imported spells with full rules text, searchable at the table), cast with the slot
+  prompt and upcast preview, roll healing digitally or by hand, and answer
+  **Concentration saves** the moment your character takes damage — the phone pops the
+  CON check with a what-to-roll hint. Between fights the home screen is a character
+  card: stats, notes, spell-slot pips and a Long Rest button.
 - **Turn gating, enforced server-side** — by default players can only act on their
   own turn (viewing is always live). A Settings toggle relaxes it so self-targeted
   damage/heal works anytime; everything else stays turn-locked. No chaos.
@@ -455,6 +496,10 @@ flowchart LR
     C -->|"toggle another condition<br/>for the whole selection"| C
     C -->|"✓ Done"| X["Back to your profile"]
 ```
+
+When exactly one actor is selected and that actor is concentrating on a spell, the
+grid gains one extra key — **Ⓒ with the spell's name** — that ends the Concentration
+(and disappears with it). Groups never show it.
 
 #### Monster Attack flow
 
@@ -657,7 +702,7 @@ npm install
 npm run dev        # live-reload dev session
 npm run dev:mobile # (second terminal) rebuild the player web bundle on change
 npm run build      # compile main/preload/renderer + player web bundle to out/
-npm run dist       # → release/Deck of Many Turns Setup 3.2.0.exe (NSIS)
+npm run dist       # → release/Deck of Many Turns Setup 3.3.0.exe (NSIS)
 ```
 
 The player web page is served as plain static files from `out/mobile` in dev and
@@ -827,9 +872,9 @@ Project code is MIT-licensed (see `app/package.json`).
   change and restored on launch.
 - **Location:** `%APPDATA%/deck-of-many-turns/data/` — one JSON file per store, loaded
   into id-indexed maps in the main process and written back atomically (temp file +
-  rename) on every change. Global stores (monsters, settings, the campaign index) sit
-  at the root; each campaign keeps its own PCs, templates, active combat, archive and
-  player claims under `data/campaigns/<id>/`. First launch after the campaign update
+  rename) on every change. Global stores (monsters, spells, settings, the campaign
+  index) sit at the root; each campaign keeps its own PCs, templates, active combat,
+  archive and player claims under `data/campaigns/<id>/`. First launch after the campaign update
   moves existing data into a "Main Campaign" folder; first launch after the app rename
   copies data from the old `%APPDATA%/dnd-combat-tracker` location (the old folder
   stays as a backup).

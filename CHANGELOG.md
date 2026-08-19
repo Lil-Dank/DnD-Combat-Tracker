@@ -7,6 +7,54 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ## [Unreleased]
 
+## [3.3.0] — 2026-08-19
+
+### Added
+
+- **Spellbook** — a global spell library beside the monsters: **Import SRD
+  Spells** loads all 339 SRD 5.2.1 spells with full rules text in English and
+  German; homebrew spells live in the same editor. A minimal structured layer
+  (spell attack, save with its damage-on-success rule, damage/healing dice,
+  linear upcast) covers what gets rolled — everything else stays readable
+  rules text.
+- **Spells as character actions** — attach a spell to a PC from the Party
+  editor or the phone ("✨ From Spellbook"), supplying the caster's attack
+  bonus or save DC. The copy is editable like any attack, which is also how
+  cantrip dice scale as characters level.
+- **Spell slots & casting** — per-level slot rows on the PC (straight off the
+  character sheet); casting asks which slot to spend, previews the upcast
+  bonus and decrements automatically. Cantrips cast free; Long Rest (Party
+  screen or phone) restores everything. Healing spells roll and apply as
+  healing, digital or manual with a what-to-roll hint; utility spells spend
+  the slot and land in the log. The DM attack modal runs the same flow for
+  players without a phone; slots show as pips on Party rows and the combat
+  expander.
+- **Concentration tracking** — casting a concentration spell tags the
+  character (condition-style chip on the DM combat row with ✕, phone
+  initiative rows and the Player View). Damage prompts the claiming phone
+  with the Constitution save (DC = half the damage, min 10) — rolled
+  digitally or typed with a hint; a failed save or going down breaks the
+  spell. The Stream Deck's condition grid gains a one-shot **Ⓒ** key to end a
+  single selected actor's Concentration.
+- **Phone spellbook & character card** — a searchable reference of every
+  imported spell with full rules text, and an out-of-combat home screen
+  showing stats, notes, slot pips, Long Rest and quick navigation.
+- Bridge protocol: combatants carry a localized `concentration` label; new
+  `clearConcentration` command.
+
+### Changed
+
+- Save-based actions can now deal **no** damage on a successful save (Acid
+  Splash and friends) instead of always half; every resolver and label
+  respects the rule. Existing monster data keeps its half-on-save behavior.
+- The phone's Spellbook and Past-combats links are proper outline buttons.
+
+### Fixed
+
+- Starting a second copy of the app while another held the player-web port
+  left it stuck behind an "Uncaught Exception: EADDRINUSE" dialog with no
+  window; the port conflict now surfaces only as the Settings status text.
+
 ## [3.2.0] — 2026-08-18
 
 ### Added
@@ -259,7 +307,8 @@ First packaged release.
   Picker profiles for MK.2 (5×3), XL (8×4) and 9×4 decks.
 - Four themes; local-only JSON storage.
 
-[Unreleased]: https://github.com/Lil-Dank/deck-of-many-turns/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/Lil-Dank/deck-of-many-turns/compare/v3.3.0...HEAD
+[3.3.0]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.3.0
 [3.2.0]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.2.0
 [3.1.2]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.1.2
 [3.1.1]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.1.1

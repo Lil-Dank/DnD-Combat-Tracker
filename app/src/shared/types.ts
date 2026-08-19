@@ -113,6 +113,11 @@ export interface MonsterAction {
     upcastText: string | null;
     /** The rolled dice apply as healing to an ally instead of damage. */
     healing: boolean;
+    /** Casting starts Concentration (tagged on the combatant, checked on damage). */
+    concentration?: boolean;
+    /** German name/text snapshot, so language switches localize the copy. */
+    deName?: string | null;
+    deText?: string | null;
   } | null;
 }
 
@@ -288,6 +293,12 @@ export interface Combatant {
   /** null while waiting for the DM to enter a PC's rolled initiative. */
   initiative: number | null;
   isDowned: boolean;
+  /**
+   * The Concentration spell this combatant is maintaining, shown as a
+   * condition-like tag. Set when a concentration spell is cast, replaced by
+   * the next one, cleared by a failed check or the DM.
+   */
+  concentration?: { name: string; deName?: string | null } | null;
 }
 
 export type CombatPhase = 'setup' | 'active';

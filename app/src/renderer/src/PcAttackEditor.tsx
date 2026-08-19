@@ -5,7 +5,7 @@ import { useI18n } from './i18n';
 import { DmgText } from './DmgText';
 import { DamageEditor } from '../../components/DamageEditor';
 import { useKenkuLibrary } from './useKenkuLibrary';
-import { spellToAction } from '../../shared/spellAction';
+import { spellToAction, spellActionName } from '../../shared/spellAction';
 import { spellLevelLabel } from '../../shared/i18n';
 import {
   ABILITIES,
@@ -65,7 +65,7 @@ export function PcAttackEditor({
         {pc.attacks.map((a) => (
           <li key={a.id}>
             <span>
-              <strong>{a.name}</strong>{' '}
+              <strong>{spellActionName(lang, a)}</strong>{' '}
               {a.spell && (
                 <span className="tag spell-chip" title={t('pcs.spellChipNote')}>
                   ✨ {spellLevelLabel(lang, a.spell.level)}

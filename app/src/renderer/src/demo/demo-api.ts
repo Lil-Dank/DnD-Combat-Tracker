@@ -31,9 +31,10 @@ import type {
   Spell,
   SpellSlots,
 } from '../../../shared/types';
-import { DEFAULT_SETTINGS } from '../../../shared/types';
+import { DEFAULT_SETTINGS, abilityMod } from '../../../shared/types';
+import { translate } from '../../../shared/i18n';
 import { rollD20, type RollMode } from '../../../shared/dice';
-import { spellToAction } from '../../../shared/spellAction';
+import { spellToAction, spellActionName } from '../../../shared/spellAction';
 import {
   abilityCodeLabel,
   monsterName,
@@ -398,6 +399,40 @@ export function createDemoApi(): Api {
         }
       } else {
         c.isDowned = true;
+        // Going down breaks concentration outright (incapacitated) — no check.
+        if (c.concentration) c.concentration = null;
+      }
+    }
+    // Damage to a concentrating PC → the claiming phone-sim gets a CON-save
+    // prompt (mirror of state.ts + playerServer.ts).
+    if (c.type === 'pc' && !c.isDowned && c.concentration) {
+      const session = [...playerSessions].find((s) => s.pcId === c.sourceId);
+      if (session) {
+        const pc = cur().pcs.find((p) => p.id === c.sourceId);
+        const conMod = pc?.abilities ? abilityMod(pc.abilities.con) : null;
+        const pending: ConcSave = {
+          id: uuid(),
+          pcId: c.sourceId,
+          combatantId: c.id,
+          spellName: c.concentration.name,
+          deName: c.concentration.deName ?? null,
+          dc: Math.max(10, Math.floor(amount / 2)),
+          damage: amount,
+          conMod,
+          session,
+        };
+        concSaves.set(pending.id, pending);
+        session.onMessage(
+          JSON.stringify({
+            type: 'concSave',
+            id: pending.id,
+            spellName: pending.spellName,
+            deName: pending.deName,
+            dc: pending.dc,
+            damage: amount,
+            conMod,
+          }),
+        );
       }
     }
     save();
@@ -590,6 +625,7 @@ export function createDemoApi(): Api {
     spellName: string,
     slotLevel: number | null,
     ctx: ActionCtx = DM_CTX,
+    concentration?: { name: string; deName?: string | null } | null,
   ): boolean {
     const pc = cur().pcs.find((p) => p.id === pcId);
     if (!pc) return false;
@@ -601,6 +637,11 @@ export function createDemoApi(): Api {
       pc.spellSlots = slots;
     }
     const combat = cur().combat;
+    // Only one spell can be concentrated on — a new one replaces the tag.
+    if (concentration && combat && combat.phase === 'active') {
+      const c = combat.combatants.find((x) => x.type === 'pc' && x.sourceId === pcId);
+      if (c) c.concentration = { ...concentration };
+    }
     if (combat) {
       pushLog(combat, {
         kind: 'cast',
@@ -973,7 +1014,12 @@ export function createDemoApi(): Api {
             isDowned: c.isDowned,
             conditions: c.conditions,
             attacks: c.attacks
-              .filter((a) => a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0))
+              // Mirror of bridge.ts: spell snapshots stay off the deck.
+              .filter(
+                (a) =>
+                  !a.spell &&
+                  (a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0)),
+              )
               .map((a) => ({
                 id: a.id,
                 name:
@@ -1065,6 +1111,60 @@ export function createDemoApi(): Api {
   }
   const pendingSaves = new Map<string, PendingSave>();
 
+  /** Pending Concentration checks (mirror of playerServer.ts). */
+  interface ConcSave {
+    id: string;
+    pcId: string;
+    combatantId: string;
+    spellName: string;
+    deName: string | null;
+    dc: number;
+    damage: number;
+    conMod: number | null;
+    session: PlayerSession;
+  }
+  const concSaves = new Map<string, ConcSave>();
+
+  function resolveConcSave(pending: ConcSave, die: number | null, total: number): void {
+    concSaves.delete(pending.id);
+    const saved = total >= pending.dc;
+    const lang = data.settings.language;
+    const label = `${translate(lang, 'spellbook.concentration')} (${
+      lang === 'de' && pending.deName ? pending.deName : pending.spellName
+    })`;
+    const pc = cur().pcs.find((p) => p.id === pending.pcId);
+    const combat = cur().combat;
+    if (combat) {
+      pushLog(combat, {
+        kind: 'save',
+        actorName: pc?.name ?? '?',
+        actorType: 'pc',
+        attackName: label,
+        total,
+        outcome: saved ? 'saved' : 'failed',
+        source: 'player',
+        sourceName: sourceNameFor(pending.pcId),
+      });
+      if (!saved) {
+        const c = combat.combatants.find((x) => x.id === pending.combatantId);
+        if (c) c.concentration = null;
+      }
+    }
+    save();
+    pending.session.onMessage(
+      JSON.stringify({
+        type: 'concSaveResult',
+        id: pending.id,
+        die,
+        total,
+        dc: pending.dc,
+        saved,
+        spellName: pending.spellName,
+        deName: pending.deName,
+      }),
+    );
+  }
+
   function tokenPcId(token: string | null): string | null {
     if (!token) return null;
     for (const [pcId, claim] of playerClaims()) if (claim.token === token) return pcId;
@@ -1105,6 +1205,7 @@ export function createDemoApi(): Api {
             isCurrentTurn: i === combat.currentIndex,
             isDowned: c.isDowned,
             conditions: c.conditions,
+            concentration: c.concentration ?? null,
             isBloodied: c.type === 'monster' ? c.currentHp < c.maxHp * 0.5 : undefined,
           };
           if (c.type !== 'pc') return base;
@@ -1240,10 +1341,13 @@ export function createDemoApi(): Api {
     const meta = action.spell;
     if (!meta) return true;
     const ctx = playerCtx(pcId);
-    if (meta.level === 0) return castSpellInner(pcId, action.name, null, ctx);
+    // Log snapshots carry names in the language active when the entry was made.
+    const spellName = spellActionName(data.settings.language, action);
+    const conc = meta.concentration ? { name: action.name, deName: meta.deName ?? null } : null;
+    if (meta.level === 0) return castSpellInner(pcId, spellName, null, ctx, conc);
     const lvl = typeof slotLevelRaw === 'number' && Number.isInteger(slotLevelRaw) ? slotLevelRaw : -1;
     if (lvl < meta.level || lvl > 9) return false;
-    return castSpellInner(pcId, action.name, lvl, ctx);
+    return castSpellInner(pcId, spellName, lvl, ctx, conc);
   }
 
   function sourceNameFor(pcId: string): string | undefined {
@@ -1621,8 +1725,22 @@ export function createDemoApi(): Api {
       return;
     }
 
+    if (type === 'concSaveDigital') {
+      const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
+      if (!pending || pending.session !== session) return;
+      const die = 1 + Math.floor(Math.random() * 20);
+      resolveConcSave(pending, die, die + (pending.conMod ?? 0));
+      return;
+    }
+
+    if (type === 'concSaveManual') {
+      const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
+      if (!pending || pending.session !== session || typeof cmd.total !== 'number') return;
+      resolveConcSave(pending, null, Math.floor(cmd.total));
+      return;
+    }
+
     if (type === 'getSpells') {
-      const de = data.settings.language === 'de';
       sendTo({
         type: 'spellList',
         spells: data.spells
@@ -1630,8 +1748,7 @@ export function createDemoApi(): Api {
           .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
           .map((s) => ({
             id: s.id,
-            name: de && s.l10n?.de?.name ? s.l10n.de.name : s.name,
-            englishName: s.name,
+            name: s.name,
             level: s.level,
             school: s.school,
             castingTime: s.castingTime,
@@ -1640,13 +1757,14 @@ export function createDemoApi(): Api {
             duration: s.duration,
             concentration: s.concentration,
             ritual: s.ritual,
-            text: de && s.l10n?.de?.text ? s.l10n.de.text : s.text,
+            text: s.text,
             attack: s.attack,
             save: s.save,
             damage: s.damage,
             healing: s.healing,
             upcast: s.upcast,
             upcastText: s.upcastText,
+            l10n: s.l10n ?? null,
           })),
       });
       return;
@@ -1852,7 +1970,8 @@ export function createDemoApi(): Api {
       save();
     },
     importSrdSpells,
-    castSpell: async (pcId, spellName, slotLevel) => castSpellInner(pcId, spellName, slotLevel),
+    castSpell: async (pcId, spellName, slotLevel, concentration) =>
+      castSpellInner(pcId, spellName, slotLevel, DM_CTX, concentration ?? null),
     longRest: async (pcId) => longRestInner(pcId),
 
     saveTemplate: async (t) => {
@@ -2055,6 +2174,13 @@ export function createDemoApi(): Api {
     },
     resolvePlayerSave: async (id, results) => resolvePlayerSave(id, results),
     dismissPlayerSave: async (id) => dismissPlayerSave(id),
+    setConcentration: async (combatantId, value) => {
+      const combat = cur().combat;
+      const c = combat?.combatants.find((x) => x.id === combatantId);
+      if (!combat || !c) return;
+      c.concentration = value ?? null;
+      save();
+    },
     onPlayerSavePending: (cb) => {
       const wrapped = (pending: object) => cb(pending as Parameters<typeof cb>[0]);
       savePendingListeners.add(wrapped);

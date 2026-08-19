@@ -38,10 +38,13 @@ export function registerIpc(): void {
   ipcMain.handle('spell:save', (_e, s) => store.saveSpell(s));
   ipcMain.handle('spell:delete', (_e, id) => store.deleteSpell(id));
   ipcMain.handle('spell:importSrd', () => importSrdSpells());
-  ipcMain.handle('pc:castSpell', (_e, { pcId, spellName, slotLevel }) =>
-    store.castSpell(pcId, spellName, slotLevel),
+  ipcMain.handle('pc:castSpell', (_e, { pcId, spellName, slotLevel, concentration }) =>
+    store.castSpell(pcId, spellName, slotLevel, undefined, concentration ?? null),
   );
   ipcMain.handle('pc:longRest', (_e, pcId) => store.longRest(pcId));
+  ipcMain.handle('combat:setConcentration', (_e, { combatantId, value }) =>
+    store.setConcentration(combatantId, value ?? null),
+  );
 
   ipcMain.handle('template:save', (_e, t) => store.saveTemplate(t));
   ipcMain.handle('template:delete', (_e, id) => store.deleteTemplate(id));

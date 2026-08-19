@@ -11,6 +11,7 @@ import { MonsterAttackModal, hasRollableAttacks } from '../MonsterAttackModal';
 import { useI18n } from '../i18n';
 import { CombatLogPanel } from '../CombatLogPanel';
 import { SlotPips } from '../SlotPips';
+import { spellActionName, spellActionText } from '../../../shared/spellAction';
 
 export function CombatScreen({
   state,
@@ -245,7 +246,7 @@ function SetupPhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => 
 // ---------------------------------------------------------------- active
 
 function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () => void }) {
-  const { t, mon, cond: cond2 } = useI18n();
+  const { t, lang, mon, cond: cond2 } = useI18n();
   const combat = state.combat!;
   const confirm = useConfirm();
   const [amounts, setAmounts] = useState<Record<string, string>>({});
@@ -373,7 +374,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                       {c.isDowned && <span className="downed-tag"> ✝ {t('combat.downed')}</span>}
                     </span>
                   </span>
-                  {c.conditions.length > 0 && (
+                  {(c.conditions.length > 0 || c.concentration) && (
                     <span className="row-conditions">
                       {c.conditions.map((cond) => (
                         <button
@@ -386,6 +387,19 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
                           <span className="chip-x">✕</span>
                         </button>
                       ))}
+                      {c.concentration && (
+                        <button
+                          className="condition-badge conc-badge"
+                          title={t('combat.clickToRemove')}
+                          onClick={() => void api.setConcentration(c.id, null)}
+                        >
+                          {t('spellbook.concentration')} (
+                          {lang === 'de' && c.concentration.deName
+                            ? c.concentration.deName
+                            : c.concentration.name}
+                          )<span className="chip-x">✕</span>
+                        </button>
+                      )}
                     </span>
                   )}
                 </span>
@@ -616,7 +630,7 @@ function AttackPanel({
   l10n?: import('../../../shared/i18n').MonsterL10n;
   slots?: import('../../../shared/types').SpellSlots | null;
 }) {
-  const { t, abilityCode, locAction, fmtRange } = useI18n();
+  const { t, lang, abilityCode, locAction, fmtRange } = useI18n();
   return (
     <div className="attack-panel">
       {combatant.abilities && <AbilityTable abilities={combatant.abilities} />}
@@ -628,17 +642,19 @@ function AttackPanel({
       )}
       {combatant.attacks.map((a) => {
         const loc = locAction(l10n, a);
+        const name = a.spell ? spellActionName(lang, a) : loc.name;
+        const text = a.spell ? spellActionText(lang, a) : loc.text;
         // Attack rolls render compactly; save/other actions live in their text.
-        const showText = a.type !== 'attack' && loc.text;
+        const showText = a.type !== 'attack' && text;
         return (
-          <div key={a.id} className="attack-panel-row" title={loc.text}>
-            <strong>{loc.name}</strong>
+          <div key={a.id} className="attack-panel-row" title={text}>
+            <strong>{name}</strong>
             {a.display.toHit && <span>{a.display.toHit} {t('combat.toHit')}</span>}
             {a.save && <span>{t('combat.saveDc', { ability: abilityCode(a.save.ability), dc: a.save.dc })}</span>}
             {loc.range && <span>{fmtRange(loc.range)}</span>}
             {loc.damage && <span><DmgText text={loc.damage} /></span>}
             {a.attack?.usage?.type === 'recharge' && <span className="muted">{t('attack.recharge', { min: a.attack.usage.min })}</span>}
-            {showText && <AttackText text={loc.text} />}
+            {showText && <AttackText text={text} />}
           </div>
         );
       })}

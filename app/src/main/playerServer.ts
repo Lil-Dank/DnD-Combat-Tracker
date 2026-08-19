@@ -10,6 +10,7 @@ import { handleAttackEvent } from './kenku';
 import { logAttackEvent } from './combatLog';
 import { rollD20, rollPool, type RollMode } from '../shared/dice';
 import { monsterName } from '../shared/i18n';
+import { spellActionName } from '../shared/spellAction';
 import type {
   AppState,
   Combatant,
@@ -17,6 +18,8 @@ import type {
   MonsterAction,
   PlayerClaimInfo,
 } from '../shared/types';
+import { abilityMod } from '../shared/types';
+import { translate } from '../shared/i18n';
 
 /**
  * LAN webserver for the player companion web app: one HTTP server (static
@@ -62,6 +65,22 @@ interface PendingSave {
   /** Log attribution captured when the save was started. */
   sourceName?: string;
 }
+
+/** A pending Constitution save to keep Concentration after taking damage. */
+interface ConcSave {
+  id: string;
+  pcId: string;
+  combatantId: string;
+  spellName: string;
+  deName: string | null;
+  dc: number;
+  damage: number;
+  /** CON modifier for the digital roll and the manual hint (null = unknown). */
+  conMod: number | null;
+  socket: WebSocket;
+}
+
+const concSaves = new Map<string, ConcSave>();
 
 let httpServer: Server | null = null;
 let wss: WebSocketServer | null = null;
@@ -240,6 +259,7 @@ function playerStateMessage(state: AppState, info: SocketInfo): string {
           isCurrentTurn: i === combat!.currentIndex,
           isDowned: c.isDowned,
           conditions: c.conditions,
+          concentration: c.concentration ?? null,
           isBloodied: c.type === 'monster' ? isBloodied(c) : undefined,
         };
         // Player-View disclosure: monster HP/AC never leave the app.
@@ -335,6 +355,9 @@ interface PlayerCommand {
   archiveId?: string;
   /** Spell casts: the slot level spent (absent for cantrips). */
   slotLevel?: number;
+  /** Concentration checks: the pending check id and (manual) rolled total. */
+  id?: string;
+  total?: number;
 }
 
 /** The acting PC's live combatant, or null when it isn't in the fight. */
@@ -440,12 +463,17 @@ async function spendSlotForCast(
 ): Promise<boolean> {
   const meta = ctx.action.spell;
   if (!meta) return true;
+  // Log snapshots carry names in the language active when the entry was made.
+  const spellName = spellActionName(store.getState().settings.language, ctx.action);
+  const conc = meta.concentration
+    ? { name: ctx.action.name, deName: meta.deName ?? null }
+    : null;
   if (meta.level === 0) {
-    return store.castSpell(ctx.pcId, ctx.action.name, null, { source: 'player', sourceName });
+    return store.castSpell(ctx.pcId, spellName, null, { source: 'player', sourceName }, conc);
   }
   const lvl = typeof slotLevel === 'number' && Number.isInteger(slotLevel) ? slotLevel : -1;
   if (lvl < meta.level || lvl > 9) return false;
-  return store.castSpell(ctx.pcId, ctx.action.name, lvl, { source: 'player', sourceName });
+  return store.castSpell(ctx.pcId, spellName, lvl, { source: 'player', sourceName }, conc);
 }
 
 interface AttackContext {
@@ -729,6 +757,46 @@ export function dismissPendingSave(id: string): void {
   if (!pending) return;
   pendingSaves.delete(id);
   send(pending.socket, { type: 'saveResolved', id, cancelled: true, results: [] });
+}
+
+/** Verdict on a Concentration check: log it, break the spell on a failure. */
+async function resolveConcSave(pending: ConcSave, die: number | null, total: number): Promise<void> {
+  concSaves.delete(pending.id);
+  const saved = total >= pending.dc;
+  const lang = store.getState().settings.language;
+  const label = `${translate(lang, 'spellbook.concentration')} (${
+    lang === 'de' && pending.deName ? pending.deName : pending.spellName
+  })`;
+  const pc = store.getState().pcs.find((p) => p.id === pending.pcId);
+  await store.appendLog({
+    kind: 'save',
+    actorName: pc?.name ?? '?',
+    actorType: 'pc',
+    attackName: label,
+    total,
+    outcome: saved ? 'saved' : 'failed',
+    source: 'player',
+    sourceName: sourceNameOf(sockets.get(pending.socket)),
+  });
+  if (!saved) await store.setConcentration(pending.combatantId, null);
+  send(pending.socket, {
+    type: 'concSaveResult',
+    id: pending.id,
+    die,
+    total,
+    dc: pending.dc,
+    saved,
+    spellName: pending.spellName,
+    deName: pending.deName,
+  });
+}
+
+/** Combat ended or campaign switched before the player answered. */
+function dismissConcSave(id: string): void {
+  const pending = concSaves.get(id);
+  if (!pending) return;
+  concSaves.delete(id);
+  send(pending.socket, { type: 'concSaveResult', id, cancelled: true });
 }
 
 // ---- command handling --------------------------------------------------------
@@ -1061,18 +1129,33 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
       return;
     }
 
+    case 'concSaveDigital': {
+      // Concentration check, app-rolled: d20 + CON modifier vs the DC.
+      const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
+      if (!pending || pending.socket !== socket) return;
+      const die = Math.floor(Math.random() * 20) + 1;
+      await resolveConcSave(pending, die, die + (pending.conMod ?? 0));
+      return;
+    }
+
+    case 'concSaveManual': {
+      // The player rolled physical dice and typed the total.
+      const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
+      if (!pending || pending.socket !== socket || typeof cmd.total !== 'number') return;
+      await resolveConcSave(pending, null, Math.floor(cmd.total));
+      return;
+    }
+
     case 'getSpells': {
       // On-demand spellbook reference (all imported spells, no class filter —
       // players browse what they might prepare). Not part of state pushes:
-      // ~340 full spell texts would bloat every update.
-      const state = store.getState();
-      const de = state.settings.language === 'de';
+      // ~340 full spell texts would bloat every update. English + German ride
+      // together so the phone localizes at render.
       send(socket, {
         type: 'spellList',
-        spells: state.spells.map((s) => ({
+        spells: store.getState().spells.map((s) => ({
           id: s.id,
-          name: de && s.l10n?.de?.name ? s.l10n.de.name : s.name,
-          englishName: s.name,
+          name: s.name,
           level: s.level,
           school: s.school,
           castingTime: s.castingTime,
@@ -1081,13 +1164,14 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
           duration: s.duration,
           concentration: s.concentration,
           ritual: s.ritual,
-          text: de && s.l10n?.de?.text ? s.l10n.de.text : s.text,
+          text: s.text,
           attack: s.attack,
           save: s.save,
           damage: s.damage,
           healing: s.healing,
           upcast: s.upcast,
           upcastText: s.upcastText,
+          l10n: s.l10n ?? null,
         })),
       });
       return;
@@ -1152,6 +1236,7 @@ export async function remountClaims(filePath: string): Promise<void> {
 export async function handleCampaignSwitch(id: string): Promise<void> {
   if (id === store.activeCampaignId || !store.hasCampaign(id)) return;
   for (const pid of [...pendingSaves.keys()]) dismissPendingSave(pid);
+  for (const pid of [...concSaves.keys()]) dismissConcSave(pid);
   await remountClaims(store.campaignFilePath(id, 'player-claims.json'));
   await store.mountCampaign(id);
   publishClaims();
@@ -1169,11 +1254,31 @@ export function startPlayerServer(): void {
       // Combat over → any save the DM never adjudicated is moot.
       if (!state.combat || state.combat.phase !== 'active') {
         for (const id of [...pendingSaves.keys()]) dismissPendingSave(id);
+        for (const id of [...concSaves.keys()]) dismissConcSave(id);
       }
       const { enabled, port } = state.settings.playerWeb;
       if (enabled !== currentlyEnabled || (enabled && port !== currentPort)) {
         restart();
       }
+    });
+    // Damage hit a concentrating PC → prompt the phone that claims it.
+    store.onConcentrationCheck((check) => {
+      const entry = [...sockets.entries()].find(([, info]) => info.pcId === check.pcId);
+      if (!entry) return; // unclaimed: the DM adjudicates via the chip
+      const [socket] = entry;
+      const pc = store.getState().pcs.find((p) => p.id === check.pcId);
+      const conMod = pc?.abilities ? abilityMod(pc.abilities.con) : null;
+      const pending: ConcSave = { id: randomUUID(), ...check, conMod, socket };
+      concSaves.set(pending.id, pending);
+      send(socket, {
+        type: 'concSave',
+        id: pending.id,
+        spellName: check.spellName,
+        deName: check.deName,
+        dc: check.dc,
+        damage: check.damage,
+        conMod,
+      });
     });
   }
   restart();
@@ -1200,6 +1305,14 @@ function restart(): void {
   });
 
   wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  // ws re-emits the http server's errors (EADDRINUSE!) on the socket server;
+  // unhandled, that's an uncaught main-process exception — Electron then
+  // blocks startup behind a modal error dialog and the DM window never opens
+  // when another instance holds the port. The http handler above already
+  // reports the failure in Settings.
+  wss.on('error', (err) => {
+    console.error('Player web: websocket server error', err);
+  });
   wss.on('connection', (socket, req) => {
     sockets.set(socket, {
       token: null,

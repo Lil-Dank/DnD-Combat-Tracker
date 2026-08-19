@@ -27,6 +27,8 @@ export interface WireCombatant {
   isCurrentTurn: boolean;
   isDowned: boolean;
   conditions: Condition[];
+  /** The Concentration spell being maintained, shown as a condition-like tag. */
+  concentration?: { name: string; deName?: string | null } | null;
   /** Monsters only — HP/AC never cross the wire for them. */
   isBloodied?: boolean;
   /** PCs only. */
@@ -50,12 +52,14 @@ export interface WireYou {
   combatantId: string | null;
 }
 
-/** One spellbook entry as served to phones (name/text pre-localized). */
+/**
+ * One spellbook entry as served to phones. `name`/`text` are canonical
+ * English; `l10n` carries the German pair — the phone localizes at render,
+ * so a language switch flips the open spellbook too.
+ */
 export interface WireSpell {
   id: string;
   name: string;
-  /** Stable key for search and attaching, even when `name` is German. */
-  englishName: string;
   level: number;
   school: string;
   castingTime: string;
@@ -71,6 +75,7 @@ export interface WireSpell {
   healing: { dice: string; count: number; die: number } | null;
   upcast: SpellUpcast | null;
   upcastText: string | null;
+  l10n?: { de?: { name: string; text: string } } | null;
 }
 
 export interface WireArchiveSummary {
@@ -184,6 +189,33 @@ export interface HealResultMsg {
   math?: string;
 }
 
+/**
+ * Your concentrating character took damage: make a DC Constitution saving
+ * throw to keep the spell (digital, or roll your own and type the total).
+ */
+export interface ConcSaveMsg {
+  type: 'concSave';
+  id: string;
+  spellName: string;
+  deName: string | null;
+  dc: number;
+  damage: number;
+  /** CON modifier for the roll button and the manual hint; null = unknown. */
+  conMod: number | null;
+}
+
+export interface ConcSaveResultMsg {
+  type: 'concSaveResult';
+  id: string;
+  cancelled?: boolean;
+  die?: number | null;
+  total?: number;
+  dc?: number;
+  saved?: boolean;
+  spellName?: string;
+  deName?: string | null;
+}
+
 export type ServerMsg =
   | StateMsg
   | AttackResultMsg
@@ -194,6 +226,8 @@ export type ServerMsg =
   | SpellListMsg
   | CastResultMsg
   | HealResultMsg
+  | ConcSaveMsg
+  | ConcSaveResultMsg
   | { type: 'claimResult'; ok: boolean; reason?: string }
   | SavePendingMsg
   | { type: 'kicked' }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AppState, Combatant, MonsterAction } from '../../shared/types';
 import { rollD20, rollPool, type RollMode } from '../../shared/dice';
 import { api } from './api';
+import { spellActionName, spellActionText } from '../../shared/spellAction';
 import { DmgText } from './DmgText';
 import { useI18n } from './i18n';
 
@@ -50,10 +51,14 @@ export function MonsterAttackModal({
   attackerId: string;
   onClose: () => void;
 }) {
-  const { t, dmg, mon, abilityCode, locAction } = useI18n();
+  const { t, lang, dmg, mon, abilityCode, locAction } = useI18n();
   const combat = state.combat;
   const attacker = combat?.combatants.find((c) => c.id === attackerId);
   const l10nDe = state.monsters.find((m) => m.id === attacker?.sourceId)?.l10n?.de;
+  // Spell snapshots carry their own German pair; monster actions use the
+  // template l10n as before.
+  const actName = (a: MonsterAction) => (a.spell ? spellActionName(lang, a) : locAction(l10nDe, a).name);
+  const actText = (a: MonsterAction) => (a.spell ? spellActionText(lang, a) : a.display.text);
 
   const [step, setStep] = useState<Step>('attack');
   const [attack, setAttack] = useState<MonsterAction | null>(null);
@@ -87,6 +92,10 @@ export function MonsterAttackModal({
   const stepAfterCast = (a: MonsterAction): Step | 'done' =>
     a.onHit.damage.length > 0 || a.type === 'attack' ? 'target' : 'done';
 
+  /** Concentration tag for the caster's combatant (English + German names). */
+  const concOf = (a: MonsterAction) =>
+    a.spell?.concentration ? { name: a.name, deName: a.spell.deName ?? null } : null;
+
   const pickAttack = (a: MonsterAction) => {
     setAttack(a);
     setTargets([]);
@@ -102,7 +111,7 @@ export function MonsterAttackModal({
       }
       // Cantrip: log the cast (free), then straight on — utility cantrips
       // are done right there.
-      void api.castSpell(pcRecord.id, a.name, null);
+      void api.castSpell(pcRecord.id, actName(a), null, concOf(a));
       if (stepAfterCast(a) === 'done') {
         onClose();
         return;
@@ -114,7 +123,7 @@ export function MonsterAttackModal({
   /** Slot step confirm: spend the slot (server-validated), log, move on. */
   const castWithSlot = async (a: MonsterAction, lvl: number) => {
     if (!pcRecord) return;
-    const ok = await api.castSpell(pcRecord.id, a.name, lvl);
+    const ok = await api.castSpell(pcRecord.id, actName(a), lvl, concOf(a));
     if (!ok) {
       setCastErr(true);
       return;
@@ -154,7 +163,7 @@ export function MonsterAttackModal({
             actorType: attacker.type,
             targetName: singleTarget ? mon(singleTarget.displayName) : undefined,
             targetType: singleTarget?.type,
-            attackName: locAction(l10nDe, attack).name,
+            attackName: actName(attack),
             die,
             dice,
             total,
@@ -250,8 +259,8 @@ export function MonsterAttackModal({
             <h3>{t('attack.pickAttack')}</h3>
             <div className="monster-pick-list">
               {attacker.attacks.filter(isRollable).map((a) => (
-                <button key={a.id} className="pick-btn" title={a.display.text} onClick={() => pickAttack(a)}>
-                  {locAction(l10nDe, a).name}
+                <button key={a.id} className="pick-btn" title={actText(a)} onClick={() => pickAttack(a)}>
+                  {actName(a)}
                   {a.display.toHit && ` (${a.display.toHit})`}
                   {a.save && ` (${abilityCode(a.save.ability)} ${t('monsters.dc')} ${a.save.dc})`}
                 </button>
@@ -265,7 +274,7 @@ export function MonsterAttackModal({
 
         {step === 'slot' && attack && attack.spell && pcRecord && (
           <>
-            <h3>{t('cast.slotTitle', { spell: attack.name })}</h3>
+            <h3>{t('cast.slotTitle', { spell: actName(attack) })}</h3>
             <div className="monster-pick-list">
               {Array.from({ length: 10 - attack.spell.level }, (_, i) => attack.spell!.level + i)
                 .filter((lvl) => (pcRecord.spellSlots?.max[lvl - 1] ?? 0) > 0)
@@ -347,7 +356,7 @@ export function MonsterAttackModal({
 
         {step === 'roll' && attack && (
           <>
-            <h3>{locAction(l10nDe, attack).name}</h3>
+            <h3>{actName(attack)}</h3>
             <p className="muted">
               {isSave
                 ? t('combat.targetsCount', {

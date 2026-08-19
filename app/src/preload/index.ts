@@ -60,9 +60,19 @@ const api = {
   deleteSpell: (id: string) => ipcRenderer.invoke('spell:delete', id),
   importSrdSpells: (): Promise<{ imported: number }> => ipcRenderer.invoke('spell:importSrd'),
   /** Spend a slot (null = cantrip, log only). False when no slot is left. */
-  castSpell: (pcId: string, spellName: string, slotLevel: number | null): Promise<boolean> =>
-    ipcRenderer.invoke('pc:castSpell', { pcId, spellName, slotLevel }),
+  castSpell: (
+    pcId: string,
+    spellName: string,
+    slotLevel: number | null,
+    concentration?: { name: string; deName?: string | null } | null,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke('pc:castSpell', { pcId, spellName, slotLevel, concentration }),
   longRest: (pcId: string) => ipcRenderer.invoke('pc:longRest', pcId),
+  /** Set or clear a combatant's Concentration tag. */
+  setConcentration: (
+    combatantId: string,
+    value: { name: string; deName?: string | null } | null,
+  ) => ipcRenderer.invoke('combat:setConcentration', { combatantId, value }),
 
   saveTemplate: (t: Omit<EncounterTemplate, 'id'> & { id?: string }) =>
     ipcRenderer.invoke('template:save', t),

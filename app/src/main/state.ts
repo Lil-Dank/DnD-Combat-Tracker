@@ -83,6 +83,17 @@ export class AppStore {
   playerClients: PlayerClaimInfo[] = [];
   /** Combat happenings for side-effect listeners (Kenku sounds); see index.ts. */
   private combatEventListener: ((event: KenkuEventId) => void) | null = null;
+  /** Damage hit a concentrating PC → the player web prompts a CON save. */
+  private concentrationCheckListener:
+    | ((check: {
+        pcId: string;
+        combatantId: string;
+        spellName: string;
+        deName: string | null;
+        dc: number;
+        damage: number;
+      }) => void)
+    | null = null;
 
   /**
    * Global boot: settings, monster library and the campaign index (all
@@ -374,6 +385,7 @@ export class AppStore {
     spellName: string,
     slotLevel: number | null,
     ctx: ActionContext = DM_CTX,
+    concentration?: { name: string; deName?: string | null } | null,
   ): Promise<boolean> {
     const pc = this.pcs.get(pcId);
     if (!pc) return false;
@@ -384,6 +396,13 @@ export class AppStore {
       const current = [...slots.current];
       current[idx] -= 1;
       await this.pcs.put({ ...pc, spellSlots: { ...slots, current } });
+    }
+    // A concentration spell tags the caster's combatant; casting another one
+    // replaces the previous (you can only concentrate on one spell).
+    if (concentration) {
+      const combat = this.getActiveCombat();
+      const c = combat?.combatants.find((x) => x.type === 'pc' && x.sourceId === pcId);
+      if (c) c.concentration = { ...concentration };
     }
     await this.appendLog({
       kind: 'cast',
@@ -396,6 +415,18 @@ export class AppStore {
     });
     this.notify();
     return true;
+  }
+
+  /** Set or clear a combatant's Concentration tag (DM chip / failed check). */
+  async setConcentration(
+    combatantId: string,
+    value: { name: string; deName?: string | null } | null,
+  ): Promise<void> {
+    const combat = this.combat.get();
+    const c = combat?.combatants.find((x) => x.id === combatantId);
+    if (!combat || !c) return;
+    c.concentration = value;
+    await this.setCombat(combat);
   }
 
   /** Long Rest: every expended slot returns. */
@@ -777,11 +808,39 @@ export class AppStore {
         }
       } else {
         c.isDowned = true;
+        // Going down breaks concentration outright (incapacitated) — no check.
+        if (c.concentration) c.concentration = null;
       }
+    }
+    // Damage to a concentrating PC forces a Constitution save:
+    // DC = max(10, half the damage). The claiming phone gets the prompt.
+    let concCheck: {
+      pcId: string;
+      combatantId: string;
+      spellName: string;
+      deName: string | null;
+      dc: number;
+      damage: number;
+    } | null = null;
+    if (c.type === 'pc' && !c.isDowned && c.concentration) {
+      concCheck = {
+        pcId: c.sourceId,
+        combatantId: c.id,
+        spellName: c.concentration.name,
+        deName: c.concentration.deName ?? null,
+        dc: Math.max(10, Math.floor(amount / 2)),
+        damage: amount,
+      };
     }
     await this.setCombat(combat);
     this.emitCombatEvent('damageApplied');
     if (killedOrDowned) this.emitCombatEvent(killedOrDowned);
+    if (concCheck) this.concentrationCheckListener?.(concCheck);
+  }
+
+  /** playerServer registers here to prompt the claiming phone. */
+  onConcentrationCheck(cb: typeof this.concentrationCheckListener): void {
+    this.concentrationCheckListener = cb;
   }
 
   async applyHeal(combatantId: string, amount: number, ctx: ActionContext = DM_CTX): Promise<void> {

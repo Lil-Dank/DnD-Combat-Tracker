@@ -1060,3 +1060,16 @@ h3 {
   font-weight: 500;
   color: var(--muted);
 }
+
+/* ---- concentration ------------------------------------------------------ */
+
+.chip.conc-chip {
+  background: rgba(147, 112, 219, 0.18);
+  border-color: rgba(147, 112, 219, 0.55);
+}
+
+.conc-info {
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 4px 0 14px;
+}

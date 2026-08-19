@@ -400,6 +400,11 @@ const en: Dict = {
   'mob.cast': 'Cast',
   'mob.longRestConfirm': 'Tap again to confirm',
   'mob.err.noSlot': 'No spell slot of that level left.',
+  'mob.concInfo':
+    'You took {damage} damage while concentrating on {spell} — make a DC {dc} Constitution saving throw to keep it.',
+  'mob.concKept': 'Concentration held!',
+  'mob.concLost': '{spell} slips away…',
+  'mob.concVs': 'vs DC {dc}',
   'mob.resolve': 'Resolve',
   'mob.waitingDm': 'Waiting for the DM to roll saves…',
   'mob.dmgDealt': '{damage} damage dealt',
@@ -892,6 +897,11 @@ const de: Dict = {
   'mob.cast': 'Wirken',
   'mob.longRestConfirm': 'Zum Bestätigen erneut tippen',
   'mob.err.noSlot': 'Kein Zauberplatz dieses Grades übrig.',
+  'mob.concInfo':
+    'Du hast {damage} Schaden erlitten, während du dich auf {spell} konzentrierst — bestehe einen Konstitutions-Rettungswurf (SG {dc}), um die Konzentration zu halten.',
+  'mob.concKept': 'Konzentration gehalten!',
+  'mob.concLost': '{spell} entgleitet dir…',
+  'mob.concVs': 'gegen SG {dc}',
   'mob.resolve': 'Auswerten',
   'mob.waitingDm': 'Der SL würfelt die Rettungswürfe…',
   'mob.dmgDealt': '{damage} Schaden verursacht',

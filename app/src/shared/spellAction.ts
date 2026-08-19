@@ -2,7 +2,8 @@ import type { DamageInstance, MonsterAction, Spell } from './types';
 
 /**
  * The slice of a spell the attach conversion needs — structural, so the
- * phone's WireSpell (pre-localized, no classes/source) qualifies too.
+ * phone's WireSpell (no classes/source) qualifies too. `name`/`text` are the
+ * canonical English; `l10n` carries the German pair when the SRD has one.
  */
 export type CastableSpell = Pick<
   Spell,
@@ -18,7 +19,8 @@ export type CastableSpell = Pick<
   | 'healing'
   | 'upcast'
   | 'upcastText'
->;
+  | 'concentration'
+> & { l10n?: { de?: { name: string; text: string } } | null };
 
 /**
  * Snapshots a spellbook entry into a PC action ("attach"). The copy is a
@@ -96,6 +98,19 @@ export function spellToAction(
       upcast: spell.upcast ? { ...spell.upcast } : null,
       upcastText: spell.upcastText,
       healing: spell.healing !== null,
+      concentration: spell.concentration ?? false,
+      deName: spell.l10n?.de?.name ?? null,
+      deText: spell.l10n?.de?.text ?? null,
     },
   };
+}
+
+/** The attached spell's display name in the given language. */
+export function spellActionName(lang: string, a: MonsterAction): string {
+  return lang === 'de' && a.spell?.deName ? a.spell.deName : a.name;
+}
+
+/** The attached spell's rules text in the given language. */
+export function spellActionText(lang: string, a: MonsterAction): string {
+  return lang === 'de' && a.spell?.deText ? a.spell.deText : a.display.text;
 }

@@ -33,7 +33,7 @@ import type {
 } from '../../../shared/types';
 import { DEFAULT_SETTINGS, abilityMod } from '../../../shared/types';
 import { translate } from '../../../shared/i18n';
-import { rollD20, type RollMode } from '../../../shared/dice';
+import { rollD20, stripDiceResults, type RollMode } from '../../../shared/dice';
 import { spellToAction, spellActionName } from '../../../shared/spellAction';
 import { applyLogEntryDelete, applyLogEntryEdit } from '../../../shared/logEdit';
 import {
@@ -1189,7 +1189,9 @@ export function createDemoApi(): Api {
   }
 
   function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
-    // Mirror of the real server: no dice compositions on player surfaces.
+    // Mirror of the real server: live rolls keep their thrown composition
+    // ("2d6 +4") but lose the per-die results; attack-roll numbers stay
+    // DM-side. Archived fights skip the filter entirely.
     return log.map((e) =>
       e.kind === 'attackRoll' || e.math !== undefined
         ? {
@@ -1197,8 +1199,8 @@ export function createDemoApi(): Api {
             die: undefined,
             dice: undefined,
             total: e.kind === 'attackRoll' ? undefined : e.total,
-            math: undefined,
-            // mathTypes stays: damage type is table knowledge.
+            math: e.math === undefined ? undefined : stripDiceResults(e.math),
+            // mathTypes stays: damage type is table knowledge too.
           }
         : e,
     );
@@ -1820,7 +1822,8 @@ export function createDemoApi(): Api {
         templateName: found.templateName,
         endedAt: found.endedAt,
         rounds: found.rounds,
-        log: filterLogForPlayers(found.log),
+        // Unredacted, like the real server: Past Combats show everything.
+        log: found.log,
       });
       return;
     }

@@ -153,9 +153,12 @@ export function LogCards({
     const dmgType = d ? entryDamageType(d) : null;
     const dmgKey = d ? `dmg-${d.id}` : '';
     // "2d6 [3+5] +4 = 12" → formula "2d6 +4" for the row; full math expands.
+    // Redacted live math ("2d6 +4 = 12", no brackets) still shows the thrown
+    // composition but has no per-die results left to expand.
     const formula = d?.math
       ? displayDice(lang, d.math.replace(/\s*\[[^\]]*\]/g, '').replace(/\s*=.*$/, ''))
       : null;
+    const dmgExpands = !!d?.math && d.math.includes('[');
     return (
       <div key={b.key} className="log-block" data-kind="attack">
         {tools(r)}
@@ -215,14 +218,14 @@ export function LogCards({
               )}
             </span>
             <div
-              className={`lb-dmg-row ${open.has(dmgKey) ? 'open' : ''} ${d.math ? '' : 'noclick'}`}
-              onClick={() => d.math && toggle(dmgKey)}
+              className={`lb-dmg-row ${open.has(dmgKey) ? 'open' : ''} ${dmgExpands ? '' : 'noclick'}`}
+              onClick={() => dmgExpands && toggle(dmgKey)}
             >
               {formula && <span className="formula tnum">{formula} =</span>}
               <span className={`total tnum ${dmgType ? `dt-${dmgType}` : ''}`}>{d.amount}</span>
-              {d.math && <span className="chev">▶</span>}
+              {dmgExpands && <span className="chev">▶</span>}
             </div>
-            {d.math && open.has(dmgKey) && (
+            {dmgExpands && d.math && open.has(dmgKey) && (
               <div className="lb-breakdown tnum">
                 <SegText segs={rollMathSegments(displayDice(lang, d.math), d.mathTypes)} />
               </div>

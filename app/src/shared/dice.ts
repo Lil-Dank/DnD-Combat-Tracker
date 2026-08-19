@@ -3,6 +3,12 @@ export function displayDice(lang: string, s: string): string {
   return lang === 'de' ? s.replace(/(\d)d(\d)/g, '$1W$2').replace(/\bd(\d)/g, 'W$1') : s;
 }
 
+/** "2d6 [3+5] +4 = 12" → "2d6 +4 = 12": the thrown composition without the
+ *  per-die results — what player surfaces may see of a live roll. */
+export function stripDiceResults(s: string): string {
+  return s.replace(/\s*\[[^\]]*\]/g, '');
+}
+
 /** "2d8+2" / "1d4" / "3d6-1" (spaces tolerated) → parts, or null. */
 export function parseDice(s: string): { count: number; die: number; bonus: number } | null {
   const m = s.replace(/\s/g, '').match(/^(\d+)d(\d+)([+-]\d+)?$/i);

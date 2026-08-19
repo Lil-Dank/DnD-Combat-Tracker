@@ -8,7 +8,7 @@ import { store } from './state';
 import { JsonValue } from './storage';
 import { handleAttackEvent } from './kenku';
 import { logAttackEvent } from './combatLog';
-import { rollD20, rollPool, type RollMode } from '../shared/dice';
+import { rollD20, rollPool, stripDiceResults, type RollMode } from '../shared/dice';
 import { monsterName } from '../shared/i18n';
 import { spellActionName } from '../shared/spellAction';
 import type {
@@ -224,8 +224,11 @@ function isBloodied(c: Combatant): boolean {
  * numbers and damage math stay DM-side; save totals remain (table-announced).
  */
 function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
-  // No dice compositions on player surfaces at all: attack-roll numbers and
-  // damage math stay DM-side (save totals remain - they're table-announced).
+  // Live-combat redaction: attack-roll numbers stay DM-side, and damage math
+  // keeps its composition ("2d6 +4" — what was thrown is table knowledge) but
+  // loses the per-die results in the brackets. Save totals remain - they're
+  // table-announced. Archived fights skip this filter entirely: once combat
+  // is over, players may browse the full breakdowns in Past Combats.
   return log.map((e) =>
     e.kind === 'attackRoll' || e.math !== undefined
       ? {
@@ -233,9 +236,8 @@ function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
           die: undefined,
           dice: undefined,
           total: e.kind === 'attackRoll' ? undefined : e.total,
-          math: undefined,
-          // mathTypes stays: the damage TYPE is table knowledge, only the
-          // dice compositions are DM-side.
+          math: e.math === undefined ? undefined : stripDiceResults(e.math),
+          // mathTypes stays: the damage TYPE is table knowledge too.
         }
       : e,
   );
@@ -1205,7 +1207,8 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
         templateName: entry.templateName,
         endedAt: entry.endedAt,
         rounds: entry.rounds,
-        log: filterLogForPlayers(entry.log),
+        // Unredacted: the fight is history, Past Combats show everything.
+        log: entry.log,
       });
       return;
     }

@@ -120,7 +120,7 @@ async function captureAll(tag) {
     await dm.eval('window.api.togglePlayerView()');
     await sleep(2500);
   }
-  const t2 = await fetch('http://127.0.0.1:9222/json').then((r) => r.json());
+  const t2 = await fetch(`http://127.0.0.1:${PORT}/json`).then((r) => r.json());
   const pvT = t2.find((x) => x.url.includes('#player'));
   if (pvT) {
     const pv = await connect(pvT.webSocketDebuggerUrl);
@@ -161,5 +161,6 @@ console.log(`UNCHANGED BETWEEN EN AND DE (${suspects.size}):\n`);
 for (const [line, where] of [...suspects].sort()) {
   console.log(`  ${JSON.stringify(line).padEnd(72)} ${[...where].join(',')}`);
 }
+const { writeFileSync } = await import('fs');
 writeFileSync(process.argv[2] ?? 'lang-diff.json', JSON.stringify({ EN, DE }, null, 1));
 dm.ws.close();

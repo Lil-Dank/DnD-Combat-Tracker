@@ -7,6 +7,51 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ## [Unreleased]
 
+## [3.4.0] — 2026-08-20
+
+### Added
+
+- **Combat log as cards** — the log renders one card per character instead of
+  a flat line list: attack rolls show both advantage/disadvantage d20s with
+  the dropped die struck through and a big hit/miss/crit verdict, damage rows
+  carry their type and dice composition and click open into the full per-die
+  breakdown, spell casts get slot and concentration chips, saving throws show
+  die, modifier and total against the DC. Rounds, turns and combat bounds
+  divide the stream as slim cardless rules. Shared by the DM sidebar, the
+  Combat Archive and the phones.
+- **Editable log entries** — hover a block in the live sidebar for ✎/🗑.
+  Actors, targets, amounts, rolls, outcomes, damage types and conditions can
+  be corrected in place; damage and healing edits re-apply the HP difference
+  to the target, and deleting an entry reverts what it did (deleting the hit
+  that downed a PC brings them back up, with concentration handled). Dead
+  monsters are never resurrected — edits to their history are record-only.
+- **Enrichable damage entries** — bare "takes 6 damage" lines from the dice
+  roller can be given the missing attacker and a damage type from the same
+  editor.
+- Saving throws record their d20 and the DC; casts record whether they hold
+  concentration — save rows and cast chips show them on every surface.
+
+### Changed
+
+- **Player-facing redaction** — the live phone log now shows a damage roll's
+  thrown composition ("2d6 +4"); only the per-die results and attack-roll
+  numbers stay DM-side. Past Combats browsed from a phone are no longer
+  redacted at all — the fight is history, breakdowns included.
+- Unpaired damage with dice math (area spells, save-based casts, dice-roller
+  hits) shows its roll line under the "takes X damage" sentence, so the roll
+  is visible even without an attack card.
+- The combat-log sidebar auto-scrolls only when new entries arrive — never
+  while an entry is being edited — and the archive's log uses a fixed-width
+  card column.
+
+### Fixed
+
+- Damage compositions no longer repeat the modifier ("1W4+2 +2 = 5"): the
+  bracket group is prefixed with the plain dice term.
+- Long German verdicts ("kritischer Treffer!") wrapped the attack-roll row to
+  two lines; card verdicts are now compact ("Krit!") and never wrap, and the
+  save row's DC ("SG 14") stays on one line.
+
 ## [3.3.0] — 2026-08-19
 
 ### Added
@@ -307,7 +352,8 @@ First packaged release.
   Picker profiles for MK.2 (5×3), XL (8×4) and 9×4 decks.
 - Four themes; local-only JSON storage.
 
-[Unreleased]: https://github.com/Lil-Dank/deck-of-many-turns/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/Lil-Dank/deck-of-many-turns/compare/v3.4.0...HEAD
+[3.4.0]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.4.0
 [3.3.0]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.3.0
 [3.2.0]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.2.0
 [3.1.2]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.1.2

@@ -23,7 +23,7 @@ already in progress.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v3.3.0-success)
+![Release](https://img.shields.io/badge/release-v3.4.0-success)
 
 </div>
 
@@ -80,7 +80,7 @@ name, and the combat log keeps the story on the right.</i>
 | 📺 **Player View** | Display-only second-monitor window. Monsters show no numbers — just a progressive "bloodied" reddening. Auto-fits any actor count. **Styled for chroma keying.** |
 | 📱 **Player phone companion** | [Opt-in LAN webpage](#player-phone-companion) for players' phones: claim your character via QR code, follow initiative, deal damage/heal, roll your attacks — gated to your turn. No app installs. |
 | 🎛️ **Stream Deck plugin** | Turn control, damage/heal numpad, multi-actor conditions, monster attack rolls, and a dice roller — all on hardware keys that render their own labels. |
-| 📜 **Combat log & archive** | [Every action logged](#combat-log--archive) with who-did-what-to-whom from every surface (DM window, deck, phones); ended combats archive with their full log. |
+| 📜 **Combat log & archive** | [Every action logged as cards](#combat-log--archive) — attack rolls with expandable dice breakdowns, casts, saves, conditions — and editable by the DM: fixing an amount or deleting an entry re-applies the HP difference. Ended combats archive with their full log. |
 | 🔊 **Kenku FM audio** | [Sound effects and battle playlists](#kenku-fm-audio) via Kenku FM's remote API: event sounds, per-attack sounds with trigger points, encounter playlists, a soundboard panel. |
 | 🎨 **Themes** | Dark (default), PHB Style, Default Electron, Light. |
 | 🗣 **English & German** | [Full UI localization](#language) across both windows *and* the deck. Game terms follow the SRD 5.2.1 in each language. |
@@ -108,7 +108,7 @@ for anyone integrating their own hardware or overlays.
 
 Grab both files from the [**latest release**](../../releases/latest):
 
-1. **App** — run `Deck of Many Turns Setup 3.3.0.exe` (NSIS installer, choose your own directory).
+1. **App** — run `Deck of Many Turns Setup 3.4.0.exe` (NSIS installer, choose your own directory).
 2. **Stream Deck plugin** — double-click `com.dmtools.dnd-combat-tracker.streamDeckPlugin`;
    the Stream Deck app installs it and registers the bundled picker profiles.
 3. Start the app. The plugin connects within a few seconds — the DM window's sidebar
@@ -312,12 +312,25 @@ view is styled for it:
 
 ### Combat log & archive
 
-Every action lands in a **combat log** — damage, healing, attack rolls with their d20
-results, saving throws, conditions, downs, kills, turn and round changes — tagged with
-where it came from (DM window, Stream Deck, or a player's phone). The Combat screen
-shows it in a collapsible right-hand sidebar; phones get a one-line ticker that pulls
-up into the full log. The player-facing log hides monster attack-roll numbers (players
-see *"Goblin 2: Scimitar vs Aria — hit"*, not the to-hit math). Log lines are stored
+Every action lands in a **combat log** rendered as cards, one per character: attack
+rolls show both advantage/disadvantage d20s with the dropped die struck through and a
+big hit/miss/crit verdict, damage rows carry their type and dice composition and click
+open into the full per-die breakdown, spell casts get slot and concentration chips,
+saving throws show die, modifier and total against the DC. Rounds, turns and combat
+bounds divide the stream as slim cardless rules. Everything is tagged with where it
+came from (DM window, Stream Deck, or a player's phone).
+
+The DM can **edit any entry in place** — hover a block for ✎/🗑. Correcting a damage
+or healing amount re-applies the difference to the target's HP (deleting the hit that
+downed a PC brings them back up); bare entries from the dice roller can be enriched
+with the missing attacker and a damage type. Dead monsters stay dead — edits to their
+history are record-only.
+
+The Combat screen shows the log in a collapsible right-hand sidebar; phones get a
+one-line ticker that pulls up into the full card view. Live, the player-facing log
+shows what was thrown but not how it landed — *"Scimitar → Aria: hit"* plus the
+damage composition (*2d6 +2*), never the to-hit math or per-die results. Once a fight
+is archived, its full breakdowns open up to players too. Log lines are stored
 structurally and rendered through the localization layer, so switching language
 re-renders history too.
 
@@ -702,7 +715,7 @@ npm install
 npm run dev        # live-reload dev session
 npm run dev:mobile # (second terminal) rebuild the player web bundle on change
 npm run build      # compile main/preload/renderer + player web bundle to out/
-npm run dist       # → release/Deck of Many Turns Setup 3.3.0.exe (NSIS)
+npm run dist       # → release/Deck of Many Turns Setup 3.4.0.exe (NSIS)
 ```
 
 The player web page is served as plain static files from `out/mobile` in dev and

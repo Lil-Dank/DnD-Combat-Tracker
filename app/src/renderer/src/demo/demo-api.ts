@@ -35,6 +35,7 @@ import { DEFAULT_SETTINGS, abilityMod } from '../../../shared/types';
 import { translate } from '../../../shared/i18n';
 import { rollD20, type RollMode } from '../../../shared/dice';
 import { spellToAction, spellActionName } from '../../../shared/spellAction';
+import { applyLogEntryDelete, applyLogEntryEdit } from '../../../shared/logEdit';
 import {
   abilityCodeLabel,
   monsterName,
@@ -649,6 +650,7 @@ export function createDemoApi(): Api {
         actorType: 'pc',
         attackName: spellName,
         ...(slotLevel !== null ? { slotLevel } : {}),
+        ...(concentration ? { conc: true } : {}),
         source: ctx.source,
         sourceName: ctx.sourceName,
       });
@@ -1116,6 +1118,7 @@ export function createDemoApi(): Api {
     attackId: string;
     attackName: string;
     damage: number;
+    dc: number | undefined;
     /** Damage on a successful save (mirror of playerServer.ts). */
     onSuccess: 'half' | 'none';
     targetIds: string[];
@@ -1152,7 +1155,9 @@ export function createDemoApi(): Api {
         actorName: pc?.name ?? '?',
         actorType: 'pc',
         attackName: label,
+        die: die ?? undefined,
         total,
+        dc: pending.dc,
         outcome: saved ? 'saved' : 'failed',
         source: 'player',
         sourceName: sourceNameFor(pending.pcId),
@@ -1568,6 +1573,7 @@ export function createDemoApi(): Api {
           attackId: action.id,
           attackName: action.name,
           damage,
+          dc: action.save?.dc,
           onSuccess: action.save?.onSuccess ?? 'half',
           targetIds,
           session,
@@ -1843,6 +1849,7 @@ export function createDemoApi(): Api {
           targetType: 'pc',
           attackName: pending.attackName,
           total: r.total,
+          dc: pending.dc,
           outcome: r.saved ? 'saved' : 'failed',
           source: 'dm',
         });
@@ -2109,6 +2116,25 @@ export function createDemoApi(): Api {
         combat.currentIndex = 0;
       }
       save();
+    },
+    editLogEntry: async (id, patch) => {
+      const combat = cur().combat;
+      if (!combat) return;
+      if (applyLogEntryEdit(combat, id, patch)) {
+        // Fresh array identity: unlike the real app (fresh objects over IPC),
+        // the demo hands React the live objects, and LogCards memoizes on the
+        // log array.
+        combat.log = [...combat.log];
+        save();
+      }
+    },
+    deleteLogEntry: async (id) => {
+      const combat = cur().combat;
+      if (!combat) return;
+      if (applyLogEntryDelete(combat, id)) {
+        combat.log = [...combat.log];
+        save();
+      }
     },
     addMonsterToCombat: async (monsterTemplateId, quantity) => {
       const combat = cur().combat;

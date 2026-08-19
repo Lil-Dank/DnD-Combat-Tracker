@@ -3,7 +3,7 @@ import type { ArchivedCombat } from '../../../shared/types';
 import { api } from '../api';
 import { useConfirm } from '../Confirm';
 import { useI18n } from '../i18n';
-import { LogEntries } from '../LogEntries';
+import { LogCards } from '../../../components/LogCards';
 
 /**
  * The Combat Archive: every ended combat's log, kept until deleted. Two-pane
@@ -80,7 +80,7 @@ export function ArchiveScreen() {
                   </span>
                 </h2>
                 <div className="archive-log">
-                  <LogEntries log={open.log} />
+                  <LogCards log={open.log} lang={lang} t={t} showSource />
                 </div>
               </>
             )}

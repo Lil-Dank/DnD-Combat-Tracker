@@ -728,6 +728,7 @@ export async function resolvePendingSave(
       targetType: 'pc',
       attackName: pending.attackName,
       total: r.total,
+      dc: pending.dc,
       outcome: r.saved ? 'saved' : 'failed',
       source: 'dm',
     });
@@ -773,7 +774,9 @@ async function resolveConcSave(pending: ConcSave, die: number | null, total: num
     actorName: pc?.name ?? '?',
     actorType: 'pc',
     attackName: label,
+    die: die ?? undefined,
     total,
+    dc: pending.dc,
     outcome: saved ? 'saved' : 'failed',
     source: 'player',
     sourceName: sourceNameOf(sockets.get(pending.socket)),

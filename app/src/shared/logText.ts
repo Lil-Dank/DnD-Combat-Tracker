@@ -1,6 +1,7 @@
 import type { LogEntry } from './types';
-import { DAMAGE_TYPE_DE, conditionLabel, translate, type Lang } from './i18n';
+import { DAMAGE_TYPE_DE, conditionLabel, damageTypeLabel, translate, type Lang } from './i18n';
 import { displayDice } from './dice';
+import { entryDamageType } from './logCards';
 
 /**
  * Combat-log rendering. Entries store structured params; surfaces render
@@ -75,10 +76,9 @@ export function logEntrySegments(lang: Lang, e: LogEntry): LogSegment[] {
       text = t('log.turn', { actor });
       break;
     case 'damage': {
-      // Name the damage type when the entry knows exactly one; mixed-type
-      // hits stay generic (the math sub-line still tints each part).
-      const known = [...new Set((e.mathTypes ?? []).filter((x): x is string => x !== null))];
-      const type = known.length === 1 ? known[0] : null;
+      // Name the damage type when the entry knows it (explicit field or a
+      // unique mathTypes value); mixed-type hits stay generic.
+      const type = entryDamageType(e);
       const amount = mark(e.amount ?? 0, 'seg-dmg');
       if (type) {
         const label =
@@ -272,4 +272,71 @@ export function damageTypeSegments(lang: Lang, text: string): LogSegment[] {
 export function logSourceTag(lang: Lang, e: LogEntry): string {
   const base = translate(lang, `log.src.${e.source}`);
   return e.sourceName ? `${base} (${e.sourceName})` : base;
+}
+
+// ---- card view (shared LogCards component) ----------------------------------
+
+/**
+ * Body-line segments for a log card, with the card's subject omitted (it's
+ * the header). Covers the text-y kinds; roll rows and cast chips are
+ * structural and composed by the component itself.
+ */
+export function logCardSegments(lang: Lang, e: LogEntry): LogSegment[] {
+  const t = (key: string, params?: Record<string, string | number>) => translate(lang, key, params);
+  const actor = mark(e.actorName ?? '?', typeCls(e.actorType) ? `${typeCls(e.actorType)} sc` : 'sc');
+
+  let text: string;
+  switch (e.kind) {
+    case 'damage': {
+      const type = entryDamageType(e);
+      const amount = mark(e.amount ?? 0, 'seg-dmg lb-amount');
+      const typeSeg = type ? mark(damageTypeLabel(lang, type), `dt-${type} sc`) : '';
+      if (type && e.actorName) text = t('log.card.takesTypedFrom', { amount, type: typeSeg, actor });
+      else if (type) text = t('log.card.takesTyped', { amount, type: typeSeg });
+      else if (e.actorName) text = t('log.card.takesFrom', { amount, actor });
+      else text = t('log.card.takes', { amount });
+      break;
+    }
+    case 'heal': {
+      const amount = mark(e.amount ?? 0, 'seg-heal lb-amount');
+      text = e.actorName
+        ? t('log.card.healsFrom', { amount, actor })
+        : t('log.card.heals', { amount });
+      break;
+    }
+    case 'conditionAdded':
+      text = t('log.card.is', {
+        condition: mark(e.condition ? conditionLabel(lang, e.condition) : '?', 'lb-cond-chip'),
+      });
+      break;
+    case 'conditionRemoved':
+      text = t('log.card.noLonger', {
+        condition: mark(e.condition ? conditionLabel(lang, e.condition) : '?', 'lb-cond-chip'),
+      });
+      break;
+    case 'down':
+      text = t('log.card.down');
+      break;
+    case 'kill':
+      text = t('log.card.kill');
+      break;
+    default:
+      text = '';
+  }
+  return parseSegments(text);
+}
+
+/** Relative time under 12h ("4m ago"), locale datetime beyond. */
+export function logCardTime(lang: Lang, now: number, ts: number): string {
+  const t = (key: string, params?: Record<string, string | number>) => translate(lang, key, params);
+  const diff = Math.max(0, now - ts);
+  if (diff < 60_000) return t('log.card.agoS', { n: Math.max(1, Math.round(diff / 1000)) });
+  if (diff < 3_600_000) return t('log.card.agoM', { n: Math.round(diff / 60_000) });
+  if (diff < 12 * 3_600_000) return t('log.card.agoH', { n: Math.round(diff / 3_600_000) });
+  return new Date(ts).toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }

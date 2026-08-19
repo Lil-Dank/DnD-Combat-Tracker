@@ -828,7 +828,271 @@ h3 {
   color: var(--gold);
 }
 
+/* ---- Combat-log cards (shared LogCards component, read-only here) ---- */
 
+/* Synthetic small caps from the app font itself. */
+.sc {
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.45px;
+}
+
+.log-cards {
+  font-size: 14px;
+}
+
+.log-sep-round {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 8px;
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.log-sep-round::before,
+.log-sep-round::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid rgba(212, 175, 55, 0.45);
+}
+
+.log-sep-bound {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 8px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.log-sep-bound::before,
+.log-sep-bound::after {
+  content: '';
+  flex: 1;
+  border-top: 1px dashed var(--border);
+}
+
+.log-sep-turn {
+  margin: 8px 0 4px 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+  opacity: 0.8;
+}
+
+.log-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 9px;
+  margin: 6px 0;
+  overflow: hidden;
+}
+
+.log-card.pc { border-left-color: var(--pc-color); }
+.log-card.monster { border-left-color: var(--monster-color); }
+
+.log-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.log-card-name {
+  font-weight: 700;
+  font-size: 14.5px;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.45px;
+}
+
+.log-card.pc .log-card-name { color: var(--pc-color); }
+.log-card.monster .log-card-name { color: var(--monster-color); }
+
+.log-card-meta {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.log-block {
+  position: relative;
+  padding: 7px 10px 8px;
+}
+
+.log-block + .log-block { border-top: 1px solid rgba(255, 255, 255, 0.07); }
+
+.lb-action {
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  font-size: 16.5px;
+  color: var(--text);
+}
+
+.lb-action .to {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 13.5px;
+}
+
+.lb-action .to b { font-weight: 600; font-size: 14.5px; }
+
+.lb-roll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 9px;
+}
+
+.lb-roll .lbl {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 46px;
+  flex-shrink: 0;
+}
+
+.lb-roll .die { font-size: 14px; color: var(--muted); }
+.lb-roll .die.dropped { text-decoration: line-through; opacity: 0.45; }
+
+.lb-roll .total {
+  margin-left: auto;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.lb-roll .total.hit { color: var(--text); }
+.lb-roll .total.crit { color: var(--good); }
+.lb-roll .total.miss { color: var(--miss); text-decoration: line-through; }
+
+.lb-roll .verdict {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lb-roll .verdict.solo { margin-left: auto; }
+.lb-roll .verdict.hit { color: var(--bad); }
+.lb-roll .verdict.crit { color: var(--good); }
+.lb-roll .verdict.miss { color: var(--miss); }
+.lb-roll .adv { font-size: 10.5px; font-weight: 700; color: var(--good); }
+.lb-roll .dis { font-size: 10.5px; font-weight: 700; color: var(--bad); }
+
+.lb-roll .chev,
+.lb-dmg-row .chev {
+  color: var(--muted);
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+
+.lb-roll.open .chev,
+.lb-dmg-row.open .chev { transform: rotate(90deg); }
+
+.lb-dmg { margin-top: 5px; }
+
+.lb-dmg .dmg-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lb-dmg .dmg-label .type { font-weight: 700; }
+
+.lb-dmg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 9px;
+}
+
+.lb-dmg-row .formula { color: var(--muted); font-size: 13px; }
+
+.lb-dmg-row .total {
+  margin-left: auto;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--bad);
+}
+
+.lb-breakdown {
+  margin-top: 3px;
+  padding: 3px 9px 1px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.lb-breakdown .lr-dice { color: var(--accent-2); opacity: 0.9; }
+.lb-breakdown .lr-rolls { color: var(--gold); opacity: 0.85; }
+.lb-breakdown .lr-dropped { text-decoration: line-through; opacity: 0.55; }
+.lb-breakdown .lr-adv { color: var(--good); font-weight: 600; }
+.lb-breakdown .lr-dis { color: var(--bad); font-weight: 600; }
+
+.lb-effect { font-size: 13.5px; }
+
+.lb-effect .lb-amount {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.lb-effect .seg-pc,
+.lb-effect .seg-monster { font-size: 14.5px; }
+
+.lb-cond-chip {
+  display: inline-block;
+  background: rgba(192, 57, 43, 0.18);
+  border: 1px solid rgba(231, 76, 60, 0.5);
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.log-block[data-kind='condition'] .lb-effect { color: var(--muted); }
+
+.log-block.lb-down {
+  background: rgba(224, 85, 85, 0.12);
+  font-weight: 700;
+}
+
+.log-block.lb-down .lb-effect { font-size: 14px; }
+
+.lb-cast .casts-word { font-weight: 400; font-size: 14px; color: var(--muted); }
+.lb-cast .spell-name { font-size: 17px; font-weight: 800; }
+.lb-cast .chips { display: flex; gap: 5px; margin-top: 4px; }
+
+.lb-cast .slot-chip {
+  display: inline-block;
+  background: rgba(147, 112, 219, 0.18);
+  border: 1px solid rgba(147, 112, 219, 0.5);
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lb-save .save-label { font-weight: 700; font-size: 14.5px; }
+.lb-roll.save .mod { font-size: 13px; color: var(--muted); }
+.lb-roll.save .vs { font-size: 12px; color: var(--muted); }
+.lb-roll.save .total.ok { color: var(--good); }
+.lb-roll.save .total.fail { color: var(--bad); }
+.lb-roll.save .verdict.ok { color: var(--good); }
+.lb-roll.save .verdict.fail { color: var(--bad); }
 
 /* archive */
 

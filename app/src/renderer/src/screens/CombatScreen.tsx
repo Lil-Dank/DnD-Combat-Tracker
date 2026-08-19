@@ -521,7 +521,7 @@ function ActivePhase({ state, onOpenDice }: { state: AppState; onOpenDice: () =>
           );
         })}
       </ul>
-      <CombatLogPanel log={combat.log} />
+      <CombatLogPanel log={combat.log} combatants={combat.combatants} />
       </div>
       {combat.combatants.length === 0 && (
         <p className="empty-note">{t('combat.noCombatants')}</p>

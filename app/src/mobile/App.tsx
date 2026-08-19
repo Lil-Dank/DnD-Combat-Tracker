@@ -40,6 +40,7 @@ import type {
 import { PlayerSocket, deviceToken } from './ws';
 import { uuid } from '../shared/uuid';
 import { DamageEditor } from '../components/DamageEditor';
+import { LogCards } from '../components/LogCards';
 
 type View =
   | { id: 'home' }
@@ -1942,32 +1943,13 @@ function LogList({ log, lang }: { log: LogEntry[]; lang: Lang }) {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [log.length]);
 
-  let lastRound = -1;
   return (
     <div className="log-list">
-      {log.map((e) => {
-        const roundHeader =
-          e.round !== lastRound && e.round > 0 ? (
-            <div className="log-round">{translate(lang, 'log.round', { round: e.round })}</div>
-          ) : null;
-        lastRound = e.round > 0 ? e.round : lastRound;
-        return (
-          <div key={e.id}>
-            {roundHeader}
-            <div className={`log-entry kind-${e.kind}`}>
-              {logEntrySegments(lang, e).map((seg, i) =>
-                seg.cls ? (
-                  <span key={i} className={seg.cls}>
-                    {seg.text}
-                  </span>
-                ) : (
-                  seg.text
-                ),
-              )}
-            </div>
-          </div>
-        );
-      })}
+      <LogCards
+        log={log}
+        lang={lang}
+        t={(key, params) => translate(lang, key, params)}
+      />
       <div ref={endRef} />
     </div>
   );

@@ -30,7 +30,8 @@ async function connect(url) {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const targets = await fetch('http://127.0.0.1:9222/json').then((r) => r.json());
+const PORT = process.env.CDP_PORT ?? '9222';
+const targets = await fetch(`http://127.0.0.1:${PORT}/json`).then((r) => r.json());
 const dm = await connect(targets.find((x) => x.url.includes('#dm')).webSocketDebuggerUrl);
 
 // ---- seed enough data that every screen has content to render

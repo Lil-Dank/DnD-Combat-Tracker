@@ -180,8 +180,14 @@
     border: 1px solid color-mix(in srgb, var(--conc) 50%, transparent);
     border-radius: 999px; padding: 0 8px; font-size: 11px; font-weight: 600;
   }
-  .lb-save .save-ok { color: var(--success); font-weight: 700; }
-  .lb-save .save-fail { color: var(--danger); font-weight: 700; }
+  .lb-save .save-label { font-variant-caps: all-small-caps; letter-spacing: .45px; font-weight: 700; font-size: 13.5px; }
+  .lb-roll.save { cursor: default; }
+  .lb-roll.save .mod { font-size: 12px; color: var(--text-muted); }
+  .lb-roll.save .vs { font-size: 11px; color: var(--text-muted); }
+  .lb-roll.save .total.ok { color: var(--success); }
+  .lb-roll.save .total.fail { color: var(--danger); }
+  .lb-roll.save .verdict.ok { color: var(--success); }
+  .lb-roll.save .verdict.fail { color: var(--danger); }
   .type.fire { color: var(--dt-fire); } .type.cold { color: var(--dt-cold); }
   .type.slashing { color: var(--dt-slashing); } .type.radiant { color: var(--dt-radiant); }
   .type.piercing { color: var(--dt-piercing); }
@@ -280,6 +286,7 @@ const STREAM = [
       roll: { dice: [8, 14], kept: 8, mod: 5, total: 13, verdict: 'miss' } },
   ]},
   { card: { name: 'Worg 1', type: 'monster', ts: NOW - 120000, src: 'DM' }, blocks: [
+    { kind: 'save', label: 'DEX save vs Fireball', die: 5, mod: 1, total: 6, dc: 14, ok: false },
     { kind: 'take', amount: 24, dmgType: 'fire', from: { name: 'Bartholomew Quill', type: 'pc' } },
     { kind: 'cond', condition: 'Prone', added: true },
   ]},
@@ -294,7 +301,7 @@ const STREAM = [
 
   { card: { name: 'Seraphina Dawnbringer', type: 'pc', ts: NOW - 60000, src: 'Phone (Mia)' }, blocks: [
     { kind: 'cast', spell: 'Bless', slot: 1, conc: true },
-    { kind: 'save', label: 'Concentration (Bless)', total: 14, dc: 11, ok: true },
+    { kind: 'save', label: 'Concentration (Bless)', die: 12, mod: 2, total: 14, dc: 11, ok: true },
   ]},
   { card: { name: 'Seraphina Dawnbringer', type: 'pc', ts: NOW - 40200, src: 'DM' }, blocks: [
     { kind: 'take', amount: 19, dmgType: 'slashing', from: { name: 'Bugbear Warrior', type: 'monster' } },
@@ -382,8 +389,17 @@ function blockHtml(b, cardName) {
       <div class="chips">${slot}${conc}</div></div>`;
   }
   if (b.kind === 'save') {
+    const mod = b.mod >= 0 ? `+${b.mod}` : `${b.mod}`;
     return `<div class="log-block lb-save" data-kind="save">${tools}
-      <div class="lb-effect">🛡 <span class="sc">${esc(b.label)}</span> — <b class="tnum">${b.total}</b> vs DC ${b.dc} · <span class="${b.ok ? 'save-ok' : 'save-fail'}">${b.ok ? 'held' : 'failed'}</span></div></div>`;
+      <div class="save-label">🛡 ${esc(b.label)}</div>
+      <div class="lb-roll save">
+        <span class="lbl">Save</span>
+        <span class="die tnum">${b.die}</span>
+        <span class="mod tnum">${mod}</span>
+        <span class="total ${b.ok ? 'ok' : 'fail'} tnum">${b.total}</span>
+        <span class="vs tnum">vs DC ${b.dc}</span>
+        <span class="verdict ${b.ok ? 'ok' : 'fail'}">${b.ok ? 'held' : 'failed'}</span>
+      </div></div>`;
   }
   if (b.kind === 'cond') {
     return `<div class="log-block" data-kind="cond">${tools}

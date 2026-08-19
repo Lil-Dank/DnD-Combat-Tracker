@@ -53,8 +53,8 @@ const text = () => dm.eval(`document.body.innerText`);
 async function captureAll(tag) {
   const shots = {};
   const screens = tag === 'en'
-    ? { combat: 'Combat', party: 'Party', monsters: 'Monsters', encounters: 'Encounters', settings: 'Settings' }
-    : { combat: 'Kampf', party: 'Gruppe', monsters: 'Monster', encounters: 'Begegnungen', settings: 'Einstellungen' };
+    ? { combat: 'Combat', party: 'Party', monsters: 'Monsters', spellbook: 'Spellbook', encounters: 'Encounters', settings: 'Settings' }
+    : { combat: 'Kampf', party: 'Gruppe', monsters: 'Monster', spellbook: 'Zauberbuch', encounters: 'Begegnungen', settings: 'Einstellungen' };
 
   for (const [key, label] of Object.entries(screens)) {
     await nav(label);

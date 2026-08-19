@@ -3,6 +3,7 @@ import type { AppState } from '../../shared/types';
 import { api } from './api';
 import { PcScreen } from './screens/PcScreen';
 import { MonsterScreen } from './screens/MonsterScreen';
+import { SpellbookScreen } from './screens/SpellbookScreen';
 import { TemplatesScreen } from './screens/TemplatesScreen';
 import { CombatScreen } from './screens/CombatScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
@@ -18,12 +19,13 @@ import type { PlayerSavePendingInfo } from '../../preload/index';
 import { translate } from '../../shared/i18n';
 import logoUrl from '../../../resources/icon.png';
 
-type Tab = 'combat' | 'pcs' | 'monsters' | 'templates' | 'archive' | 'settings';
+type Tab = 'combat' | 'pcs' | 'monsters' | 'spellbook' | 'templates' | 'archive' | 'settings';
 
 const TABS: { id: Tab; key: string }[] = [
   { id: 'combat', key: 'nav.combat' },
   { id: 'pcs', key: 'nav.party' },
   { id: 'monsters', key: 'nav.monsters' },
+  { id: 'spellbook', key: 'nav.spellbook' },
   { id: 'templates', key: 'nav.encounters' },
   { id: 'archive', key: 'nav.archive' },
   { id: 'settings', key: 'nav.settings' },
@@ -158,6 +160,7 @@ export function App() {
       <main className="content">
         {tab === 'pcs' && <PcScreen state={state} />}
         {tab === 'monsters' && <MonsterScreen state={state} />}
+        {tab === 'spellbook' && <SpellbookScreen state={state} />}
         {tab === 'templates' && (
           <TemplatesScreen
             state={state}

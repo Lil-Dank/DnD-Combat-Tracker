@@ -30,7 +30,8 @@ async function connect(url) {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const targets = await fetch('http://127.0.0.1:9222/json').then((r) => r.json());
+const PORT = process.env.CDP_PORT ?? '9222';
+const targets = await fetch(`http://127.0.0.1:${PORT}/json`).then((r) => r.json());
 const dm = await connect(targets.find((x) => x.url.includes('#dm')).webSocketDebuggerUrl);
 
 // ---- seed enough data that every screen has content to render
@@ -53,8 +54,8 @@ const text = () => dm.eval(`document.body.innerText`);
 async function captureAll(tag) {
   const shots = {};
   const screens = tag === 'en'
-    ? { combat: 'Combat', party: 'Party', monsters: 'Monsters', encounters: 'Encounters', settings: 'Settings' }
-    : { combat: 'Kampf', party: 'Gruppe', monsters: 'Monster', encounters: 'Begegnungen', settings: 'Einstellungen' };
+    ? { combat: 'Combat', party: 'Party', monsters: 'Monsters', spellbook: 'Spellbook', encounters: 'Encounters', settings: 'Settings' }
+    : { combat: 'Kampf', party: 'Gruppe', monsters: 'Monster', spellbook: 'Zauberbuch', encounters: 'Begegnungen', settings: 'Einstellungen' };
 
   for (const [key, label] of Object.entries(screens)) {
     await nav(label);
@@ -119,7 +120,7 @@ async function captureAll(tag) {
     await dm.eval('window.api.togglePlayerView()');
     await sleep(2500);
   }
-  const t2 = await fetch('http://127.0.0.1:9222/json').then((r) => r.json());
+  const t2 = await fetch(`http://127.0.0.1:${PORT}/json`).then((r) => r.json());
   const pvT = t2.find((x) => x.url.includes('#player'));
   if (pvT) {
     const pv = await connect(pvT.webSocketDebuggerUrl);
@@ -160,5 +161,6 @@ console.log(`UNCHANGED BETWEEN EN AND DE (${suspects.size}):\n`);
 for (const [line, where] of [...suspects].sort()) {
   console.log(`  ${JSON.stringify(line).padEnd(72)} ${[...where].join(',')}`);
 }
+const { writeFileSync } = await import('fs');
 writeFileSync(process.argv[2] ?? 'lang-diff.json', JSON.stringify({ EN, DE }, null, 1));
 dm.ws.close();

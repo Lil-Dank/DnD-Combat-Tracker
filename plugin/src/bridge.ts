@@ -39,6 +39,8 @@ export interface BridgeCombatant {
   isCurrentTurn: boolean;
   isDowned?: boolean;
   conditions: string[];
+  /** Localized spell name the actor is concentrating on, or null/absent. */
+  concentration?: string | null;
   attacks?: BridgeAttack[];
 }
 
@@ -68,6 +70,7 @@ export type BridgeCommand =
     }
   | { type: 'applyHeal'; actorId: string; amount: number }
   | { type: 'toggleCondition'; actorId: string; condition: string }
+  | { type: 'clearConcentration'; actorId: string }
   | {
       /**
        * Attack-flow progress report; app-side it triggers Kenku sounds and,

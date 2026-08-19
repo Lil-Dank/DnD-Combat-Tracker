@@ -8,7 +8,7 @@ import { registerIpc, broadcastPlayerViewStatus } from './ipc';
 import { createDmWindow, initWindowState, onPlayerViewChanged } from './windows';
 import { startBridge } from './bridge';
 import { startPlayerServer, stopPlayerServer } from './playerServer';
-import { loadGermanMonsterNames } from './srd';
+import { loadGermanMonsterNames, loadGermanSpellL10n } from './srd';
 import { handleCombatEvent, startKenkuStatusPolling } from './kenku';
 import { setMonsterNameMap } from '../shared/i18n';
 
@@ -83,6 +83,7 @@ app.whenReady().then(async () => {
   const l10nDe = await loadGermanMonsterNames();
   setMonsterNameMap(l10nDe);
   await store.backfillMonsterL10n(l10nDe);
+  await store.backfillSpellL10n(await loadGermanSpellL10n());
   registerIpc();
   onPlayerViewChanged(() => broadcastPlayerViewStatus());
   startBridge();

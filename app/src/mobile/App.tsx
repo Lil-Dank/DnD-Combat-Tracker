@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { abilityCodeLabel, abilityLabels, conditionLabel, damageTypeLabel, translate, DAMAGE_TYPE_DE, type Lang } from '../shared/i18n';
+import {
+  abilityCodeLabel,
+  abilityLabels,
+  conditionLabel,
+  damageTypeLabel,
+  spellComponents,
+  spellField,
+  spellLevelLabel,
+  spellSchoolLabel,
+  translate,
+  DAMAGE_TYPE_DE,
+  type Lang,
+} from '../shared/i18n';
 import { displayDice, formatDice, parseDice, type RollMode } from '../shared/dice';
 import {
   damageTypeSegments,
@@ -7,20 +19,26 @@ import {
   logEntryText,
   rollMathSegments,
 } from '../shared/logText';
-import type { LogEntry, MonsterAction } from '../shared/types';
+import type { LogEntry, MonsterAction, SpellSlots } from '../shared/types';
 import { ABILITY_KEYS, abilityMod } from '../shared/types';
 import { formToAction, actionToForm, emptyAction, ABILITIES, type ActionForm } from '../renderer/src/actionForm';
+import { spellToAction, spellActionName, spellActionText } from '../shared/spellAction';
 import type {
   ArchiveEntryMsg,
   AttackResultMsg,
   AttackRollResultMsg,
+  ConcSaveMsg,
+  ConcSaveResultMsg,
   DamageResultMsg,
+  HealResultMsg,
   SavePendingMsg,
   SaveResolvedMsg,
   StateMsg,
   WireCombatant,
+  WireSpell,
 } from './protocol';
 import { PlayerSocket, deviceToken } from './ws';
+import { uuid } from '../shared/uuid';
 import { DamageEditor } from '../components/DamageEditor';
 
 type View =
@@ -28,12 +46,14 @@ type View =
   | { id: 'hp'; mode: 'damage' | 'heal' }
   | { id: 'attack' }
   | { id: 'myAttacks' }
+  | { id: 'spellbook' }
   | { id: 'log' }
   | { id: 'archive' };
 
-/** Rollable actions, same filter the deck uses. */
+/** Rollable actions: attacks, damaging saves — and every spell snapshot
+ * (healing and utility spells cast from the same flow). */
 const rollable = (a: MonsterAction) =>
-  a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0);
+  a.spell != null || a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0);
 
 export function App() {
   const [state, setState] = useState<StateMsg | null>(null);
@@ -46,6 +66,12 @@ export function App() {
   const [savePendingMsg, setSavePendingMsg] = useState<SavePendingMsg | null>(null);
   const [waitingSave, setWaitingSave] = useState(false);
   const [archiveEntry, setArchiveEntry] = useState<ArchiveEntryMsg | null>(null);
+  const [healMsg, setHealMsg] = useState<HealResultMsg | null>(null);
+  /** Session cache of the on-demand spellbook reference. */
+  const [spellList, setSpellList] = useState<WireSpell[] | null>(null);
+  /** Pending Concentration checks (queued: several hits, several saves). */
+  const [concQueue, setConcQueue] = useState<ConcSaveMsg[]>([]);
+  const [concResult, setConcResult] = useState<ConcSaveResultMsg | null>(null);
   const socketRef = useRef<PlayerSocket | null>(null);
 
   const lang: Lang = state?.language ?? 'en';
@@ -76,6 +102,26 @@ export function App() {
           break;
         case 'archiveEntry':
           setArchiveEntry(msg);
+          break;
+        case 'spellList':
+          setSpellList(msg.spells);
+          break;
+        case 'healResult':
+          setHealMsg(msg);
+          break;
+        case 'castResult':
+          // Slot spend confirmed; the state push updates the pips.
+          break;
+        case 'concSave':
+          setConcQueue((q) => [...q, msg]);
+          break;
+        case 'concSaveResult':
+          if (msg.cancelled) {
+            setConcQueue((q) => q.filter((x) => x.id !== msg.id));
+            setConcResult((r) => (r?.id === msg.id ? null : r));
+          } else {
+            setConcResult(msg);
+          }
           break;
         case 'kicked':
           setToast('mob.kicked');
@@ -161,7 +207,14 @@ export function App() {
               {state.combatActive ? (
                 <InitiativeList state={state} t={t} lang={lang} />
               ) : (
-                <div className="center muted tall">{t('mob.noCombat')}</div>
+                <CharacterCard
+                  state={state}
+                  t={t}
+                  lang={lang}
+                  send={send}
+                  onSpellbook={() => setView({ id: 'spellbook' })}
+                  onActions={() => setView({ id: 'myAttacks' })}
+                />
               )}
               <LogPeek state={state} lang={lang} onOpen={() => setView({ id: 'log' })} />
               <nav className="action-bar">
@@ -217,6 +270,7 @@ export function App() {
               atkRoll={atkRollMsg}
               dmgResult={dmgMsg}
               savePending={savePendingMsg}
+              healResult={healMsg}
               waiting={waitingSave}
               clearResult={() => setAttackMsg(null)}
               onClose={() => {
@@ -224,6 +278,7 @@ export function App() {
                 setAtkRollMsg(null);
                 setDmgMsg(null);
                 setSavePendingMsg(null);
+                setHealMsg(null);
                 setWaitingSave(false);
                 setView({ id: 'home' });
               }}
@@ -235,7 +290,19 @@ export function App() {
               state={state}
               t={t}
               send={send}
+              spellList={spellList}
               onArchive={() => setView({ id: 'archive' })}
+              onSpellbook={() => setView({ id: 'spellbook' })}
+              onClose={() => setView({ id: 'home' })}
+            />
+          )}
+
+          {view.id === 'spellbook' && (
+            <SpellbookSheet
+              t={t}
+              lang={lang}
+              send={send}
+              spellList={spellList}
               onClose={() => setView({ id: 'home' })}
             />
           )}
@@ -284,9 +351,127 @@ export function App() {
               )}
             </Sheet>
           )}
+
+          {concQueue.length > 0 && (
+            <ConcSaveOverlay
+              msg={concQueue[0]}
+              result={concResult?.id === concQueue[0].id ? concResult : null}
+              lang={lang}
+              t={t}
+              send={send}
+              onDone={() => {
+                setConcQueue((q) => q.slice(1));
+                setConcResult(null);
+              }}
+            />
+          )}
         </>
       )}
     </div>
+  );
+}
+
+// ---- concentration check ------------------------------------------------------
+
+/**
+ * Your concentrating character just took damage: a Constitution saving throw
+ * decides whether the spell holds. Rolls digitally (d20 + CON) or takes a
+ * manually rolled total, with the hint of what to throw.
+ */
+function ConcSaveOverlay({
+  msg,
+  result,
+  lang,
+  t,
+  send,
+  onDone,
+}: {
+  msg: ConcSaveMsg;
+  result: ConcSaveResultMsg | null;
+  lang: Lang;
+  t: (k: string, p?: Record<string, string | number>) => string;
+  send: (m: Record<string, unknown>) => void;
+  onDone: () => void;
+}) {
+  const [manual, setManual] = useState(false);
+  const [total, setTotal] = useState('');
+  const [sent, setSent] = useState(false);
+  const spell = lang === 'de' && msg.deName ? msg.deName : msg.spellName;
+  const modStr =
+    msg.conMod === null ? '' : ` ${msg.conMod >= 0 ? '+' : '−'}${Math.abs(msg.conMod)}`;
+
+  if (result) {
+    return (
+      <Sheet title={`Ⓒ ${spell}`} onClose={onDone} t={t}>
+        <div className="result">
+          {result.die != null && <DiceValues dice={[result.die]} size={80} />}
+          <div className={`verdict ${result.saved ? 'hit' : 'miss'}`}>
+            {t(result.saved ? 'mob.concKept' : 'mob.concLost', { spell })}
+          </div>
+          <p className="atk-math tnum">
+            {result.total} {t('mob.concVs', { dc: result.dc ?? msg.dc })}
+          </p>
+          <button className="big primary" onClick={onDone}>
+            {t('mob.done')}
+          </button>
+        </div>
+      </Sheet>
+    );
+  }
+
+  return (
+    <Sheet title={`Ⓒ ${spell}`} onClose={() => undefined} t={t} noBack>
+      <p className="conc-info">
+        {t('mob.concInfo', { damage: msg.damage, dc: msg.dc, spell })}
+      </p>
+      <div className="mode-toggle">
+        <button className={manual ? '' : 'selected'} onClick={() => setManual(false)}>
+          {t('mob.digital')}
+        </button>
+        <button className={manual ? 'selected' : ''} onClick={() => setManual(true)}>
+          {t('mob.manual')}
+        </button>
+      </div>
+      {!manual ? (
+        <button
+          className="big primary"
+          disabled={sent}
+          onClick={() => {
+            setSent(true);
+            send({ type: 'concSaveDigital', id: msg.id });
+          }}
+        >
+          🎲 {displayDice(lang, 'd20')}
+          {modStr}
+        </button>
+      ) : (
+        <div className="manual-entry">
+          <label>
+            {t('mob.d20Total')}
+            <span className="roll-hint tnum">
+              🎲 {displayDice(lang, 'd20')}
+              {modStr}
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={total}
+              onChange={(e) => setTotal(e.target.value)}
+            />
+          </label>
+          <button
+            className="big primary"
+            disabled={sent || total.trim() === ''}
+            onClick={() => {
+              setSent(true);
+              send({ type: 'concSaveManual', id: msg.id, total: parseInt(total, 10) || 0 });
+            }}
+          >
+            {t('mob.resolve')}
+          </button>
+        </div>
+      )}
+    </Sheet>
   );
 }
 
@@ -345,6 +530,189 @@ function ClaimScreen({
   );
 }
 
+// ---- character card (home, no combat) ---------------------------------------
+
+function PhoneSlotPips({ slots }: { slots: SpellSlots | null }) {
+  if (!slots) return null;
+  const groups = slots.max
+    .map((max, i) => ({ level: i + 1, max, current: slots.current[i] ?? 0 }))
+    .filter((g) => g.max > 0);
+  if (!groups.length) return null;
+  return (
+    <div className="card-slots">
+      {groups.map((g) => (
+        <span key={g.level} className="card-slot tnum">
+          <b>L{g.level}</b>{' '}
+          {g.max <= 6 ? '●'.repeat(g.current) + '○'.repeat(g.max - g.current) : `${g.current}/${g.max}`}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The between-sessions view of your character: stats, notes, spell slots and
+ * the spellbook — a tidy sheet instead of the old "no combat" shrug.
+ */
+function CharacterCard({
+  state,
+  t,
+  lang,
+  send,
+  onSpellbook,
+  onActions,
+}: {
+  state: StateMsg;
+  t: (k: string, p?: Record<string, string | number>) => string;
+  lang: Lang;
+  send: (msg: Record<string, unknown>) => void;
+  onSpellbook: () => void;
+  onActions: () => void;
+}) {
+  const you = state.you!;
+  const [restArmed, setRestArmed] = useState(false);
+  useEffect(() => {
+    if (!restArmed) return;
+    const id = setTimeout(() => setRestArmed(false), 3000);
+    return () => clearTimeout(id);
+  }, [restArmed]);
+
+  return (
+    <div className="char-card">
+      <p className="muted card-idle">{t('mob.noCombat')}</p>
+      <div className="card-stats tnum">
+        <span>
+          <b>{t('common.maxHp')}</b> {you.maxHp}
+        </span>
+        <span>
+          <b>{t('common.ac')}</b> {you.ac}
+        </span>
+        <span>
+          <b>{t('common.initMod')}</b> {you.initMod >= 0 ? `+${you.initMod}` : you.initMod}
+        </span>
+      </div>
+      {you.abilities && (
+        <div className="you-stats card-abilities">
+          {ABILITY_KEYS.map((k) => {
+            const score = you.abilities![k];
+            const mod = abilityMod(score);
+            return (
+              <span key={k} className="you-stat tnum">
+                <b>{abilityLabels(lang)[k]}</b> {score} ({mod >= 0 ? `+${mod}` : mod})
+              </span>
+            );
+          })}
+        </div>
+      )}
+      {you.notes && <div className="you-notes card-notes">{you.notes}</div>}
+      <PhoneSlotPips slots={you.spellSlots} />
+      <div className="card-actions">
+        <button className="big" onClick={onActions}>
+          📝 {t('mob.myAttacks')}
+        </button>
+        <button className="big" onClick={onSpellbook}>
+          📖 {t('spellbook.title')}
+        </button>
+        {you.spellSlots && (
+          <button
+            className={`big ${restArmed ? 'primary' : ''}`}
+            onClick={() => {
+              if (restArmed) {
+                send({ type: 'longRest' });
+                setRestArmed(false);
+              } else {
+                setRestArmed(true);
+              }
+            }}
+          >
+            {restArmed ? `🛌 ${t('mob.longRestConfirm')}` : t('pcs.longRest')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- spellbook reference -----------------------------------------------------
+
+/**
+ * The table spellbook: every spell the DM has imported (no class filter, on
+ * purpose — browse what you might prepare tomorrow). Fetched once per
+ * session, full rules text readable at the table.
+ */
+function SpellbookSheet({
+  t,
+  lang,
+  send,
+  spellList,
+  onClose,
+}: {
+  t: (k: string, p?: Record<string, string | number>) => string;
+  lang: Lang;
+  send: (msg: Record<string, unknown>) => void;
+  spellList: WireSpell[] | null;
+  onClose: () => void;
+}) {
+  const [filter, setFilter] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!spellList) send({ type: 'getSpells' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const locName = (s: WireSpell) => (lang === 'de' && s.l10n?.de?.name ? s.l10n.de.name : s.name);
+  const locText = (s: WireSpell) => (lang === 'de' && s.l10n?.de?.text ? s.l10n.de.text : s.text);
+  const list = (spellList ?? []).filter(
+    (s) =>
+      s.name.toLowerCase().includes(filter.toLowerCase()) ||
+      locName(s).toLowerCase().includes(filter.toLowerCase()),
+  );
+
+  return (
+    <Sheet title={`📖 ${t('spellbook.title')}`} onClose={onClose} t={t}>
+      {!spellList ? (
+        <p className="muted">{t('mob.connecting')}</p>
+      ) : spellList.length === 0 ? (
+        <p className="muted">{t('spellbook.empty')}</p>
+      ) : (
+        <>
+          <input
+            className="spell-search"
+            placeholder={t('spellbook.search')}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <ul className="attack-list spell-list">
+            {list.map((s) => (
+              <li key={s.id}>
+                <button onClick={() => setOpenId(openId === s.id ? null : s.id)}>
+                  <strong>
+                    {locName(s)}
+                    {s.concentration && <span className="muted"> {lang === 'de' ? 'Ⓚ' : 'Ⓒ'}</span>}
+                  </strong>
+                  <span className="muted">
+                    {spellLevelLabel(lang, s.level)} · {spellSchoolLabel(lang, s.school)}
+                  </span>
+                </button>
+                {openId === s.id && (
+                  <div className="spell-detail">
+                    <p className="muted spell-detail-head">
+                      {spellField(lang, s.castingTime)} · {spellField(lang, s.range)} ·{' '}
+                      {spellComponents(lang, s.components)} · {spellField(lang, s.duration)}
+                      {s.ritual && ` · ${t('spellbook.ritual')}`}
+                    </p>
+                    <p className="spell-detail-text">{locText(s)}</p>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
 // ---- initiative ------------------------------------------------------------
 
 function InitiativeList({
@@ -381,13 +749,22 @@ function InitiativeList({
               )}
             </span>
           </div>
-          {c.conditions.length > 0 && (
+          {(c.conditions.length > 0 || c.concentration) && (
             <div className="init-conditions">
               {c.conditions.map((cond) => (
                 <span key={cond} className="chip">
                   {conditionLabel(lang, cond)}
                 </span>
               ))}
+              {c.concentration && (
+                <span className="chip conc-chip">
+                  {t('spellbook.concentration')} (
+                  {lang === 'de' && c.concentration.deName
+                    ? c.concentration.deName
+                    : c.concentration.name}
+                  )
+                </span>
+              )}
             </div>
           )}
           {c.id === state.you?.combatantId && state.you.abilities && (
@@ -493,6 +870,7 @@ function AttackFlow({
   atkRoll,
   dmgResult,
   savePending,
+  healResult,
   waiting,
   clearResult,
   onClose,
@@ -504,6 +882,7 @@ function AttackFlow({
   atkRoll: AttackRollResultMsg | null;
   dmgResult: DamageResultMsg | null;
   savePending: SavePendingMsg | null;
+  healResult: HealResultMsg | null;
   waiting: boolean;
   clearResult: () => void;
   onClose: () => void;
@@ -516,6 +895,10 @@ function AttackFlow({
   const [natural, setNatural] = useState<20 | 1 | null>(null);
   const [damage, setDamage] = useState('');
   const [rollMode, setRollMode] = useState<RollMode>('normal');
+  // Spell casts: the chosen slot level (null = cantrip / not a spell), and
+  // whether the slot step has been passed.
+  const [slotLevel, setSlotLevel] = useState<number | null>(null);
+  const [slotChosen, setSlotChosen] = useState(false);
   // Split digital flow: tumble → the dice settle on their numbers → the
   // verdict builds around them → damage tumbles and settles in place.
   // Save-based digital rolls ride the same phases with their damage dice.
@@ -526,6 +909,17 @@ function AttackFlow({
 
   const attacks = useMemo(() => you.attacks.filter(rollable), [you.attacks]);
   const isSave = attack ? attack.type === 'save' || attack.save !== null : false;
+  const isHeal = attack?.spell?.healing === true;
+  const isUtility =
+    attack != null && attack.spell != null && !isHeal && attack.type === 'other' &&
+    attack.onHit.damage.length === 0;
+  const needsSlot = attack?.spell != null && attack.spell.level > 0;
+  /** Upcast dice added by the chosen slot ("+2d6"), for hints and animations. */
+  const upcastDice = useMemo(() => {
+    const meta = attack?.spell;
+    if (!meta?.upcast || slotLevel === null || slotLevel <= meta.level) return null;
+    return { count: meta.upcast.count * (slotLevel - meta.level), die: meta.upcast.die };
+  }, [attack, slotLevel]);
 
   // One animated die per damage die of the attack (capped to stay readable).
   const dmgDiceSizes = useMemo(() => {
@@ -535,15 +929,19 @@ function AttackFlow({
       if (d.condition || !d.count || !d.die) continue;
       for (let i = 0; i < d.count && sizes.length < 12; i++) sizes.push(d.die);
     }
+    if (upcastDice) {
+      for (let i = 0; i < upcastDice.count && sizes.length < 12; i++) sizes.push(upcastDice.die);
+    }
     return sizes.length > 0 ? sizes : [6];
-  }, [attack]);
+  }, [attack, upcastDice]);
 
   // The tumble ends AND the server result is in → settle on the numbers.
   useEffect(() => {
     if (phase !== 'tumbling' || !tumbleDone) return;
     if (atkRoll) setPhase('settled');
     else if (savePending) setPhase(savePending.rolls?.length ? 'settled' : 'verdict');
-  }, [phase, tumbleDone, atkRoll, savePending]);
+    else if (healResult) setPhase(healResult.rolls?.length ? 'settled' : 'verdict');
+  }, [phase, tumbleDone, atkRoll, savePending, healResult]);
 
   // Hold the settled number for a beat, then build the verdict around it.
   useEffect(() => {
@@ -572,13 +970,17 @@ function AttackFlow({
     }
   };
 
+  // Every cast command carries the chosen slot level (undefined = cantrip);
+  // the server validates and spends it.
+  const slot = slotLevel ?? undefined;
+
   // Save-based actions: one shot (the DM adjudicates), but the roller still
   // gets the damage-dice reveal before the waiting screen.
   const fireDigitalSave = () => {
     setPhase('tumbling');
     setTumbleDone(false);
     setTimeout(() => setTumbleDone(true), 3000);
-    send({ type: 'attackDigital', attackId: attack!.id, targetIds: targets });
+    send({ type: 'attackDigital', attackId: attack!.id, targetIds: targets, slotLevel: slot });
   };
 
   const fireAttackRoll = () => {
@@ -590,6 +992,7 @@ function AttackFlow({
       attackId: attack!.id,
       targetIds: targets,
       advantage: rollMode === 'normal' ? undefined : rollMode,
+      slotLevel: slot,
     });
   };
 
@@ -597,7 +1000,30 @@ function AttackFlow({
     setPhase('dmgTumbling');
     setTumbleDone(false);
     setTimeout(() => setTumbleDone(true), 2200);
-    send({ type: 'damageRollDigital', attackId: attack!.id, targetIds: targets });
+    send({ type: 'damageRollDigital', attackId: attack!.id, targetIds: targets, slotLevel: slot });
+  };
+
+  const fireHealDigital = () => {
+    setPhase('tumbling');
+    setTumbleDone(false);
+    setTimeout(() => setTumbleDone(true), 2200);
+    send({ type: 'castHealDigital', attackId: attack!.id, targetIds: targets, slotLevel: slot });
+  };
+
+  const fireHealManual = () => {
+    send({
+      type: 'castHealManual',
+      attackId: attack!.id,
+      targetIds: targets,
+      amount: parseInt(damage, 10) || 0,
+      slotLevel: slot,
+    });
+    onClose();
+  };
+
+  const fireUtilityCast = () => {
+    send({ type: 'castSpell', attackId: attack!.id, slotLevel: slot });
+    onClose();
   };
 
   const fireManual = () => {
@@ -607,6 +1033,7 @@ function AttackFlow({
         attackId: attack!.id,
         targetIds: targets,
         damage: parseInt(damage, 10) || 0,
+        slotLevel: slot,
       });
       return;
     }
@@ -617,26 +1044,27 @@ function AttackFlow({
       d20Total: parseInt(d20, 10) || 0,
       natural: natural ?? undefined,
       damage: parseInt(damage, 10) || 0,
+      slotLevel: slot,
     });
   };
 
   // The dice are in the air: the result stays hidden until the tumble ends.
   if (phase === 'tumbling') {
     return (
-      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+      <Sheet title={(attack ? spellActionName(state.language, attack) : t('mob.attack'))} onClose={onClose} t={t}>
         <RollingDice
           label={t('mob.rolling')}
-          sizes={isSave ? dmgDiceSizes : rollMode !== 'normal' ? [20, 20] : [20]}
+          sizes={isSave || isHeal ? dmgDiceSizes : rollMode !== 'normal' ? [20, 20] : [20]}
         />
       </Sheet>
     );
   }
 
   // The dice settle on their numbers and hold a beat before the verdict.
-  if (phase === 'settled' && (atkRoll || savePending)) {
-    const dice = atkRoll ? atkRoll.dice : (savePending?.rolls ?? []);
+  if (phase === 'settled' && (atkRoll || savePending || healResult)) {
+    const dice = atkRoll ? atkRoll.dice : (savePending?.rolls ?? healResult?.rolls ?? []);
     return (
-      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+      <Sheet title={(attack ? spellActionName(state.language, attack) : t('mob.attack'))} onClose={onClose} t={t}>
         <div className="rolling">
           <DiceValues
             dice={dice}
@@ -649,12 +1077,33 @@ function AttackFlow({
     );
   }
 
+  // Healing verdict: the settled dice, the total restored, done.
+  if (phase === 'verdict' && healResult) {
+    return (
+      <Sheet title={(attack ? spellActionName(state.language, attack) : t('mob.attack'))} onClose={onClose} t={t}>
+        <div className="result">
+          {healResult.rolls && healResult.rolls.length > 0 && (
+            <DiceValues dice={healResult.rolls} size={healResult.rolls.length > 6 ? 44 : 58} />
+          )}
+          <div className="verdict heal">✚ {healResult.amount}</div>
+          {healResult.math && (
+            <p className="dmg-breakdown tnum">{displayDice(state.language, healResult.math)}</p>
+          )}
+          <p className="muted">{t('mob.healedTarget', { name: healResult.targetName })}</p>
+          <button className="big primary" onClick={onClose}>
+            {t('mob.done')}
+          </button>
+        </div>
+      </Sheet>
+    );
+  }
+
   // The verdict builds around the settled dice, which stay put.
   if ((phase === 'verdict' || phase === 'dmgTumbling' || phase === 'dmgSettled') && atkRoll) {
     const bonus = atkRoll.total - atkRoll.die;
     const bonusStr = bonus === 0 ? '' : ` ${bonus > 0 ? '+' : '−'} ${Math.abs(bonus)}`;
     return (
-      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+      <Sheet title={(attack ? spellActionName(state.language, attack) : t('mob.attack'))} onClose={onClose} t={t}>
         <div className="result">
           <DiceValues dice={atkRoll.dice} kept={atkRoll.die} size={atkRoll.dice.length > 1 ? 64 : 80} />
           <div className={`verdict ${atkRoll.outcome}`}>
@@ -716,7 +1165,7 @@ function AttackFlow({
   // Result view (single attack or resolved saves)
   if (result || waiting) {
     return (
-      <Sheet title={attack?.name ?? t('mob.attack')} onClose={onClose} t={t}>
+      <Sheet title={(attack ? spellActionName(state.language, attack) : t('mob.attack'))} onClose={onClose} t={t}>
         {waiting && (
           <div className="result">
             {savePending?.rolls && savePending.rolls.length > 0 && (
@@ -802,8 +1251,21 @@ function AttackFlow({
           <ul className="attack-list">
             {attacks.map((a) => (
               <li key={a.id}>
-                <button onClick={() => setAttack(a)}>
-                  <strong>{a.name}</strong>
+                <button
+                  onClick={() => {
+                    setAttack(a);
+                    setSlotLevel(null);
+                    setSlotChosen(false);
+                  }}
+                >
+                  <strong>
+                    {spellActionName(state.language, a)}
+                    {a.spell && (
+                      <span className="spell-chip-mob">
+                        {' '}✨ {spellLevelLabel(state.language, a.spell.level)}
+                      </span>
+                    )}
+                  </strong>
                   <span className="muted">
                     {a.display.toHit ?? (a.save ? `${abilityCodeLabel(state.language, a.save.ability)} ${a.save.dc}` : '')}
                     {a.display.damage ? (
@@ -817,14 +1279,75 @@ function AttackFlow({
         </>
       )}
 
-      {attack && (
+      {attack && needsSlot && !slotChosen && attack.spell && (
+        <>
+          <h3>{t('cast.slotTitle', { spell: spellActionName(state.language, attack) })}</h3>
+          <div className="slot-grid">
+            {Array.from({ length: 10 - attack.spell.level }, (_, i) => attack.spell!.level + i)
+              .filter((lvl) => (you.spellSlots?.max[lvl - 1] ?? 0) > 0)
+              .map((lvl) => {
+                const left = you.spellSlots?.current[lvl - 1] ?? 0;
+                return (
+                  <button
+                    key={lvl}
+                    className="target slot-btn"
+                    disabled={left <= 0}
+                    onClick={() => {
+                      setSlotLevel(lvl);
+                      setSlotChosen(true);
+                    }}
+                  >
+                    {t('cast.slotBtn', { n: lvl, left })}
+                  </button>
+                );
+              })}
+          </div>
+          {Array.from({ length: 10 - attack.spell.level }, (_, i) => attack.spell!.level + i).every(
+            (lvl) => (you.spellSlots?.current[lvl - 1] ?? 0) <= 0,
+          ) && <p className="muted">{t('cast.noSlots')}</p>}
+          {attack.spell.upcast && (
+            <p className="muted">
+              ⬆{' '}
+              {t('spellbook.upcastPerLevel', {
+                dice: displayDice(state.language, `${attack.spell.upcast.count}d${attack.spell.upcast.die}`),
+                level: attack.spell.level,
+              })}
+            </p>
+          )}
+          {!attack.spell.upcast && attack.spell.upcastText && (
+            <p className="muted">⬆ {attack.spell.upcastText}</p>
+          )}
+          {spellActionText(state.language, attack) && (
+            <p className="spell-note">{spellActionText(state.language, attack)}</p>
+          )}
+        </>
+      )}
+
+      {attack && (!needsSlot || slotChosen) && isUtility && (
         <>
           <h3>
-            {attack.name} — {t('mob.pickTargets')}
+            {spellActionName(state.language, attack)}
+            {slotLevel !== null && <span className="muted"> · {spellLevelLabel(state.language, slotLevel)}</span>}
+          </h3>
+          {spellActionText(state.language, attack) && (
+            <p className="spell-note">{spellActionText(state.language, attack)}</p>
+          )}
+          <button className="big primary" onClick={fireUtilityCast}>
+            ✨ {t('mob.cast')}
+          </button>
+        </>
+      )}
+
+      {attack && (!needsSlot || slotChosen) && !isUtility && (
+        <>
+          <h3>
+            {spellActionName(state.language, attack)} — {t(isHeal ? 'mob.pickAlly' : 'mob.pickTargets')}
           </h3>
           <div className="target-grid">
             {state.combatants
-              .filter((c) => c.id !== you.combatantId)
+              // Healing may target anyone, yourself included; attacks
+              // exclude your own combatant as before.
+              .filter((c) => (isHeal ? true : c.id !== you.combatantId))
               .map((c) => (
                 <button
                   key={c.id}
@@ -847,7 +1370,40 @@ function AttackFlow({
                 </button>
               </div>
 
-              {!manual && !isSave && (
+              {!manual && isHeal && (
+                <button className="big primary" onClick={fireHealDigital}>
+                  ✚ {t('mob.roll')}
+                </button>
+              )}
+
+              {manual && isHeal && (
+                <div className="manual-entry">
+                  <label>
+                    {t('mob.healRolled')}
+                    {attack.display.damage && (
+                      <span className="roll-hint tnum">
+                        🎲 <DmgText lang={state.language} text={attack.display.damage} />
+                        {upcastDice && ` + ${displayDice(state.language, `${upcastDice.count}d${upcastDice.die}`)}`}
+                      </span>
+                    )}
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={damage}
+                      onChange={(e) => setDamage(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="big primary"
+                    disabled={damage.trim() === ''}
+                    onClick={fireHealManual}
+                  >
+                    {t('mob.resolve')}
+                  </button>
+                </div>
+              )}
+
+              {!manual && !isSave && !isHeal && (
                 <>
                   <div className="mode-toggle adv-toggle">
                     <button
@@ -881,7 +1437,7 @@ function AttackFlow({
                 </button>
               )}
 
-              {manual && (
+              {manual && !isHeal && (
                 <div className="manual-entry">
                   {!isSave && (
                     <>
@@ -920,6 +1476,8 @@ function AttackFlow({
                     {attack.display.damage && (
                       <span className="roll-hint tnum">
                         🎲 <DmgText lang={state.language} text={attack.display.damage} />
+                        {upcastDice &&
+                          ` + ${displayDice(state.language, `${upcastDice.count}d${upcastDice.die}`)}`}
                       </span>
                     )}
                     <input
@@ -952,17 +1510,25 @@ function MyAttacks({
   state,
   t,
   send,
+  spellList,
   onArchive,
+  onSpellbook,
   onClose,
 }: {
   state: StateMsg;
   t: (k: string, p?: Record<string, string | number>) => string;
   send: (msg: Record<string, unknown>) => void;
+  spellList: WireSpell[] | null;
   onArchive: () => void;
+  onSpellbook: () => void;
   onClose: () => void;
 }) {
   const you = state.you!;
   const [form, setForm] = useState<ActionForm | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [pickFilter, setPickFilter] = useState('');
+  const [picked, setPicked] = useState<WireSpell | null>(null);
+  const [bonus, setBonus] = useState('');
 
   const patch = (p: Partial<ActionForm>) => setForm((f) => (f ? { ...f, ...p } : f));
 
@@ -973,6 +1539,113 @@ function MyAttacks({
     setForm(null);
   };
 
+  const attach = (spell: WireSpell, opts: { toHit?: number; dc?: number }) => {
+    // crypto.randomUUID is unavailable on insecure LAN origins — shared/uuid
+    // falls back to getRandomValues there (same as the device token).
+    const action = spellToAction(spell, opts, `spell.${uuid()}`, you.attacks.length);
+    send({ type: 'saveAttack', action });
+    setPicking(false);
+    setPicked(null);
+    setBonus('');
+    setPickFilter('');
+  };
+
+  const locSpellName = (s: WireSpell) =>
+    state.language === 'de' && s.l10n?.de?.name ? s.l10n.de.name : s.name;
+  const pickList = (spellList ?? []).filter(
+    (s) =>
+      s.name.toLowerCase().includes(pickFilter.toLowerCase()) ||
+      locSpellName(s).toLowerCase().includes(pickFilter.toLowerCase()),
+  );
+
+  if (picking) {
+    if (picked) {
+      const needsToHit = picked.attack;
+      const needsDc = !picked.attack && !!picked.save;
+      const n = parseInt(bonus, 10);
+      return (
+        <Sheet title={locSpellName(picked)} onClose={onClose} t={t}>
+          <p className="muted">
+            {spellLevelLabel(state.language, picked.level)} ·{' '}
+            {spellSchoolLabel(state.language, picked.school)}
+          </p>
+          {needsToHit && (
+            <label className="mob-form">
+              {t('pcs.spellToHit')}
+              <input
+                autoFocus
+                type="number"
+                inputMode="numeric"
+                placeholder="+5"
+                value={bonus}
+                onChange={(e) => setBonus(e.target.value)}
+              />
+            </label>
+          )}
+          {needsDc && (
+            <label className="mob-form">
+              {t('pcs.spellDc')}
+              <input
+                autoFocus
+                type="number"
+                inputMode="numeric"
+                placeholder="13"
+                value={bonus}
+                onChange={(e) => setBonus(e.target.value)}
+              />
+            </label>
+          )}
+          <div className="form-pair">
+            <button className="big" onClick={() => setPicked(null)}>
+              {t('common.back')}
+            </button>
+            <button
+              className="big primary"
+              disabled={(needsToHit || needsDc) && !Number.isFinite(n)}
+              onClick={() =>
+                attach(picked, needsToHit ? { toHit: n || 0 } : needsDc ? { dc: n || 10 } : {})
+              }
+            >
+              {t('pcs.attach')}
+            </button>
+          </div>
+        </Sheet>
+      );
+    }
+    return (
+      <Sheet title={`✨ ${t('pcs.fromSpellbook')}`} onClose={onClose} t={t}>
+        <button className="sheet-back" onClick={() => setPicking(false)}>
+          {t('common.back')}
+        </button>
+        {!spellList ? (
+          <p className="muted">{t('mob.connecting')}</p>
+        ) : (
+          <>
+            <input
+              className="spell-search"
+              placeholder={t('spellbook.search')}
+              value={pickFilter}
+              onChange={(e) => setPickFilter(e.target.value)}
+            />
+            <ul className="attack-list spell-list">
+              {pickList.map((s) => (
+                <li key={s.id}>
+                  <button onClick={() => setPicked(s)}>
+                    <strong>{locSpellName(s)}</strong>
+                    <span className="muted">
+                      {spellLevelLabel(state.language, s.level)} ·{' '}
+                      {spellSchoolLabel(state.language, s.school)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </Sheet>
+    );
+  }
+
   return (
     <Sheet title={`📝 ${t('mob.myAttacks')}`} onClose={onClose} t={t}>
       {!form && (
@@ -981,7 +1654,14 @@ function MyAttacks({
             {you.attacks.map((a) => (
               <li key={a.id}>
                 <button onClick={() => setForm(actionToForm(a))}>
-                  <strong>{a.name}</strong>
+                  <strong>
+                    {spellActionName(state.language, a)}
+                    {a.spell && (
+                      <span className="spell-chip-mob">
+                        {' '}✨ {spellLevelLabel(state.language, a.spell.level)}
+                      </span>
+                    )}
+                  </strong>
                   <span className="muted">
                     {a.display.toHit ?? (a.save ? `${abilityCodeLabel(state.language, a.save.ability)} ${a.save.dc}` : '')}
                     {a.display.damage ? (
@@ -1002,9 +1682,25 @@ function MyAttacks({
           <button className="big" onClick={() => setForm(emptyAction())}>
             + {t('pcs.addAttack')}
           </button>
-          <button className="linkish archive-link" onClick={onArchive}>
-            📜 {t('mob.archive')}
+          <button
+            className="big"
+            onClick={() => {
+              if (!spellList) send({ type: 'getSpells' });
+              setPicking(true);
+            }}
+          >
+            {t('pcs.fromSpellbook')}
           </button>
+          {/* Navigation, not actions: real buttons, but in the lighter
+              outline style so they read apart from the editor buttons. */}
+          <div className="sheet-nav-row">
+            <button className="big ghost" onClick={onSpellbook}>
+              📖 {t('spellbook.title')}
+            </button>
+            <button className="big ghost" onClick={onArchive}>
+              📜 {t('mob.archive')}
+            </button>
+          </div>
         </>
       )}
 
@@ -1284,18 +1980,23 @@ function Sheet({
   onClose,
   t,
   children,
+  noBack = false,
 }: {
   title: string;
   onClose: () => void;
   t: (k: string) => string;
   children: React.ReactNode;
+  /** Must-answer overlays (concentration checks) hide the back button. */
+  noBack?: boolean;
 }) {
   return (
     <div className="sheet">
       <header className="sheet-header">
-        <button className="sheet-back" onClick={onClose}>
-          {t('common.back')}
-        </button>
+        {!noBack && (
+          <button className="sheet-back" onClick={onClose}>
+            {t('common.back')}
+          </button>
+        )}
         <h2>{title}</h2>
       </header>
       <div className="sheet-body">{children}</div>

@@ -61,10 +61,20 @@ function stateMessage(state: AppState): string {
           isCurrentTurn: i === combat!.currentIndex,
           isDowned: c.isDowned,
           conditions: c.conditions,
+          // Localized spell name the actor concentrates on, for the deck's
+          // condition flow (labels arrive pre-translated, like action names).
+          concentration: c.concentration
+            ? (lang === 'de' && c.concentration.deName) || c.concentration.name
+            : null,
           // Rollable actions for the deck's Attack flow (attack rolls, plus
-          // save actions that deal damage — e.g. breath weapons).
+          // save actions that deal damage — e.g. breath weapons). Spell
+          // snapshots stay off the deck: no slot UI there this release.
           attacks: c.attacks
-            .filter((a) => a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0))
+            .filter(
+              (a) =>
+                !a.spell &&
+                (a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0)),
+            )
             .map((a) => ({
               id: a.id,
               // Deck labels use the German SRD action name when the template
@@ -98,6 +108,7 @@ const KNOWN_COMMANDS = new Set([
   'applyDamage',
   'applyHeal',
   'toggleCondition',
+  'clearConcentration',
 ]);
 
 async function handleCommand(cmd: BridgeCommand): Promise<void> {
@@ -137,6 +148,10 @@ async function handleCommand(cmd: BridgeCommand): Promise<void> {
       if (cmd.actorId && typeof cmd.condition === 'string') {
         return store.toggleCondition(cmd.actorId, cmd.condition as never, ctx);
       }
+      return;
+    case 'clearConcentration':
+      // The deck's condition flow drops a combatant's Concentration tag.
+      if (cmd.actorId) return store.setConcentration(cmd.actorId, null);
       return;
     case 'attackEvent': {
       // Deliberately absent from KNOWN_COMMANDS: a sound trigger should not

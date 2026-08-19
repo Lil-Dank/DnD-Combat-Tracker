@@ -136,7 +136,15 @@ export function formToAction(f: ActionForm, order: number, existing?: MonsterAct
           usage: existing?.attack?.usage ?? null,
         }
       : null,
-    save: isSave ? { ability: f.saveAbility, dc: parseInt(f.saveDc, 10) || 10 } : null,
+    save: isSave
+      ? {
+          ability: f.saveAbility,
+          dc: parseInt(f.saveDc, 10) || 10,
+          // The damage-on-success rule has no form field; spell snapshots
+          // carry it through edits unchanged.
+          ...(existing?.save?.onSuccess ? { onSuccess: existing.save.onSuccess } : {}),
+        }
+      : null,
     onHit: {
       damage,
       alternateDamage: existing?.onHit.alternateDamage ?? null,
@@ -144,6 +152,9 @@ export function formToAction(f: ActionForm, order: number, existing?: MonsterAct
     },
     onHitOrMiss: existing?.onHitOrMiss ?? null,
     kenkuSound: f.kenkuSound ?? null,
+    // Spell metadata survives edits — an edited snapshot still casts (slot
+    // prompt, upcast, heal polarity all keyed off this).
+    spell: existing?.spell ?? null,
     display: {
       toHit: isAttack ? (toHit >= 0 ? `+${toHit}` : `${toHit}`) : null,
       range: rangeParts.join(' or ') || null,

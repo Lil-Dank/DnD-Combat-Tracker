@@ -280,6 +280,73 @@ select.campaign-select {
   padding: 4px 8px;
 }
 
+/* Spellbook: expanded row header + compact roll summary */
+.spell-header-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.spell-roll-summary {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+/* Spell slots: compact pips beside names + the 9-level max editor row */
+.slot-pips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-left: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+.slot-pips-group b {
+  font-weight: 600;
+  letter-spacing: 0;
+  margin-right: 2px;
+}
+
+.slot-row {
+  flex-wrap: wrap;
+}
+
+.slot-row label {
+  flex: 0 0 auto;
+}
+
+.slot-row input {
+  width: 52px;
+}
+
+.pc-attack-add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.spell-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.tag.spell-chip {
+  font-size: 11px;
+}
+
+/* Concentration reads as its own kind of badge — arcane purple tint. */
+.condition-badge.conc-badge {
+  background: rgba(147, 112, 219, 0.16);
+  border-color: rgba(147, 112, 219, 0.55);
+}
+
 /* Manage modal rows */
 .campaign-list {
   display: flex;

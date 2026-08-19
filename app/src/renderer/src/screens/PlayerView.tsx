@@ -225,14 +225,26 @@ export function PlayerView({ state }: { state: AppState }) {
   );
 }
 
-function ConditionBadges({ conditions }: { conditions: string[] }) {
-  const { cond: label } = useI18n();
-  if (conditions.length === 0) return null;
+function ConditionBadges({
+  conditions,
+  concentration,
+}: {
+  conditions: string[];
+  concentration?: { name: string; deName?: string | null } | null;
+}) {
+  const { t, lang, cond: label } = useI18n();
+  if (conditions.length === 0 && !concentration) return null;
   return (
     <div className="pv-conditions">
       {conditions.map((c) => (
         <span key={c} className="pv-condition">{label(c as Condition)}</span>
       ))}
+      {concentration && (
+        <span className="pv-condition pv-conc">
+          {t('spellbook.concentration')} (
+          {lang === 'de' && concentration.deName ? concentration.deName : concentration.name})
+        </span>
+      )}
     </div>
   );
 }
@@ -270,7 +282,7 @@ function PlayerCard({ c, isCurrent }: { c: Combatant; isCurrent: boolean }) {
       >
         {c.isDowned ? t('pv.downed') : `${c.currentHp} / ${c.maxHp}`}
       </div>
-      <ConditionBadges conditions={c.conditions} />
+      <ConditionBadges conditions={c.conditions} concentration={c.concentration} />
     </div>
   );
 }

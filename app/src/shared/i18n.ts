@@ -57,6 +57,110 @@ export const DAMAGE_TYPE_DE: Record<string, string> = {
   thunder: 'Donner',
 };
 
+/** Schools of magic, as named in the German SRD 5.2.1. */
+export const SPELL_SCHOOL_DE: Record<string, string> = {
+  abjuration: 'Bannmagie',
+  conjuration: 'Beschwörung',
+  divination: 'Erkenntnismagie',
+  enchantment: 'Verzauberung',
+  evocation: 'Hervorrufung',
+  illusion: 'Illusion',
+  necromancy: 'Nekromantie',
+  transmutation: 'Verwandlung',
+};
+
+/**
+ * German words for the enumerable parts of a spell header (casting times,
+ * range keywords, duration keywords, component letters). Free-text values
+ * (manual spells, material descriptions) pass through untranslated — the
+ * same split the monster library makes.
+ */
+const SPELL_WORD_DE: Record<string, string> = {
+  Action: 'Aktion',
+  'Bonus Action': 'Bonusaktion',
+  Reaction: 'Reaktion',
+  '1 Minute': '1 Minute',
+  '10 Minutes': '10 Minuten',
+  '1 Hour': '1 Stunde',
+  'or Ritual': 'oder Ritual',
+  Touch: 'Berührung',
+  Self: 'Selbst',
+  Instantaneous: 'Unmittelbar',
+  Concentration: 'Konzentration',
+  'up to': 'bis zu',
+  round: 'Runde',
+  rounds: 'Runden',
+  minute: 'Minute',
+  minutes: 'Minuten',
+  hour: 'Stunde',
+  hours: 'Stunden',
+  day: 'Tag',
+  days: 'Tage',
+  'until dispelled': 'bis zur Bannung',
+  'until dispelled or triggered': 'bis zur Bannung oder Auslösung',
+  special: 'besonders',
+};
+
+/** Class names as in the German SRD 5.2.1. */
+const SPELL_CLASS_DE: Record<string, string> = {
+  Barbarian: 'Barbar',
+  Bard: 'Barde',
+  Cleric: 'Kleriker',
+  Druid: 'Druide',
+  Fighter: 'Kämpfer',
+  Monk: 'Mönch',
+  Paladin: 'Paladin',
+  Ranger: 'Waldläufer',
+  Rogue: 'Schurke',
+  Sorcerer: 'Zauberer',
+  Warlock: 'Hexenmeister',
+  Wizard: 'Magier',
+};
+
+export function spellClassLabel(lang: Lang, cls: string): string {
+  return lang === 'de' ? (SPELL_CLASS_DE[cls] ?? cls) : cls;
+}
+
+export function spellSchoolLabel(lang: Lang, school: string): string {
+  return lang === 'de' ? (SPELL_SCHOOL_DE[school] ?? school) : school.charAt(0).toUpperCase() + school.slice(1);
+}
+
+/** "Cantrip" / "Level 3" — DE "Zaubertrick" / "3. Grad". */
+export function spellLevelLabel(lang: Lang, level: number): string {
+  if (level === 0) return lang === 'de' ? 'Zaubertrick' : 'Cantrip';
+  return lang === 'de' ? `${level}. Grad` : `Level ${level}`;
+}
+
+// Longest phrases first, so "until dispelled or triggered" wins over
+// "until dispelled" and "up to" is replaced as a unit.
+const SPELL_WORD_ENTRIES = Object.entries(SPELL_WORD_DE)
+  .sort((a, b) => b[0].length - a[0].length)
+  .map(([enWord, deWord]) => ({
+    re: new RegExp(`\\b${enWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'),
+    de: deWord,
+  }));
+
+/**
+ * Translates a spell header value (casting time, range, duration) phrase by
+ * phrase using SPELL_WORD_DE; unknown words pass through untranslated.
+ * Distances convert to meters like the German SRD (5 ft = 1,5 m).
+ */
+export function spellField(lang: Lang, value: string): string {
+  if (lang !== 'de' || !value) return value;
+  let out = value.replace(/(\d+)[ -](?:feet|foot)/g, (_, n) => {
+    const meters = (Number(n) / 5) * 1.5;
+    return `${String(meters).replace('.', ',')} Meter`;
+  });
+  for (const { re, de } of SPELL_WORD_ENTRIES) out = out.replace(re, de);
+  return out;
+}
+
+/** Component string for display: German swaps S (Somatic) for G (Gestik). */
+export function spellComponents(lang: Lang, components: string): string {
+  if (lang !== 'de') return components;
+  return components.replace(/\bS\b/, 'G');
+}
+
 type Dict = Record<string, string>;
 
 const en: Dict = {
@@ -66,6 +170,7 @@ const en: Dict = {
   'nav.combat': '⚔ Combat',
   'nav.party': '🛡 Party',
   'nav.monsters': '🐉 Monsters',
+  'nav.spellbook': '📖 Spellbook',
   'nav.encounters': '🗺 Encounters',
   'nav.settings': '⚙ Settings',
   'nav.openPlayerView': 'Open Player View',
@@ -107,6 +212,38 @@ const en: Dict = {
   'monsters.range': 'range',
   'monsters.save': 'save',
   'monsters.dc': 'DC',
+
+  'spellbook.title': 'Spellbook',
+  'spellbook.import': '⤓ Import SRD Spells',
+  'spellbook.add': '+ Add Spell',
+  'spellbook.search': 'Search spells…',
+  'spellbook.empty': 'No spells yet. Import the SRD set or add your own.',
+  'spellbook.deleteConfirm': 'Delete {name}? PCs keep any copies already attached to their actions.',
+  'spellbook.imported': 'Imported {n} spells from the SRD 5.2.1 dataset.',
+  'spellbook.level': 'Level',
+  'spellbook.school': 'School',
+  'spellbook.castingTime': 'Casting Time',
+  'spellbook.range': 'Range',
+  'spellbook.components': 'Components',
+  'spellbook.duration': 'Duration',
+  'spellbook.classes': 'Classes',
+  'spellbook.concentration': 'Concentration',
+  'spellbook.ritual': 'Ritual',
+  'spellbook.editSpell': 'Edit Spell',
+  'spellbook.addSpell': 'Add Spell',
+  'spellbook.rollLayer': 'Rolls',
+  'spellbook.rollLayerNote': '(what gets rolled at the table — everything else stays in the text)',
+  'spellbook.attackRoll': 'Spell attack roll',
+  'spellbook.saveAbility': 'Save',
+  'spellbook.onSuccess': 'On success',
+  'spellbook.onSuccessHalf': 'Half damage',
+  'spellbook.onSuccessNone': 'No damage',
+  'spellbook.damage': 'Damage',
+  'spellbook.healing': 'Healing dice',
+  'spellbook.upcast': 'Upcast',
+  'spellbook.upcastPerLevel': '+{dice} per slot level above {level}',
+  'spellbook.text': 'Rules text',
+  'spellbook.noSave': 'None',
 
   'templates.title': 'Encounter Templates',
   'templates.new': '+ New Template',
@@ -192,6 +329,8 @@ const en: Dict = {
   'pw.saveTitle': 'Saving throw — {attack}',
   'pw.saveInfo':
     '{actor} forces a {ability} saving throw (DC {dc}). Damage: {damage} (half on a success).',
+  'pw.saveInfoNone':
+    '{actor} forces a {ability} saving throw (DC {dc}). Damage: {damage} (none on a success).',
   'pw.saveSaved': 'saved',
   'pw.saveFailed': 'failed',
   'pw.saveApply': 'Apply',
@@ -215,6 +354,8 @@ const en: Dict = {
   'log.outcome.crit': 'critical hit!',
   'log.outcome.hit': 'hit',
   'log.outcome.miss': 'miss',
+  'log.cast': '{actor} casts {spell} (level {level})',
+  'log.castCantrip': '{actor} casts {spell}',
   'log.saveSuccess': '{actor} saved against {attack} ({total})',
   'log.saveFail': '{actor} failed the save against {attack} ({total})',
   'log.conditionAdded': '{target} is {condition}',
@@ -253,6 +394,17 @@ const en: Dict = {
   'mob.nat20': 'Natural 20',
   'mob.nat1': 'Natural 1',
   'mob.damageRolled': 'Damage rolled',
+  'mob.healRolled': 'Healing rolled',
+  'mob.healedTarget': '{name} healed',
+  'mob.pickAlly': 'choose who to heal',
+  'mob.cast': 'Cast',
+  'mob.longRestConfirm': 'Tap again to confirm',
+  'mob.err.noSlot': 'No spell slot of that level left.',
+  'mob.concInfo':
+    'You took {damage} damage while concentrating on {spell} — make a DC {dc} Constitution saving throw to keep it.',
+  'mob.concKept': 'Concentration held!',
+  'mob.concLost': '{spell} slips away…',
+  'mob.concVs': 'vs DC {dc}',
   'mob.resolve': 'Resolve',
   'mob.waitingDm': 'Waiting for the DM to roll saves…',
   'mob.dmgDealt': '{damage} damage dealt',
@@ -310,6 +462,15 @@ const en: Dict = {
   'logPanel.empty': 'Actions will appear here as they happen.',
 
   'pcs.notes': 'Notes',
+  'pcs.slots': 'Spell slots',
+  'pcs.slotsNote': '(max per level, straight off the character sheet — casting tracks the rest)',
+  'pcs.longRest': '🛌 Long Rest',
+  'pcs.longRestNote': 'Restore all spell slots',
+  'pcs.fromSpellbook': '✨ From Spellbook',
+  'pcs.spellToHit': 'Spell attack bonus',
+  'pcs.spellDc': 'Spell save DC',
+  'pcs.attach': 'Attach',
+  'pcs.spellChipNote': 'Attached from the Spellbook — casting asks for a slot',
   'pcs.notesNote': '(class, level, passive perception — shown on the player’s phone)',
   'pcs.attacks': 'Attacks',
   'pcs.attacksNote': '(rollable from the phone, the DM attack modal and the Stream Deck)',
@@ -393,6 +554,12 @@ const en: Dict = {
   'attack.vsTarget': 'vs {name} — AC {ac}',
   'attack.whoSucceeded': 'Who succeeded the {ability} save DC {dc}?',
   'attack.savedTakeHalf': '(saved take {half} instead of {full})',
+  'attack.savedTakeNone': '(saved take no damage)',
+  'attack.applyHeal': '✚ Apply healing ({total})',
+
+  'cast.slotTitle': 'Cast {spell} — choose a slot',
+  'cast.slotBtn': 'Level {n} — {left} left',
+  'cast.noSlots': 'No slot of that level left — take a Long Rest.',
   'attack.recharge': 'Recharge {min}+',
   'combat.step1': '1. Pick an encounter template',
   'combat.step2': '2. Choose the PCs joining the fight',
@@ -503,6 +670,7 @@ const de: Dict = {
   'nav.combat': '⚔ Kampf',
   'nav.party': '🛡 Gruppe',
   'nav.monsters': '🐉 Monster',
+  'nav.spellbook': '📖 Zauberbuch',
   'nav.encounters': '🗺 Begegnungen',
   'nav.settings': '⚙ Einstellungen',
   'nav.openPlayerView': 'Spieleransicht öffnen',
@@ -545,6 +713,39 @@ const de: Dict = {
   'monsters.range': 'Distanz',
   'monsters.save': 'Rettungswurf',
   'monsters.dc': 'SG',
+
+  'spellbook.title': 'Zauberbuch',
+  'spellbook.import': '⤓ SRD-Zauber importieren',
+  'spellbook.add': '+ Zauber hinzufügen',
+  'spellbook.search': 'Zauber suchen…',
+  'spellbook.empty': 'Noch keine Zauber. Importiere das SRD-Set oder lege eigene an.',
+  'spellbook.deleteConfirm':
+    '{name} löschen? Bereits an Charaktere angehängte Kopien bleiben erhalten.',
+  'spellbook.imported': '{n} Zauber aus dem SRD-5.2.1-Datensatz importiert.',
+  'spellbook.level': 'Grad',
+  'spellbook.school': 'Schule',
+  'spellbook.castingTime': 'Zeitaufwand',
+  'spellbook.range': 'Reichweite',
+  'spellbook.components': 'Komponenten',
+  'spellbook.duration': 'Wirkungsdauer',
+  'spellbook.classes': 'Klassen',
+  'spellbook.concentration': 'Konzentration',
+  'spellbook.ritual': 'Ritual',
+  'spellbook.editSpell': 'Zauber bearbeiten',
+  'spellbook.addSpell': 'Zauber hinzufügen',
+  'spellbook.rollLayer': 'Würfe',
+  'spellbook.rollLayerNote': '(was am Tisch gewürfelt wird — alles andere bleibt im Text)',
+  'spellbook.attackRoll': 'Zauberangriffswurf',
+  'spellbook.saveAbility': 'Rettungswurf',
+  'spellbook.onSuccess': 'Bei Erfolg',
+  'spellbook.onSuccessHalf': 'Halber Schaden',
+  'spellbook.onSuccessNone': 'Kein Schaden',
+  'spellbook.damage': 'Schaden',
+  'spellbook.healing': 'Heilungswürfel',
+  'spellbook.upcast': 'Hochstufen',
+  'spellbook.upcastPerLevel': '+{dice} je Zauberplatzgrad über {level}',
+  'spellbook.text': 'Regeltext',
+  'spellbook.noSave': 'Keiner',
 
   'templates.title': 'Begegnungsvorlagen',
   'templates.new': '+ Neue Vorlage',
@@ -625,6 +826,8 @@ const de: Dict = {
   'pw.saveTitle': 'Rettungswurf — {attack}',
   'pw.saveInfo':
     '{actor} erzwingt einen {ability}-Rettungswurf (SG {dc}). Schaden: {damage} (halber bei Erfolg).',
+  'pw.saveInfoNone':
+    '{actor} erzwingt einen {ability}-Rettungswurf (SG {dc}). Schaden: {damage} (keiner bei Erfolg).',
   'pw.saveSaved': 'geschafft',
   'pw.saveFailed': 'verpatzt',
   'pw.saveApply': 'Anwenden',
@@ -648,6 +851,8 @@ const de: Dict = {
   'log.outcome.crit': 'kritischer Treffer!',
   'log.outcome.hit': 'Treffer',
   'log.outcome.miss': 'verfehlt',
+  'log.cast': '{actor} wirkt {spell} ({level}. Grad)',
+  'log.castCantrip': '{actor} wirkt {spell}',
   'log.saveSuccess': '{actor} schafft den Rettungswurf gegen {attack} ({total})',
   'log.saveFail': '{actor} verpatzt den Rettungswurf gegen {attack} ({total})',
   'log.conditionAdded': '{target} ist {condition}',
@@ -686,6 +891,17 @@ const de: Dict = {
   'mob.nat20': 'Natürliche 20',
   'mob.nat1': 'Natürliche 1',
   'mob.damageRolled': 'Gewürfelter Schaden',
+  'mob.healRolled': 'Gewürfelte Heilung',
+  'mob.healedTarget': '{name} geheilt',
+  'mob.pickAlly': 'wen heilen?',
+  'mob.cast': 'Wirken',
+  'mob.longRestConfirm': 'Zum Bestätigen erneut tippen',
+  'mob.err.noSlot': 'Kein Zauberplatz dieses Grades übrig.',
+  'mob.concInfo':
+    'Du hast {damage} Schaden erlitten, während du dich auf {spell} konzentrierst — bestehe einen Konstitutions-Rettungswurf (SG {dc}), um die Konzentration zu halten.',
+  'mob.concKept': 'Konzentration gehalten!',
+  'mob.concLost': '{spell} entgleitet dir…',
+  'mob.concVs': 'gegen SG {dc}',
   'mob.resolve': 'Auswerten',
   'mob.waitingDm': 'Der SL würfelt die Rettungswürfe…',
   'mob.dmgDealt': '{damage} Schaden verursacht',
@@ -743,6 +959,15 @@ const de: Dict = {
   'logPanel.empty': 'Aktionen erscheinen hier, sobald sie passieren.',
 
   'pcs.notes': 'Notizen',
+  'pcs.slots': 'Zauberplätze',
+  'pcs.slotsNote': '(Maximum je Grad, direkt vom Charakterbogen — den Rest verwaltet das Wirken)',
+  'pcs.longRest': '🛌 Lange Rast',
+  'pcs.longRestNote': 'Alle Zauberplätze wiederherstellen',
+  'pcs.fromSpellbook': '✨ Aus dem Zauberbuch',
+  'pcs.spellToHit': 'Zauberangriffsbonus',
+  'pcs.spellDc': 'Zauberrettungswurf-SG',
+  'pcs.attach': 'Anhängen',
+  'pcs.spellChipNote': 'Aus dem Zauberbuch angehängt — das Wirken fragt nach einem Zauberplatz',
   'pcs.notesNote': '(Klasse, Stufe, passive Wahrnehmung — auf dem Spieler-Handy sichtbar)',
   'pcs.attacks': 'Angriffe',
   'pcs.attacksNote': '(würfelbar vom Handy, im Angriffsfenster und am Stream Deck)',
@@ -832,6 +1057,12 @@ const de: Dict = {
   'attack.vsTarget': 'gegen {name} – RK {ac}',
   'attack.whoSucceeded': 'Wer hat den {ability}-Rettungswurf SG {dc} bestanden?',
   'attack.savedTakeHalf': '(Bestandene erleiden {half} statt {full})',
+  'attack.savedTakeNone': '(Bestandene erleiden keinen Schaden)',
+  'attack.applyHeal': '✚ Heilung anwenden ({total})',
+
+  'cast.slotTitle': '{spell} wirken — Zauberplatz wählen',
+  'cast.slotBtn': '{n}. Grad — {left} übrig',
+  'cast.noSlots': 'Kein Zauberplatz dieses Grades übrig — Lange Rast einlegen.',
   'attack.recharge': 'Aufladung {min}+',
   'combat.step1': '1. Begegnungsvorlage wählen',
   'combat.step2': '2. Teilnehmende Charaktere wählen',

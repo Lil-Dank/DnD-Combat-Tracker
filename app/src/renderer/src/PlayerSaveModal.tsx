@@ -79,7 +79,7 @@ export function PlayerSaveModal({
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>{t('pw.saveTitle', { attack: pending.attackName })}</h2>
         <p>
-          {t('pw.saveInfo', {
+          {t(pending.onSuccess === 'none' ? 'pw.saveInfoNone' : 'pw.saveInfo', {
             actor: pending.actorName,
             ability: abilityCode(pending.ability),
             dc: pending.dc,

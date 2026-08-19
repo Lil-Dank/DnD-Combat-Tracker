@@ -28,9 +28,13 @@ import type {
   MonsterTemplate,
   PC,
   Settings,
+  Spell,
+  SpellSlots,
 } from '../../../shared/types';
-import { DEFAULT_SETTINGS } from '../../../shared/types';
+import { DEFAULT_SETTINGS, abilityMod } from '../../../shared/types';
+import { translate } from '../../../shared/i18n';
 import { rollD20, type RollMode } from '../../../shared/dice';
+import { spellToAction, spellActionName } from '../../../shared/spellAction';
 import {
   abilityCodeLabel,
   monsterName,
@@ -48,9 +52,9 @@ import {
   demoKenkuStopSound,
 } from './demo-kenku';
 
-// Key bump reseeds returning visitors — this one brings campaigns (two are
-// seeded so the selector has something to show off).
-const LS_KEY = 'deck-of-many-turns-demo-v2';
+// Key bump reseeds returning visitors — this one brings the Spellbook
+// (seeded casters with slots and attached spells).
+const LS_KEY = 'deck-of-many-turns-demo-v3';
 const uuid = () => crypto.randomUUID();
 const d20 = () => 1 + Math.floor(Math.random() * 20);
 
@@ -67,6 +71,8 @@ interface DemoData {
   activeId: string;
   byCampaign: Record<string, CampaignData>;
   monsters: MonsterTemplate[];
+  /** Global spell library, like monsters (mirrors main's data/spells.json). */
+  spells: Spell[];
   settings: Settings;
   seeded: boolean;
 }
@@ -129,6 +135,7 @@ export function createDemoApi(): Api {
       activeId: id,
       byCampaign: { [id]: emptyCampaignData() },
       monsters: [],
+      spells: [],
       settings: { ...DEFAULT_SETTINGS },
       seeded: false,
     };
@@ -160,6 +167,7 @@ export function createDemoApi(): Api {
         if (!Array.isArray(slice.archive)) slice.archive = [];
         if (slice.combat && !Array.isArray(slice.combat.log)) slice.combat.log = [];
       }
+      if (!Array.isArray(stored.spells)) stored.spells = [];
       // Same deep-merge as main/state.ts: settings gain new sections over time.
       stored.settings = {
         ...DEFAULT_SETTINGS,
@@ -177,6 +185,7 @@ export function createDemoApi(): Api {
     return {
       pcs: [...cur().pcs].sort((a, b) => a.name.localeCompare(b.name)),
       monsters: [...data.monsters].sort((a, b) => a.name.localeCompare(b.name)),
+      spells: [...data.spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name)),
       encounterTemplates: [...cur().templates].sort((a, b) => a.name.localeCompare(b.name)),
       combat: cur().combat,
       settings: data.settings,
@@ -390,6 +399,40 @@ export function createDemoApi(): Api {
         }
       } else {
         c.isDowned = true;
+        // Going down breaks concentration outright (incapacitated) — no check.
+        if (c.concentration) c.concentration = null;
+      }
+    }
+    // Damage to a concentrating PC → the claiming phone-sim gets a CON-save
+    // prompt (mirror of state.ts + playerServer.ts).
+    if (c.type === 'pc' && !c.isDowned && c.concentration) {
+      const session = [...playerSessions].find((s) => s.pcId === c.sourceId);
+      if (session) {
+        const pc = cur().pcs.find((p) => p.id === c.sourceId);
+        const conMod = pc?.abilities ? abilityMod(pc.abilities.con) : null;
+        const pending: ConcSave = {
+          id: uuid(),
+          pcId: c.sourceId,
+          combatantId: c.id,
+          spellName: c.concentration.name,
+          deName: c.concentration.deName ?? null,
+          dc: Math.max(10, Math.floor(amount / 2)),
+          damage: amount,
+          conMod,
+          session,
+        };
+        concSaves.set(pending.id, pending);
+        session.onMessage(
+          JSON.stringify({
+            type: 'concSave',
+            id: pending.id,
+            spellName: pending.spellName,
+            deName: pending.deName,
+            dc: pending.dc,
+            damage: amount,
+            conMod,
+          }),
+        );
       }
     }
     save();
@@ -536,6 +579,92 @@ export function createDemoApi(): Api {
     return { imported: imported.length };
   }
 
+  async function importSrdSpells(): Promise<{ imported: number }> {
+    const res = await fetch('srd/spells.json');
+    const bundled = (await res.json()) as Array<Omit<Spell, 'id' | 'source' | 'l10n'>>;
+    // German spell l10n ships as a separate file; absent (or pre-DE builds)
+    // everything simply stays English — same failure mode as the real app.
+    let l10nDe: Record<string, { name: string; text: string }> = {};
+    try {
+      l10nDe = await (await fetch('srd/spells.de.json')).json();
+    } catch {
+      /* stays English */
+    }
+    const existingByName = new Map(
+      data.spells.filter((s) => s.source === 'srd').map((s) => [s.name.toLowerCase(), s.id]),
+    );
+    const imported: Spell[] = bundled.map((s) => ({
+      ...s,
+      id: existingByName.get(s.name.toLowerCase()) ?? uuid(),
+      source: 'srd',
+      l10n: l10nDe[s.name] ? { de: l10nDe[s.name] } : null,
+    }));
+    const manual = data.spells.filter((s) => s.source !== 'srd');
+    data.spells = [...manual, ...imported];
+    save();
+    return { imported: imported.length };
+  }
+
+  // ---- Spell slots ------------------------------------------------------------
+
+  /** Mirror of state.ts normalizeSlots: 9 levels, current clamped to max. */
+  function normalizeSlots(slots: SpellSlots | null | undefined): SpellSlots | null {
+    if (!slots || !Array.isArray(slots.max)) return null;
+    const clean = (v: unknown) => Math.max(0, Math.floor(Number(v) || 0));
+    const max = Array.from({ length: 9 }, (_, i) => clean(slots.max[i]));
+    const current = Array.from({ length: 9 }, (_, i) =>
+      Math.min(clean((slots.current ?? [])[i] ?? max[i]), max[i]),
+    );
+    if (max.every((v) => v === 0)) return null;
+    return { max, current };
+  }
+
+  /** Spend a slot (null = cantrip, log only) and log the cast. Mirror of state.ts. */
+  function castSpellInner(
+    pcId: string,
+    spellName: string,
+    slotLevel: number | null,
+    ctx: ActionCtx = DM_CTX,
+    concentration?: { name: string; deName?: string | null } | null,
+  ): boolean {
+    const pc = cur().pcs.find((p) => p.id === pcId);
+    if (!pc) return false;
+    if (slotLevel !== null) {
+      const idx = slotLevel - 1;
+      const slots = normalizeSlots(pc.spellSlots);
+      if (!slots || idx < 0 || idx > 8 || slots.current[idx] <= 0) return false;
+      slots.current[idx] -= 1;
+      pc.spellSlots = slots;
+    }
+    const combat = cur().combat;
+    // Only one spell can be concentrated on — a new one replaces the tag.
+    if (concentration && combat && combat.phase === 'active') {
+      const c = combat.combatants.find((x) => x.type === 'pc' && x.sourceId === pcId);
+      if (c) c.concentration = { ...concentration };
+    }
+    if (combat) {
+      pushLog(combat, {
+        kind: 'cast',
+        actorName: pc.name,
+        actorType: 'pc',
+        attackName: spellName,
+        ...(slotLevel !== null ? { slotLevel } : {}),
+        source: ctx.source,
+        sourceName: ctx.sourceName,
+      });
+    }
+    save();
+    return true;
+  }
+
+  function longRestInner(pcId: string): void {
+    const pc = cur().pcs.find((p) => p.id === pcId);
+    const slots = normalizeSlots(pc?.spellSlots);
+    if (!pc || !slots) return;
+    pc.spellSlots = { ...slots, current: [...slots.max] };
+    save();
+  }
+
   // ---- demo seed --------------------------------------------------------------
 
   async function seed(): Promise<void> {
@@ -596,7 +725,12 @@ export function createDemoApi(): Api {
         notes: 'Dwarf fighter 5 · speed 25 ft',
         attacks: [pcAttack('Warhammer', 6, null, '1d10+4', 1, 10, 4, 9, 'bludgeoning')],
       },
-      { name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2, attacks: [] },
+      {
+        name: 'Bartholomew Quill', maxHp: 31, ac: 13, initMod: 2,
+        abilities: { str: 8, dex: 14, con: 12, int: 17, wis: 12, cha: 10 },
+        notes: 'Human wizard 5 · Arcane Recovery · speed 30 ft',
+        attacks: [],
+      },
       {
         name: 'Seraphina Dawnbringer', maxHp: 45, ac: 17, initMod: 1,
         attacks: [pcAttack('Sacred Flame', null, { ability: 'DEX', dc: 13 }, '1d8', 1, 8, 0, 4, 'radiant')],
@@ -604,6 +738,28 @@ export function createDemoApi(): Api {
     ]) {
       cur().pcs.push({ id: uuid(), ...p });
     }
+
+    // The casters carry spellbook snapshots + slots, so the demo shows the
+    // whole cast flow (slot prompt, upcast, healing) out of the box.
+    await importSrdSpells();
+    const spellByName = (n: string) => data.spells.find((s) => s.name === n);
+    const attachSpell = (pcName: string, spellName: string, opts: { toHit?: number; dc?: number }) => {
+      const pc = cur().pcs.find((p) => p.name === pcName);
+      const spell = spellByName(spellName);
+      if (!pc || !spell) return;
+      pc.attacks.push(spellToAction(spell, opts, `spell.${uuid()}`, pc.attacks.length));
+    };
+    attachSpell('Bartholomew Quill', 'Fire Bolt', { toHit: 5 });
+    attachSpell('Bartholomew Quill', 'Fireball', { dc: 14 });
+    attachSpell('Bartholomew Quill', 'Misty Step', {});
+    attachSpell('Seraphina Dawnbringer', 'Cure Wounds', {});
+    attachSpell('Seraphina Dawnbringer', 'Bless', {});
+    const slots = (pcName: string, current: number[]) => {
+      const pc = cur().pcs.find((p) => p.name === pcName);
+      if (pc) pc.spellSlots = { max: [4, 3, 2, 0, 0, 0, 0, 0, 0], current: [...current, 0, 0, 0, 0, 0, 0] };
+    };
+    slots('Bartholomew Quill', [4, 3, 2]);
+    slots('Seraphina Dawnbringer', [4, 2, 2]);
 
     const byName = (n: string) => data.monsters.find((m) => m.name === n);
     const tpl = (name: string, entries: Array<[string, number]>): void => {
@@ -857,8 +1013,17 @@ export function createDemoApi(): Api {
             isCurrentTurn: i === combat.currentIndex,
             isDowned: c.isDowned,
             conditions: c.conditions,
+            // Mirror of bridge.ts: pre-localized concentration label.
+            concentration: c.concentration
+              ? (lang === 'de' && c.concentration.deName) || c.concentration.name
+              : null,
             attacks: c.attacks
-              .filter((a) => a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0))
+              // Mirror of bridge.ts: spell snapshots stay off the deck.
+              .filter(
+                (a) =>
+                  !a.spell &&
+                  (a.type === 'attack' || (a.type === 'save' && a.onHit.damage.length > 0)),
+              )
               .map((a) => ({
                 id: a.id,
                 name:
@@ -907,6 +1072,14 @@ export function createDemoApi(): Api {
       case 'toggleCondition':
         if (cmd.actorId && cmd.condition) toggleCondition(cmd.actorId, cmd.condition as Condition, DECK_CTX);
         break;
+      case 'clearConcentration': {
+        const c = cur().combat?.combatants.find((x) => x.id === cmd.actorId);
+        if (c) {
+          c.concentration = null;
+          save();
+        }
+        break;
+      }
     }
     // A real deck press pulls the DM window to the Combat screen.
     for (const cb of focusListeners) cb();
@@ -943,10 +1116,66 @@ export function createDemoApi(): Api {
     attackId: string;
     attackName: string;
     damage: number;
+    /** Damage on a successful save (mirror of playerServer.ts). */
+    onSuccess: 'half' | 'none';
     targetIds: string[];
     session: PlayerSession;
   }
   const pendingSaves = new Map<string, PendingSave>();
+
+  /** Pending Concentration checks (mirror of playerServer.ts). */
+  interface ConcSave {
+    id: string;
+    pcId: string;
+    combatantId: string;
+    spellName: string;
+    deName: string | null;
+    dc: number;
+    damage: number;
+    conMod: number | null;
+    session: PlayerSession;
+  }
+  const concSaves = new Map<string, ConcSave>();
+
+  function resolveConcSave(pending: ConcSave, die: number | null, total: number): void {
+    concSaves.delete(pending.id);
+    const saved = total >= pending.dc;
+    const lang = data.settings.language;
+    const label = `${translate(lang, 'spellbook.concentration')} (${
+      lang === 'de' && pending.deName ? pending.deName : pending.spellName
+    })`;
+    const pc = cur().pcs.find((p) => p.id === pending.pcId);
+    const combat = cur().combat;
+    if (combat) {
+      pushLog(combat, {
+        kind: 'save',
+        actorName: pc?.name ?? '?',
+        actorType: 'pc',
+        attackName: label,
+        total,
+        outcome: saved ? 'saved' : 'failed',
+        source: 'player',
+        sourceName: sourceNameFor(pending.pcId),
+      });
+      if (!saved) {
+        const c = combat.combatants.find((x) => x.id === pending.combatantId);
+        if (c) c.concentration = null;
+      }
+    }
+    save();
+    pending.session.onMessage(
+      JSON.stringify({
+        type: 'concSaveResult',
+        id: pending.id,
+        die,
+        total,
+        dc: pending.dc,
+        saved,
+        spellName: pending.spellName,
+        deName: pending.deName,
+      }),
+    );
+  }
 
   function tokenPcId(token: string | null): string | null {
     if (!token) return null;
@@ -988,6 +1217,7 @@ export function createDemoApi(): Api {
             isCurrentTurn: i === combat.currentIndex,
             isDowned: c.isDowned,
             conditions: c.conditions,
+            concentration: c.concentration ?? null,
             isBloodied: c.type === 'monster' ? c.currentHp < c.maxHp * 0.5 : undefined,
           };
           if (c.type !== 'pc') return base;
@@ -1024,6 +1254,7 @@ export function createDemoApi(): Api {
             abilities: ownPc.abilities ?? null,
             notes: ownPc.notes ?? '',
             attacks: ownPc.attacks,
+            spellSlots: ownPc.spellSlots ?? null,
             combatantId: ownCombatant?.id ?? null,
           }
         : null,
@@ -1061,7 +1292,10 @@ export function createDemoApi(): Api {
     return own !== undefined && targets.length === 1 && targets[0] === own.id;
   }
 
-  function rollActionDamage(action: MonsterAction): {
+  function rollActionDamage(
+    action: MonsterAction,
+    extra?: { count: number; die: number } | null,
+  ): {
     total: number;
     math: string;
     mathTypes: (string | null)[];
@@ -1088,8 +1322,44 @@ export function createDemoApi(): Api {
         mathParts.push(`${value}`);
       }
     }
+    // Upcast dice as their own math bracket (mirror of playerServer.ts).
+    if (extra && extra.count > 0) {
+      const rolls: number[] = [];
+      for (let i = 0; i < extra.count; i++) rolls.push(1 + Math.floor(Math.random() * extra.die));
+      allRolls.push(...rolls);
+      total += rolls.reduce((a, b) => a + b, 0);
+      mathParts.push(`${extra.count}d${extra.die} [${rolls.join('+')}]`);
+      mathTypes.push(action.onHit.damage[0]?.type ?? null);
+    }
     total = Math.max(0, total);
     return { total, math: `${mathParts.join(' + ')} = ${total}`, mathTypes, rolls: allRolls };
+  }
+
+  /** The upcast dice a chosen slot level adds (mirror of playerServer.ts). */
+  function upcastExtraOf(
+    action: MonsterAction,
+    slotLevel: unknown,
+  ): { count: number; die: number } | null {
+    const meta = action.spell;
+    if (!meta?.upcast || typeof slotLevel !== 'number' || slotLevel <= meta.level) return null;
+    return { count: meta.upcast.count * (slotLevel - meta.level), die: meta.upcast.die };
+  }
+
+  /**
+   * Spends the slot for a spell cast + logs it (mirror of spendSlotForCast).
+   * Non-spell actions pass; cantrips log free; false = noSlot.
+   */
+  function playerSpendSlot(pcId: string, action: MonsterAction, slotLevelRaw: unknown): boolean {
+    const meta = action.spell;
+    if (!meta) return true;
+    const ctx = playerCtx(pcId);
+    // Log snapshots carry names in the language active when the entry was made.
+    const spellName = spellActionName(data.settings.language, action);
+    const conc = meta.concentration ? { name: action.name, deName: meta.deName ?? null } : null;
+    if (meta.level === 0) return castSpellInner(pcId, spellName, null, ctx, conc);
+    const lvl = typeof slotLevelRaw === 'number' && Number.isInteger(slotLevelRaw) ? slotLevelRaw : -1;
+    if (lvl < meta.level || lvl > 9) return false;
+    return castSpellInner(pcId, spellName, lvl, ctx, conc);
   }
 
   function sourceNameFor(pcId: string): string | undefined {
@@ -1182,6 +1452,10 @@ export function createDemoApi(): Api {
         sendTo({ type: 'error', code: 'badTarget' });
         return;
       }
+      if (!playerSpendSlot(pcId, action, cmd.slotLevel)) {
+        sendTo({ type: 'error', code: 'noSlot' });
+        return;
+      }
       const mode = cmd.advantage === 'adv' || cmd.advantage === 'dis' ? cmd.advantage : 'normal';
       const { die, dice } = rollD20(mode as RollMode);
       const total = die + (action.attack?.toHit ?? 0);
@@ -1243,7 +1517,7 @@ export function createDemoApi(): Api {
         sendTo({ type: 'error', code: 'badTarget' });
         return;
       }
-      const rolled = rollActionDamage(action);
+      const rolled = rollActionDamage(action, upcastExtraOf(action, cmd.slotLevel));
       // Damage lands after the roller's reveal, like the real server.
       setTimeout(() => {
         applyDamage(target.id, rolled.total, {
@@ -1277,8 +1551,12 @@ export function createDemoApi(): Api {
         sendTo({ type: 'error', code: 'notYourTurn' });
         return;
       }
+      if (!playerSpendSlot(pcId, action, cmd.slotLevel)) {
+        sendTo({ type: 'error', code: 'noSlot' });
+        return;
+      }
       if (action.type === 'save' || action.save) {
-        const rolledSave = rollActionDamage(action);
+        const rolledSave = rollActionDamage(action, upcastExtraOf(action, cmd.slotLevel));
         const damage =
           type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0
             ? (cmd.damage as number)
@@ -1290,6 +1568,7 @@ export function createDemoApi(): Api {
           attackId: action.id,
           attackName: action.name,
           damage,
+          onSuccess: action.save?.onSuccess ?? 'half',
           targetIds,
           session,
         };
@@ -1312,6 +1591,7 @@ export function createDemoApi(): Api {
             ability: action.save?.ability ?? 'DEX',
             dc: action.save?.dc ?? 10,
             damage: pending.damage,
+            onSuccess: action.save?.onSuccess ?? 'half',
             targetIds: pending.targetIds,
           });
         }
@@ -1383,6 +1663,125 @@ export function createDemoApi(): Api {
       return;
     }
 
+    if (type === 'castSpell') {
+      // Utility spells: spend the slot, log the cast, nothing to roll.
+      const pc = cur().pcs.find((p) => p.id === pcId);
+      const action = pc?.attacks.find((a) => a.id === cmd.attackId);
+      if (!pc || !action || !action.spell) {
+        sendTo({ type: 'error', code: 'badAttack' });
+        return;
+      }
+      if (!playerGateAllows(pcId, [], 'attack')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      if (!playerSpendSlot(pcId, action, cmd.slotLevel)) {
+        sendTo({ type: 'error', code: 'noSlot' });
+        return;
+      }
+      sendTo({ type: 'castResult', actionId: action.id, slotLevel: (cmd.slotLevel as number) ?? null });
+      return;
+    }
+
+    if (type === 'castHealDigital' || type === 'castHealManual') {
+      // Healing spells: rolled or typed, applied as healing (mirror of the server).
+      const pc = cur().pcs.find((p) => p.id === pcId);
+      const action = pc?.attacks.find((a) => a.id === cmd.attackId);
+      const targetIds = (cmd.targetIds as string[]) ?? [];
+      if (!pc || !action || !action.spell?.healing) {
+        sendTo({ type: 'error', code: 'badAttack' });
+        return;
+      }
+      if (!playerGateAllows(pcId, targetIds, 'attack')) {
+        sendTo({ type: 'error', code: 'notYourTurn' });
+        return;
+      }
+      const combat = cur().combat;
+      const target = combat?.combatants.find((c) => c.id === targetIds[0]);
+      if (!combat || !target) {
+        sendTo({ type: 'error', code: 'badTarget' });
+        return;
+      }
+      if (!playerSpendSlot(pcId, action, cmd.slotLevel)) {
+        sendTo({ type: 'error', code: 'noSlot' });
+        return;
+      }
+      if (type === 'castHealManual') {
+        const amount = cmd.amount as number;
+        if (!Number.isInteger(amount) || amount < 1 || amount > 999) {
+          sendTo({ type: 'error', code: 'badTarget' });
+          return;
+        }
+        applyHeal(target.id, amount, playerCtx(pcId));
+        sendTo({ type: 'healResult', targetId: target.id, targetName: target.displayName, amount });
+        return;
+      }
+      const rolled = rollActionDamage(action, upcastExtraOf(action, cmd.slotLevel));
+      setTimeout(() => {
+        applyHeal(target.id, rolled.total, playerCtx(pcId));
+      }, 2900);
+      sendTo({
+        type: 'healResult',
+        targetId: target.id,
+        targetName: target.displayName,
+        amount: rolled.total,
+        rolls: rolled.rolls,
+        math: rolled.math,
+      });
+      return;
+    }
+
+    if (type === 'longRest') {
+      // Never turn-gated, like saveAttack.
+      if (pcId) longRestInner(pcId);
+      return;
+    }
+
+    if (type === 'concSaveDigital') {
+      const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
+      if (!pending || pending.session !== session) return;
+      const die = 1 + Math.floor(Math.random() * 20);
+      resolveConcSave(pending, die, die + (pending.conMod ?? 0));
+      return;
+    }
+
+    if (type === 'concSaveManual') {
+      const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
+      if (!pending || pending.session !== session || typeof cmd.total !== 'number') return;
+      resolveConcSave(pending, null, Math.floor(cmd.total));
+      return;
+    }
+
+    if (type === 'getSpells') {
+      sendTo({
+        type: 'spellList',
+        spells: data.spells
+          .slice()
+          .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+          .map((s) => ({
+            id: s.id,
+            name: s.name,
+            level: s.level,
+            school: s.school,
+            castingTime: s.castingTime,
+            range: s.range,
+            components: s.components,
+            duration: s.duration,
+            concentration: s.concentration,
+            ritual: s.ritual,
+            text: s.text,
+            attack: s.attack,
+            save: s.save,
+            damage: s.damage,
+            healing: s.healing,
+            upcast: s.upcast,
+            upcastText: s.upcastText,
+            l10n: s.l10n ?? null,
+          })),
+      });
+      return;
+    }
+
     if (type === 'saveAttack') {
       const action = cmd.action as MonsterAction;
       const pc = cur().pcs.find((p) => p.id === pcId);
@@ -1429,7 +1828,7 @@ export function createDemoApi(): Api {
     if (!pending) return;
     pendingSaves.delete(id);
     const combat = cur().combat;
-    const half = Math.floor(pending.damage / 2);
+    const half = pending.onSuccess === 'none' ? 0 : Math.floor(pending.damage / 2);
     const applied: Array<{ targetId: string; targetName: string; saved: boolean; amount: number }> = [];
     for (const r of results) {
       const target = combat?.combatants.find((c) => c.id === r.targetId);
@@ -1568,6 +1967,24 @@ export function createDemoApi(): Api {
       save();
     },
     importSrd,
+
+    saveSpell: async (s) => {
+      const id = s.id ?? uuid();
+      const existing = data.spells.find((x) => x.id === id);
+      data.spells = [
+        ...data.spells.filter((x) => x.id !== id),
+        { ...existing, ...s, id, source: existing?.source ?? s.source ?? 'manual' } as Spell,
+      ];
+      save();
+    },
+    deleteSpell: async (id) => {
+      data.spells = data.spells.filter((s) => s.id !== id);
+      save();
+    },
+    importSrdSpells,
+    castSpell: async (pcId, spellName, slotLevel, concentration) =>
+      castSpellInner(pcId, spellName, slotLevel, DM_CTX, concentration ?? null),
+    longRest: async (pcId) => longRestInner(pcId),
 
     saveTemplate: async (t) => {
       const id = t.id ?? uuid();
@@ -1769,6 +2186,13 @@ export function createDemoApi(): Api {
     },
     resolvePlayerSave: async (id, results) => resolvePlayerSave(id, results),
     dismissPlayerSave: async (id) => dismissPlayerSave(id),
+    setConcentration: async (combatantId, value) => {
+      const combat = cur().combat;
+      const c = combat?.combatants.find((x) => x.id === combatantId);
+      if (!combat || !c) return;
+      c.concentration = value ?? null;
+      save();
+    },
     onPlayerSavePending: (cb) => {
       const wrapped = (pending: object) => cb(pending as Parameters<typeof cb>[0]);
       savePendingListeners.add(wrapped);

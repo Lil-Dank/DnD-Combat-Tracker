@@ -9,6 +9,12 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ### Changed
 
+- **The DM's attack modal rolls saving throws instead of just asking who made
+  them.** A save-based action — a breath weapon, Fireball — now gets a row per
+  target with a digital d20 button showing that target's modifier, a field for a
+  physically rolled total, and a *Roll all* button for the whole area. Each throw
+  is written to the log, so a DM-run save leaves the same card as one a player
+  launched from their phone; before, it left only the damage line.
 - **Saving throws in the combat log now show the throw, not just its sum.**
   A save adjudicated in the DM's modal records the d20 behind the total, so the
   card reads `17 +2 19 vs DC 14` the way an attack roll does — it previously

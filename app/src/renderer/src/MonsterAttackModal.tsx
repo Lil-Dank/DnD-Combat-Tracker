@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AppState, Combatant, MonsterAction } from '../../shared/types';
+import { abilityMod } from '../../shared/types';
 import { rollD20, rollPool, type RollMode } from '../../shared/dice';
 import { api } from './api';
 import { spellActionName, spellActionText } from '../../shared/spellAction';
@@ -66,7 +67,9 @@ export function MonsterAttackModal({
   const [targets, setTargets] = useState<string[]>([]);
   const [atkRoll, setAtkRoll] = useState<AtkRoll | null>(null);
   const [dmgRoll, setDmgRoll] = useState<DmgRoll | null>(null);
-  const [saved, setSaved] = useState<Set<string>>(new Set());
+  /** One row per target on the saves step: the entered total and, when the
+   *  app rolled it, the d20 behind it. */
+  const [saveRows, setSaveRows] = useState<Record<string, { total: string; die: number | null }>>({});
   const [slotLevel, setSlotLevel] = useState<number | null>(null);
   const [castErr, setCastErr] = useState(false);
 
@@ -101,7 +104,7 @@ export function MonsterAttackModal({
     setTargets([]);
     setAtkRoll(null);
     setDmgRoll(null);
-    setSaved(new Set());
+    setSaveRows({});
     setSlotLevel(null);
     setCastErr(false);
     if (a.spell && pcRecord) {
@@ -215,7 +218,7 @@ export function MonsterAttackModal({
       parts.push(`${roll.total} ${dmg(attack.onHit.damage[0]?.type ?? 'variable')}`);
     }
     setDmgRoll({ total, parts, conditional, math: `${mathParts.join(' + ')} = ${total}`, mathTypes });
-    setSaved(new Set());
+    setSaveRows({});
     if (attacker) {
       void api.kenkuAttackEvent({ sourceId: attacker.sourceId, attackId: attack.id, phase: 'damageRoll' });
     }
@@ -234,7 +237,26 @@ export function MonsterAttackModal({
     const onSuccess = attack?.save?.onSuccess ?? 'half';
     const half = onSuccess === 'none' ? 0 : Math.floor(dmgRoll.total / 2);
     for (const id of targets) {
-      const halved = saved.has(id);
+      const halved = didSave(id);
+      // The throw goes in immediately before the damage it caused: the card
+      // builder pairs a save with the damage that follows it, so logging all
+      // the saves up front would split every target across two cards.
+      const target = targetObjs.find((c) => c.id === id);
+      const total = savedTotal(id);
+      if (isSave && attack?.save && target && total !== null) {
+        await api.logSaveRoll({
+          actorName: mon(target.displayName),
+          actorType: target.type,
+          targetName: mon(attacker.displayName),
+          targetType: attacker.type,
+          attackName: actName(attack),
+          ability: attack.save.ability,
+          dc: attack.save.dc,
+          die: saveRows[id]?.die ?? undefined,
+          total,
+          saved: halved,
+        });
+      }
       if (halved && half === 0) continue;
       await api.applyDamage(id, halved ? half : dmgRoll.total, {
         actorName: mon(attacker.displayName),
@@ -250,6 +272,46 @@ export function MonsterAttackModal({
   };
 
   const targetName = (c: Combatant) => `${c.isDowned ? '💀 ' : ''}${mon(c.displayName)}`;
+
+  // ---- saving throws (mirrors PlayerSaveModal, which adjudicates the same
+  // action when a phone launches it) ------------------------------------------
+
+  /** The target's modifier for this action's save ability; null if unknown. */
+  const saveBonus = (c: Combatant): number | null => {
+    const ability = attack?.save?.ability;
+    if (!ability || !c.abilities) return null;
+    const score = (c.abilities as unknown as Record<string, number>)[ability.toLowerCase().slice(0, 3)];
+    return typeof score === 'number' ? abilityMod(score) : null;
+  };
+
+  const rollSave = (id: string, bonus: number | null) => {
+    const die = Math.floor(Math.random() * 20) + 1;
+    setSaveRows((r) => ({ ...r, [id]: { die, total: String(die + (bonus ?? 0)) } }));
+  };
+
+  const rollAllSaves = () => {
+    setSaveRows(
+      Object.fromEntries(
+        targetObjs.map((c) => {
+          const die = Math.floor(Math.random() * 20) + 1;
+          return [c.id, { die, total: String(die + (saveBonus(c) ?? 0)) }];
+        }),
+      ),
+    );
+  };
+
+  const savedTotal = (id: string): number | null => {
+    const n = parseInt(saveRows[id]?.total ?? '', 10);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const didSave = (id: string): boolean => {
+    const total = savedTotal(id);
+    return total !== null && attack?.save != null && total >= attack.save.dc;
+  };
+
+  const allSavesEntered = targetObjs.every((c) => savedTotal(c.id) !== null);
+  const savedCount = targetObjs.filter((c) => didSave(c.id)).length;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -463,7 +525,7 @@ export function MonsterAttackModal({
         {step === 'saves' && attack && dmgRoll && (
           <>
             <h3>
-              {t('attack.whoSucceeded', {
+              {t('attack.rollSaves', {
                 ability: abilityCode(attack.save!.ability),
                 dc: attack.save!.dc,
               })}{' '}
@@ -473,27 +535,53 @@ export function MonsterAttackModal({
                   : t('attack.savedTakeHalf', { half: Math.floor(dmgRoll.total / 2), full: dmgRoll.total })}
               </span>
             </h3>
-            <div className="monster-pick-list">
-              {targetObjs.map((c) => (
-                <button
-                  key={c.id}
-                  className={`pick-btn ${saved.has(c.id) ? 'picked' : ''}`}
-                  onClick={() => {
-                    const next = new Set(saved);
-                    if (next.has(c.id)) next.delete(c.id);
-                    else next.add(c.id);
-                    setSaved(next);
-                  }}
-                >
-                  {saved.has(c.id) ? '½ ' : ''}{targetName(c)}
-                </button>
-              ))}
-            </div>
+            <table className="pw-save-table">
+              <tbody>
+                {targetObjs.map((c) => {
+                  const bonus = saveBonus(c);
+                  const total = savedTotal(c.id);
+                  const ok = total !== null && total >= attack.save!.dc;
+                  return (
+                    <tr key={c.id}>
+                      <td>{targetName(c)}</td>
+                      <td>
+                        <button className="btn small" onClick={() => rollSave(c.id, bonus)}>
+                          🎲 {bonus !== null && (bonus >= 0 ? `+${bonus}` : bonus)}
+                        </button>
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          className="pw-save-input"
+                          value={saveRows[c.id]?.total ?? ''}
+                          onChange={(e) =>
+                            setSaveRows((r) => ({ ...r, [c.id]: { die: null, total: e.target.value } }))
+                          }
+                          placeholder="…"
+                        />
+                        {saveRows[c.id]?.die != null && (
+                          <span className="muted"> (d20: {saveRows[c.id].die})</span>
+                        )}
+                      </td>
+                      <td>
+                        {total !== null &&
+                          (ok ? (
+                            <span className="pw-online">✓ {t('pw.saveSaved')}</span>
+                          ) : (
+                            <span className="pw-error">✗ {t('pw.saveFailed')}</span>
+                          ))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
             <div className="modal-actions">
               <button className="btn" onClick={() => setStep('roll')}>{t('common.back')}</button>
+              <button className="btn" onClick={rollAllSaves}>🎲 {t('attack.rollAllSaves')}</button>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button className="btn danger" onClick={() => void apply()}>
-                ⚔ Apply ({targets.length - saved.size}×{dmgRoll.total}, {saved.size}×
+              <button className="btn danger" disabled={!allSavesEntered} onClick={() => void apply()}>
+                ⚔ Apply ({targets.length - savedCount}×{dmgRoll.total}, {savedCount}×
                 {(attack.save?.onSuccess ?? 'half') === 'none' ? 0 : Math.floor(dmgRoll.total / 2)})
               </button>
             </div>

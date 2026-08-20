@@ -2176,6 +2176,27 @@ export function createDemoApi(): Api {
         save();
       }
     },
+    // DM-side saving throw from the attack modal, twin of the player-web
+    // route's own logging — see main/ipc.ts 'log:save'.
+    logSaveRoll: async (p) => {
+      const combat = cur().combat;
+      if (!combat) return;
+      pushLog(combat, {
+        kind: 'save',
+        actorName: p.actorName,
+        actorType: p.actorType,
+        targetName: p.targetName,
+        targetType: p.targetType,
+        attackName: p.attackName,
+        ability: p.ability,
+        die: p.die,
+        total: p.total,
+        dc: p.dc,
+        outcome: p.saved ? 'saved' : 'failed',
+        source: 'dm',
+      });
+      save();
+    },
     deleteLogEntry: async (id) => {
       const combat = cur().combat;
       if (!combat) return;

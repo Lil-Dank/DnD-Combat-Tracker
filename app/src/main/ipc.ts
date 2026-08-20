@@ -76,6 +76,22 @@ export function registerIpc(): void {
   ipcMain.handle('combat:removeCombatant', (_e, id) => store.removeCombatant(id));
   ipcMain.handle('log:edit', (_e, { id, patch }) => store.editLogEntry(id, patch));
   ipcMain.handle('log:delete', (_e, id) => store.deleteLogEntry(id));
+  ipcMain.handle('log:save', (_e, p) =>
+    store.appendLog({
+      kind: 'save',
+      actorName: p.actorName,
+      actorType: p.actorType,
+      targetName: p.targetName,
+      targetType: p.targetType,
+      attackName: p.attackName,
+      ability: p.ability,
+      die: p.die,
+      total: p.total,
+      dc: p.dc,
+      outcome: p.saved ? 'saved' : 'failed',
+      source: 'dm',
+    }),
+  );
   ipcMain.handle('combat:addMonster', (_e, { monsterTemplateId, quantity }) =>
     store.addMonsterToCombat(monsterTemplateId, quantity),
   );

@@ -109,6 +109,24 @@ const api = {
   editLogEntry: (id: string, patch: LogEntryPatch) =>
     ipcRenderer.invoke('log:edit', { id, patch }),
   deleteLogEntry: (id: string) => ipcRenderer.invoke('log:delete', id),
+  /**
+   * One saving throw the DM adjudicated in the attack modal. The player-web
+   * flow logs its own via resolvePlayerSave; this is the DM-side twin, so both
+   * routes leave the same card in the log.
+   */
+  logSaveRoll: (payload: {
+    actorName: string;
+    actorType: import('../shared/types').CombatantType;
+    targetName?: string;
+    targetType?: import('../shared/types').CombatantType;
+    attackName: string;
+    ability: string;
+    dc: number;
+    /** Absent when the DM typed a total instead of rolling. */
+    die?: number;
+    total: number;
+    saved: boolean;
+  }): Promise<void> => ipcRenderer.invoke('log:save', payload),
   addMonsterToCombat: (monsterTemplateId: string, quantity: number) =>
     ipcRenderer.invoke('combat:addMonster', { monsterTemplateId, quantity }),
 

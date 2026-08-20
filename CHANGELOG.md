@@ -7,6 +7,8 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ## [Unreleased]
 
+## [3.5.0] — 2026-08-20
+
 ### Added
 
 - **A new identity.** The d20 is replaced by a fanned stack of cards whose front
@@ -397,7 +399,8 @@ First packaged release.
   Picker profiles for MK.2 (5×3), XL (8×4) and 9×4 decks.
 - Four themes; local-only JSON storage.
 
-[Unreleased]: https://github.com/Lil-Dank/deck-of-many-turns/compare/v3.4.0...HEAD
+[Unreleased]: https://github.com/Lil-Dank/deck-of-many-turns/compare/v3.5.0...HEAD
+[3.5.0]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.5.0
 [3.4.0]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.4.0
 [3.3.0]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.3.0
 [3.2.0]: https://github.com/Lil-Dank/deck-of-many-turns/releases/tag/v3.2.0

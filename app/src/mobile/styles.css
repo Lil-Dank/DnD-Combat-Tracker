@@ -201,6 +201,10 @@ h3 {
 }
 
 .turn-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   margin: 6px 16px;
   padding: 8px 12px;
   border-radius: 10px;

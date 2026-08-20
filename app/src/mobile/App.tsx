@@ -201,6 +201,7 @@ export function App() {
 
           {state.combatActive && (
             <div className={`turn-banner ${state.myTurn ? 'mine' : ''}`}>
+              {state.myTurn && <Icon name="swords" size={18} />}
               {t(state.myTurn ? 'mob.yourTurn' : gatingHint ?? 'mob.notYourTurn')}
             </div>
           )}

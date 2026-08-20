@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/logo.png" width="140" alt="Deck of Many Turns logo: a crimson d20 with a gold wireframe on a dark plate">
+<img src="docs/images/logo.png" width="150" alt="Deck of Many Turns logo: a fanned stack of cards whose front card shows an initiative row">
 
 # Deck of Many Turns
 
@@ -45,6 +45,33 @@ name, and the combat log keeps the story on the right.</i>
 
 </div>
 
+![Deck of Many Turns](docs/images/social-preview.png)
+
+## Run the fight, not the software
+
+You are three encounters deep, four players are talking at once, and the goblin that
+went down two rounds ago is somehow still on the initiative list. **Deck of Many Turns
+is the screen behind your DM screen** — a Windows app that holds initiative, hit points
+and conditions for a table that is sitting in the same room as you. Not a virtual
+tabletop. No maps, no tokens, no subscription, no account, no cloud. It opens in a
+second, it runs on one machine, and your campaign is plain JSON on your own disk.
+
+|  |  |
+| --- | --- |
+| **Run the fight** | Roll initiative for everyone or just the monsters, drag to settle ties, resolve attacks against AC with crits and save-for-half, and watch it all land in an [editable combat log](#combat-log--archive) — fix a number and the HP follows. [→ Combat](#combat) |
+| **Show your table** | A second-monitor [Player View](#player-view--and-the-chroma-key-setup) with no numbers on the monsters, just a bloodied glow. Built opaque and green-free so it keys straight into OBS. [→ Player View](#player-view--and-the-chroma-key-setup) |
+| **Hand out the controls** | Players scan a QR code and get [their character on their own phone](#player-phone-companion) — attacks, damage, healing, spell slots, gated to their turn. Nothing to install. [→ Phones](#player-phone-companion) |
+
+**Plays well with** [Elgato Stream Deck](#stream-deck) — real keys for turns, damage and
+conditions, rendering their own labels · [Kenku FM](#kenku-fm-audio) — battle playlists
+and per-attack sound effects · [OBS](#player-view--and-the-chroma-key-setup) — the
+Player View is a keyable source · any phone with a browser · English and Deutsch, with
+game terms straight from the SRD 5.2.1.
+
+**[▶ Try it in your browser](https://lil-dank.github.io/deck-of-many-turns/)** — the
+real app, seeded with a fight in progress, a simulated player phone and a simulated
+Stream Deck. Nothing to download.
+
 ---
 
 ## Contents
@@ -82,7 +109,7 @@ name, and the combat log keeps the story on the right.</i>
 | 🎛️ **Stream Deck plugin** | Turn control, damage/heal numpad, multi-actor conditions, monster attack rolls, and a dice roller — all on hardware keys that render their own labels. |
 | 📜 **Combat log & archive** | [Every action logged as cards](#combat-log--archive) — attack rolls with expandable dice breakdowns, casts, saves, conditions — and editable by the DM: fixing an amount or deleting an entry re-applies the HP difference. Ended combats archive with their full log. |
 | 🔊 **Kenku FM audio** | [Sound effects and battle playlists](#kenku-fm-audio) via Kenku FM's remote API: event sounds, per-attack sounds with trigger points, encounter playlists, a soundboard panel. |
-| 🎨 **Themes** | Dark (default), PHB Style, Default Electron, Light. |
+| 🎨 **Ten themes** | Eight brand palettes plus PHB Style and Light. Each one recolours the whole DM window *and* the logo — [pick one from a swatch grid](#themes), not a dropdown. |
 | 🗣 **English & German** | [Full UI localization](#language) across both windows *and* the deck. Game terms follow the SRD 5.2.1 in each language. |
 | 💾 **Local-only storage** | Plain JSON in `%APPDATA%`, written atomically. Your data never leaves the machine. |
 
@@ -340,12 +367,26 @@ delete it. Players can browse the archive from their phones as well.
 
 ### Themes
 
-**Settings → Appearance** offers four presets — **Dark (default)**, **PHB Style**
-(parchment and dark-red headings, styled after official 5e books / Homebrewery),
-**Default Electron** (the original dark-purple look), and **Light**. Preset-only by
-design — the Player View keeps its own styling and background-colour setting. The UI
-ships with the [Inter](https://rsms.me/inter/) typeface, tuned for small-size
-legibility with tabular numerals in every HP/AC column.
+**Settings → Appearance** shows a grid of ten themes, each rendered in its own colours
+with a live copy of the logo — because the choice is entirely about colour, and a
+dropdown shows one option at a time.
+
+Eight are **brand palettes**: Violet ink (the default), Arcane gold, Ember slate,
+Verdant brass, Midnight cyan, Parchment inverted, Steel amber, and Plum and mint. Two
+are **paper themes** for playing in daylight: **PHB Style** (parchment and dark-red
+headings, after the official 5e books) and **Light**.
+
+A theme is ten colours, not twenty-six. Each palette declares a ground, a card stack, an
+accent and a current-turn colour; every other UI variable is derived from those, so the
+whole window — panels, borders, badges, buttons — and **the logo itself** recolour
+together. The current-turn highlight is deliberately never the accent: the accent already
+marks the active tab and the primary button, and whose turn it is has to stay the loudest
+thing on the combat screen.
+
+The Player View is exempt by construction and keeps its own styling and background-colour
+setting — it is projected or keyed, and a parchment ground has no business on it. The UI
+ships with the [Inter](https://rsms.me/inter/) typeface, tuned for small-size legibility
+with tabular numerals in every HP/AC column.
 
 <div align="center">
 

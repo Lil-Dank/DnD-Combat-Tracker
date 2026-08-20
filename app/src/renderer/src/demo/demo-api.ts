@@ -31,7 +31,7 @@ import type {
   Spell,
   SpellSlots,
 } from '../../../shared/types';
-import { DEFAULT_SETTINGS, abilityMod } from '../../../shared/types';
+import { DEFAULT_SETTINGS, abilityMod, normalizeSettings } from '../../../shared/types';
 import { translate } from '../../../shared/i18n';
 import { rollD20, stripDiceResults, type RollMode } from '../../../shared/dice';
 import { spellToAction, spellActionName } from '../../../shared/spellAction';
@@ -169,13 +169,9 @@ export function createDemoApi(): Api {
         if (slice.combat && !Array.isArray(slice.combat.log)) slice.combat.log = [];
       }
       if (!Array.isArray(stored.spells)) stored.spells = [];
-      // Same deep-merge as main/state.ts: settings gain new sections over time.
-      stored.settings = {
-        ...DEFAULT_SETTINGS,
-        ...stored.settings,
-        kenku: { ...DEFAULT_SETTINGS.kenku, ...(stored.settings?.kenku ?? {}) },
-        playerWeb: { ...DEFAULT_SETTINGS.playerWeb, ...(stored.settings?.playerWeb ?? {}) },
-      };
+      // Same normalisation as main/state.ts — a returning demo visitor can be
+      // carrying a pre-rebrand theme id in localStorage.
+      stored.settings = normalizeSettings(stored.settings);
       return stored;
     } catch {
       return null;

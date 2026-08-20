@@ -34,3 +34,7 @@ desktop.ini
 # Logs and local scratch
 *.log
 npm-debug.log*
+
+# Dev-only CDP capture helpers
+app/.shoot-*.mjs
+app/.verify-*.mjs

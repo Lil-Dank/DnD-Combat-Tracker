@@ -73,7 +73,10 @@ const icons = {
   'actions/roll': svg(72, ['#713f12', '#d97706'], `<g transform="translate(36,36)"><path d="M0 -24 L21 -12 L21 12 L0 24 L-21 12 L-21 -12 Z" fill="none" stroke="#fef3c7" stroke-width="5"/><text x="0" y="7" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="20" font-weight="bold" fill="#fef3c7">20</text></g>`),
   'actions/dice': svg(72, ['#0f3a4a', '#0e7490'], `<rect x="17" y="17" width="38" height="38" rx="8" fill="none" stroke="#cffafe" stroke-width="5"/><circle cx="28" cy="28" r="4" fill="#cffafe"/><circle cx="44" cy="28" r="4" fill="#cffafe"/><circle cx="36" cy="36" r="4" fill="#cffafe"/><circle cx="28" cy="44" r="4" fill="#cffafe"/><circle cx="44" cy="44" r="4" fill="#cffafe"/>`),
   'actions/blank': svg(72, ['#17121f', '#241b33'], ''),
-  'plugin/category': svg(28, ['#2c2144', '#150f22'], `<polygon points="14,3.7 23.1,8.95 23.1,19.45 14,24.7 4.9,19.45 4.9,8.95" fill="#a32424" stroke="#f6d27a" stroke-width="1.8" stroke-linejoin="round"/><polygon points="14,8.3 8.9,17.15 19.1,17.15" fill="#d94040" stroke="#f6d27a" stroke-width="1.6" stroke-linejoin="round"/>`),
+  // The brand mark's simple variant, hand-inlined at 28: the shared geometry
+  // in app/src/shared/brandMark.ts is the source, but this project does not
+  // import from app/, so the two cards and the accent bar are written out.
+  'plugin/category': svg(28, ['#26222F', '#17161B'], `<g transform="translate(1.9,-6.3) scale(0.278)"><rect x="14" y="35" width="72" height="26" rx="4" fill="#6B5F86" transform="rotate(17 18 48)"/><rect x="14" y="35" width="72" height="26" rx="4" fill="#EFEDF2"/><circle cx="30" cy="48" r="8" fill="#4A4160"/><rect x="44" y="43" width="32" height="10" rx="5" fill="#A96AF5"/></g>`),
 };
 
 for (const [name, content] of Object.entries(icons)) {

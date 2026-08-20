@@ -140,7 +140,17 @@ const DE = await captureAll('de');
 
 // ---- compare
 const NOISE = /^[\s\d.,:/+×()–—-]*$/;              // numbers, separators
-const PROPER = /^(Thorin|Owlbear|Eulenbär|Waldlager|SRD|CC-BY-4\.0|D&D|PHB Style \(Default\)|Default Electron|Dark|Light|English|Deutsch|Aboleth|WebSocket|Stream Deck|OBS|w\d|d\d+)/i;
+// Theme names are product names and stay English in both dictionaries; the
+// swatch grid renders all ten at once, unlike the old one-at-a-time select.
+const THEME_NAMES = 'Arcane gold|Ember slate|Verdant brass|Violet ink|Midnight cyan'
+  + '|Parchment inverted|Steel amber|Plum and mint|PHB Style|Light';
+// The sidebar wordmark is drawn art, not copy — it is the product name.
+const WORDMARK = 'DECK OF MANY|TURNS';
+const PROPER = new RegExp(
+  '^(Thorin|Owlbear|Eulenbär|Waldlager|SRD|CC-BY-4\.0|D&D|' + THEME_NAMES + '|' + WORDMARK +
+    '|Dark|English|Deutsch|Aboleth|WebSocket|Stream Deck|OBS|w\d|d\d+)',
+  'i',
+);
 const lines = (t) => (t ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
 
 const suspects = new Map();

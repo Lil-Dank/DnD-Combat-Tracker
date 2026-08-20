@@ -1,3 +1,4 @@
+import { DEFAULT_PALETTE, PALETTES, migrateThemeId, type PaletteId } from './brand';
 import { DEFAULT_LANG, type Lang, type MonsterL10n } from './i18n';
 
 // Shared data model used by main, preload, and renderer.
@@ -414,14 +415,24 @@ export interface ArchivedCombat {
   log: LogEntry[];
 }
 
-export type ThemeId = 'phb' | 'electron' | 'dark' | 'light';
+/** A theme *is* a brand palette — see shared/brand.ts for the colours. */
+export type ThemeId = PaletteId;
 
-export const THEMES: { id: ThemeId; label: string }[] = [
-  { id: 'dark', label: 'Dark (Default)' },
-  { id: 'phb', label: 'PHB Style' },
-  { id: 'electron', label: 'Default Electron' },
-  { id: 'light', label: 'Light' },
-];
+/** Derived, so the picker can never disagree with the generated CSS. */
+export const THEMES: {
+  id: ThemeId;
+  label: string;
+  note: string;
+  scheme: 'light' | 'dark';
+  group: 'brand' | 'paper';
+}[] = PALETTES.map((p) => ({
+  id: p.id,
+  label: p.label,
+  note: p.note,
+  scheme: p.scheme,
+  group: p.group,
+}));
+
 
 // ---- Kenku FM integration -------------------------------------------------
 
@@ -510,7 +521,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   playerViewBgColor: '#1a1423',
   bridgePort: 57321,
-  theme: 'dark',
+  theme: DEFAULT_PALETTE,
   autoOpenAttacks: true,
   language: DEFAULT_LANG,
   kenku: DEFAULT_KENKU_SETTINGS,
@@ -549,4 +560,20 @@ export interface AppState {
   kenkuConnected: boolean;
   /** Current PC claims from the player web server (empty while disabled). */
   playerClients: PlayerClaimInfo[];
+}
+
+/**
+ * Settings files gain keys over time and a stored theme id may predate the
+ * rebrand, so every reader normalises through here — the store, and the demo,
+ * which persists its own settings in localStorage.
+ */
+export function normalizeSettings(stored: Partial<Settings> | null | undefined): Settings {
+  const s = stored ?? {};
+  return {
+    ...DEFAULT_SETTINGS,
+    ...s,
+    theme: migrateThemeId(s.theme),
+    kenku: { ...DEFAULT_SETTINGS.kenku, ...(s.kenku ?? {}) },
+    playerWeb: { ...DEFAULT_SETTINGS.playerWeb, ...(s.playerWeb ?? {}) },
+  };
 }

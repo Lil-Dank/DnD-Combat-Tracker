@@ -7,6 +7,8 @@ import type {
   ThemeId,
 } from '../../../shared/types';
 import { THEMES } from '../../../shared/types';
+import { PALETTE_BY_ID } from '../../../shared/brand';
+import { BrandMark, paletteVars } from '../../../components/BrandMark';
 import { LANGUAGES, type Lang } from '../../../shared/i18n';
 import { api } from '../api';
 import { useI18n } from '../i18n';
@@ -315,20 +317,42 @@ export function SettingsScreen({ state }: { state: AppState }) {
         </label>
         <p className="muted">{t('settings.languageNote')}</p>
 
-        <label className="inline-label">
-          {t('settings.theme')}
-          <select
-            className="theme-select"
-            value={state.settings.theme}
-            onChange={(e) => void api.updateSettings({ theme: e.target.value as ThemeId })}
-          >
-            {THEMES.map((th) => (
-              <option key={th.id} value={th.id}>
-                {th.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="inline-label theme-label">{t('settings.theme')}</div>
+        {(['brand', 'paper'] as const).map((group) => (
+          <div key={group} className="theme-group">
+            <h3>{t(group === 'brand' ? 'settings.themeBrand' : 'settings.themePaper')}</h3>
+            <div className="theme-grid" role="radiogroup" aria-label={t('settings.theme')}>
+              {THEMES.filter((th) => th.group === group).map((th) => {
+                const palette = PALETTE_BY_ID[th.id];
+                const selected = state.settings.theme === th.id;
+                return (
+                  <button
+                    key={th.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    title={th.note}
+                    className={`theme-swatch ${selected ? 'selected' : ''}`}
+                    // The palette's own tokens, inline: everything inside then
+                    // renders in that theme without switching the app's.
+                    style={paletteVars(palette)}
+                    onClick={() => void api.updateSettings({ theme: th.id })}
+                  >
+                    <span className="sw-preview">
+                      <BrandMark size={26} treatment="inverse" />
+                      <span className="sw-bars">
+                        <i className="sw-accent" />
+                        <i className="sw-turn" />
+                        <i className="sw-text" />
+                      </span>
+                    </span>
+                    <span className="sw-label">{th.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
         <p className="muted">{t('settings.themeNote')}</p>
       </section>
 

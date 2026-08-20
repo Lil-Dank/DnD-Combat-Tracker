@@ -1,0 +1,96 @@
+/* Theme base — shared by the DM window, the player phone and the demo.
+ *
+ * assets/themes.css (generated from shared/brand.ts) declares each palette's
+ * ten brand seeds. This file turns those seeds into the UI variables both
+ * apps actually style with, which is why it must load in BOTH entry points:
+ * the phone has no styles.css of its own to fall back on.
+ */
+/* ============================================================================
+   Theme derivation.
+   Each palette in assets/themes.css declares only its ten brand seeds; every
+   UI variable below falls out of them, so adding a theme costs ten colours
+   rather than twenty-six. A palette can pin any of these in shared/brand.ts —
+   pinned values are emitted at higher specificity and win here.
+   ========================================================================= */
+:root {
+  --bg:          var(--brand-ground);
+  --bg-panel:    color-mix(in oklab, var(--brand-ground) 93%, var(--brand-text));
+  --bg-panel-2:  color-mix(in oklab, var(--brand-ground) 86%, var(--brand-text));
+  --border:      color-mix(in oklab, var(--brand-ground) 74%, var(--brand-text));
+  --border-soft: color-mix(in oklab, var(--brand-text) 12%, transparent);
+  --row-hover:   color-mix(in oklab, var(--brand-text) 6%, transparent);
+  --text:        var(--brand-text);
+  --text-muted:  var(--brand-text-muted);
+  --accent:      var(--brand-accent);
+  --accent-dim:  color-mix(in oklab, var(--brand-accent) 76%, var(--brand-ground));
+
+  /* Two jobs, two tokens. --accent is the brand colour as a FILL: button
+     grounds, the active-nav bar, badge borders — always at full strength.
+     --gold is the brand colour as INK: headings, totals, the active-nav label,
+     the wordmark. Pure accent on a panel fails contrast on several palettes at
+     text sizes, so the ink is pulled a third of the way toward the body colour
+     — still unmistakably the brand hue, but readable at 11px. */
+  --gold: color-mix(in oklab, var(--accent) 68%, var(--text));
+
+  /* The current turn keeps a colour of its own. The accent already marks the
+     active tab, the primary button and every heading; if whose-turn-it-is
+     shared it, the busiest signal on the combat screen would stop standing
+     out at all. */
+  --turn:           var(--brand-turn);
+  --current-border: var(--turn);
+  --current-tint:   color-mix(in oklab, var(--turn) 12%, transparent);
+  --current-shadow: color-mix(in oklab, var(--turn) 15%, transparent);
+
+  --on-accent-muted: color-mix(in oklab, var(--on-accent) 72%, var(--accent-dim));
+
+  --badge-bg:     color-mix(in oklab, var(--accent-dim) 42%, var(--bg-panel));
+  --badge-border: var(--accent-dim);
+  --badge-text:   color-mix(in oklab, var(--brand-accent) 45%, var(--brand-text));
+
+  --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  /* Phone aliases, declared once here so mobile/styles.css keeps its own
+     variable names without every palette having to repeat them. */
+  --panel: var(--bg-panel);
+  --panel-2: var(--bg-panel-2);
+  --muted: var(--text-muted);
+  --good: var(--success);
+  --bad: var(--danger);
+  --accent-2: color-mix(in oklab, var(--accent) 78%, var(--brand-text));
+  --pc-tint: color-mix(in oklab, var(--pc-color) 14%, transparent);
+  --monster-tint: color-mix(in oklab, var(--monster-color) 10%, transparent);
+}
+
+/* Semantic colours carry meaning, not brand: damage is red on every palette.
+   They hold steady and step only for light versus dark grounds. */
+:root[data-scheme='dark'] {
+  --danger: #ef4444;
+  --danger-soft: #fca5a5;
+  --success: #22c55e;
+  --heal-color: #86efac;
+  --pc-color: #6ea8fa;
+  --monster-color: #eb9a42;
+  --warn: #f59e0b;
+  --miss: #a03d3d;
+  --conc: #a98be0;
+  --lift: none;
+}
+
+:root[data-scheme='light'] {
+  --danger: #c02626;
+  --danger-soft: #a41c1c;
+  --success: #10662d;
+  --heal-color: #10662d;
+  --pc-color: #2158c8;
+  --monster-color: #94500a;
+  --warn: #a35709;
+  --miss: #8f2f2f;
+  --conc: #6d4bb0;
+  /* On a bright ground a 12%-alpha hairline disappears, so surfaces need real
+     edges — and a 1px lift, which is what reads as a card sitting on a page. */
+  --border-soft: color-mix(in oklab, var(--brand-text) 42%, transparent);
+  --border:      color-mix(in oklab, var(--brand-ground) 52%, var(--brand-text));
+  --row-hover:   color-mix(in oklab, var(--brand-text) 8%, transparent);
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.1), 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+

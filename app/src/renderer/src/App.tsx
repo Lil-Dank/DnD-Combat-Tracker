@@ -17,18 +17,24 @@ import { PlayerWebQrModal } from './PlayerWebQrModal';
 import { PlayerSaveModal } from './PlayerSaveModal';
 import type { PlayerSavePendingInfo } from '../../preload/index';
 import { translate } from '../../shared/i18n';
-import logoUrl from '../../../resources/icon.png';
+import { DEFAULT_PALETTE, PALETTE_BY_ID } from '../../shared/brand';
+import type { IconName } from '../../shared/icons';
+import { Icon } from '../../components/Icon';
+import { BrandLockup } from '../../components/BrandMark';
 
 type Tab = 'combat' | 'pcs' | 'monsters' | 'spellbook' | 'templates' | 'archive' | 'settings';
 
-const TABS: { id: Tab; key: string }[] = [
-  { id: 'combat', key: 'nav.combat' },
-  { id: 'pcs', key: 'nav.party' },
-  { id: 'monsters', key: 'nav.monsters' },
-  { id: 'spellbook', key: 'nav.spellbook' },
-  { id: 'templates', key: 'nav.encounters' },
-  { id: 'archive', key: 'nav.archive' },
-  { id: 'settings', key: 'nav.settings' },
+// The glyph lives here rather than inside the translated label: it is the
+// same drawing in every language, and parsing it back out of the string only
+// worked while every label happened to start with an emoji.
+const TABS: { id: Tab; key: string; icon: IconName }[] = [
+  { id: 'combat', key: 'nav.combat', icon: 'swords' },
+  { id: 'pcs', key: 'nav.party', icon: 'shield' },
+  { id: 'monsters', key: 'nav.monsters', icon: 'eye' },
+  { id: 'spellbook', key: 'nav.spellbook', icon: 'book' },
+  { id: 'templates', key: 'nav.encounters', icon: 'map' },
+  { id: 'archive', key: 'nav.archive', icon: 'archive' },
+  { id: 'settings', key: 'nav.settings', icon: 'sliders' },
 ];
 
 export function App() {
@@ -49,10 +55,23 @@ export function App() {
   }, [isPlayerView, lang]);
 
   useEffect(() => {
-    // Theme presets swap the CSS variables via this attribute (DM window UI
+    // Theme presets swap the CSS variables via these attributes (DM window UI
     // only — the Player View has its own fixed styling + background color).
-    if (state) document.documentElement.dataset.theme = state.settings.theme;
-  }, [state?.settings.theme]);
+    // data-scheme carries the light/dark trait, so rules that depend on the
+    // ground key off it instead of enumerating every theme id.
+    // The Player View is projected or keyed and must never inherit the DM's
+    // theme — the body carries --font-ui and --bg, so PHB Style's serif and a
+    // parchment ground would otherwise reach the players' screen.
+    if (isPlayerView) {
+      document.documentElement.dataset.theme = DEFAULT_PALETTE;
+      document.documentElement.dataset.scheme = 'dark';
+      return;
+    }
+    if (!state) return;
+    const palette = PALETTE_BY_ID[state.settings.theme];
+    document.documentElement.dataset.theme = state.settings.theme;
+    document.documentElement.dataset.scheme = palette?.scheme ?? 'dark';
+  }, [state?.settings.theme, isPlayerView]);
 
   useEffect(() => {
     // A campaign switch invalidates cross-screen leftovers: a preselected
@@ -107,34 +126,34 @@ export function App() {
     <ConfirmProvider cancelLabel={translate(lang, 'common.cancel')}>
     <div className="app">
       <nav className="sidebar">
-        <div className="app-title">
-          <img className="app-title-logo" src={logoUrl} alt="" />
-          <span>{translate(lang, 'app.title')}</span>
-        </div>
+        <BrandLockup appName={translate(lang, 'app.title')} />
         <CampaignSelector state={state} />
-        {TABS.map((t) => {
-          const [icon, ...words] = translate(lang, t.key).split(' ');
-          return (
-            <button
-              key={t.id}
-              className={`nav-btn ${tab === t.id ? 'active' : ''}`}
-              onClick={() => setTab(t.id)}
-            >
-              <span className="nav-icon">{icon}</span>
-              <span>{words.join(' ')}</span>
-            </button>
-          );
-        })}
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            className={`nav-btn ${tab === t.id ? 'active' : ''}`}
+            onClick={() => setTab(t.id)}
+          >
+            <span className="nav-icon">
+              <Icon name={t.icon} />
+            </span>
+            <span>{translate(lang, t.key)}</span>
+          </button>
+        ))}
         <div className="sidebar-footer">
           {state.settings.kenku.enabled && (
             <button className="nav-btn" onClick={() => setShowSoundboard(true)}>
-              <span className="nav-icon">🎵</span>
+              <span className="nav-icon">
+                <Icon name="equalizer" />
+              </span>
               <span>{translate(lang, 'kenku.soundboard')}</span>
             </button>
           )}
           {state.settings.playerWeb.enabled && (
             <button className="nav-btn" onClick={() => setShowQr(true)}>
-              <span className="nav-icon">📱</span>
+              <span className="nav-icon">
+                <Icon name="phone" />
+              </span>
               <span>{translate(lang, 'pw.qrButton')}</span>
             </button>
           )}
@@ -142,17 +161,23 @@ export function App() {
             className={`nav-btn pv-toggle ${playerViewOpen ? 'active' : ''}`}
             onClick={() => void api.togglePlayerView()}
           >
-            <span className="nav-icon">🖥</span>
+            <span className="nav-icon">
+                <Icon name="monitor" />
+              </span>
             <span>{translate(lang, playerViewOpen ? 'nav.closePlayerView' : 'nav.openPlayerView')}</span>
           </button>
           {playerViewOpen && (
             <button className="nav-btn" onClick={() => void api.togglePlayerFullscreen()}>
-              <span className="nav-icon">⛶</span>
+              <span className="nav-icon">
+                <Icon name="expand" />
+              </span>
               <span>{translate(lang, 'nav.fullscreen')}</span>
             </button>
           )}
           <div className={`bridge-status ${state.bridgeClientCount > 0 ? 'on' : ''}`}>
-            <span className="nav-icon">{state.bridgeClientCount > 0 ? '●' : '○'}</span>
+            <span className="nav-icon">
+              <Icon name={state.bridgeClientCount > 0 ? 'dotOn' : 'dotOff'} />
+            </span>
             <span>{translate(lang, state.bridgeClientCount > 0 ? 'nav.deckConnected' : 'nav.deckOffline')}</span>
           </div>
         </div>

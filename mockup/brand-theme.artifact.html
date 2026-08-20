@@ -223,9 +223,10 @@ h2.sec { font-size: 11.5px; letter-spacing: 1.2px; text-transform: uppercase; co
 </style>
 <h1>Deck of Many Turns — brand + theme mockup</h1>
 <p class="lede">Every palette below is the <b>same drawing and the same UI</b> with different colour seeds —
-nothing but colour and iconography changes, the layout is the shipped one. Judge the sidebar at 100% zoom,
-and check the <b>current-turn row against the active nav item</b>: those two must never read as the same thing.
-Untick palettes to cut the set down to eight.</p>
+nothing but colour and iconography changes, the layout is the shipped one. <b>Signed off:</b> eight brand themes
+plus PHB Style and Light, <b>Violet ink</b> as the default, accent-tint active nav, the inverse lock-up in the
+sidebar, bare + shadow for the app icon, and strong + shadow separation on the bright grounds. The controls
+below stay live so any of it can still be re-argued.</p>
 
 <div class="bar">
   <fieldset><b>Active nav</b>
@@ -245,13 +246,13 @@ Untick palettes to cut the set down to eight.</p>
   </fieldset>
   <fieldset><b>Light separation</b>
     <label><input type="radio" name="sep" value="soft"> soft</label>
-    <label><input type="radio" name="sep" value="strong" checked> strong</label>
-    <label><input type="radio" name="sep" value="shadow"> strong + shadow</label>
+    <label><input type="radio" name="sep" value="strong"> strong</label>
+    <label><input type="radio" name="sep" value="shadow" checked> strong + shadow</label>
   </fieldset>
   <fieldset><b>Monsters glyph</b>
-    <label><input type="radio" name="mon" value="horns" checked> horned head</label>
+    <label><input type="radio" name="mon" value="horns"> horned head</label>
     <label><input type="radio" name="mon" value="claw"> claw</label>
-    <label><input type="radio" name="mon" value="eye"> slit eye</label>
+    <label><input type="radio" name="mon" value="eye" checked> slit eye</label>
   </fieldset>
 </div>
 
@@ -264,8 +265,8 @@ Untick palettes to cut the set down to eight.</p>
 <div class="iconwall ui" id="icons"></div>
 
 <h2 class="sec">App icon — the same mark on a dark, light and mid taskbar</h2>
-<p class="lede" style="margin-bottom:12px">The shipped icon has no panel behind it, so whatever
-survives all three strips is the one that works in a taskbar, an installer and a favicon.</p>
+<p class="lede" style="margin-bottom:12px">The shipped icon has no panel behind it. <b>Bare + shadow ships</b>;
+the tiled variants are kept here for reference. Note the front card on the dark strip — that is the trade.</p>
 <div id="iconlab"></div>
 
 <h2 class="sec">Lock-up treatments — 28px as it ships, and 2× to inspect</h2>
@@ -455,9 +456,9 @@ const FOOT = [
 ];
 
 /* ---- render -------------------------------------------------------------- */
-let monsterGlyph = 'horns';
+let monsterGlyph = 'eye';
 let lockupTr = 'inverse';
-let sepLevel = 'strong';
+let sepLevel = 'shadow';
 const seedCss = p => [
   `--brand-tile:${p.tile}`, `--brand-ground:${p.ground}`, `--brand-back-1:${p.back1}`,
   `--brand-back-2:${p.back2}`, `--brand-front:${p.front}`, `--brand-dot:${p.dot}`,
@@ -534,7 +535,7 @@ function render() {
       </section>`).join('');
 
   const lead = shown[0] ?? PALETTES[0];
-  const ICON_TR = [['tile','flat tile'], ['tileshadow','tile + shadow'], ['shadow','bare + shadow']];
+  const ICON_TR = [['shadow','bare + shadow — SHIPS'], ['tileshadow','tile + shadow'], ['tile','flat tile']];
   const GROUNDS = [['#202020','dark taskbar'], ['#f3f3f3','light taskbar'], ['#7c7c84','mid wallpaper']];
   const TREATMENTS = ['tile', 'inverse', 'shadow', 'stroke', 'bare'];
   document.getElementById('iconlab').innerHTML =

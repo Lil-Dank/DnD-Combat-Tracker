@@ -8,6 +8,7 @@ import { store } from './state';
 import { JsonValue } from './storage';
 import { handleAttackEvent } from './kenku';
 import { logAttackEvent } from './combatLog';
+import { reopenDeferredThrow } from './concentration';
 import {
   closeRequest,
   getSaveRequest,
@@ -385,9 +386,11 @@ interface PlayerCommand {
   archiveId?: string;
   /** Spell casts: the slot level spent (absent for cantrips). */
   slotLevel?: number;
-  /** Concentration checks: the pending check id and (manual) rolled total. */
+  /** Throw prompts: the prompt id and (manual) rolled total. */
   id?: string;
   total?: number;
+  /** throwRetry: the deferred log entry the player wants put back up. */
+  entryId?: string;
 }
 
 /** The acting PC's live combatant, or null when it isn't in the fight. */
@@ -1168,6 +1171,19 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
       // Like saveAttack: never turn-gated — resting between fights is the point.
       if (!info.pcId) return;
       await store.longRest(info.pcId);
+      return;
+    }
+
+    case 'throwRetry': {
+      // The player wants a throw they still owe put back on the table. Only
+      // their own: the entry names the combatant, and it has to be the one
+      // this socket claims.
+      const combat = store.getState().combat;
+      const entry = combat?.log.find((e) => e.id === cmd.entryId);
+      if (!entry || entry.kind !== 'saveDeferred' || !entry.combatantId) return;
+      const target = combat!.combatants.find((c) => c.id === entry.combatantId);
+      if (!target || target.type !== 'pc' || target.sourceId !== info.pcId) return;
+      if (reopenDeferredThrow(entry)) await store.deleteLogEntry(entry.id);
       return;
     }
 

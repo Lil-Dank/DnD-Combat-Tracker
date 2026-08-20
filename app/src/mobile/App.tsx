@@ -319,7 +319,11 @@ export function App() {
 
           {view.id === 'log' && (
             <Sheet title={t('mob.logTitle')} onClose={() => setView({ id: 'home' })} t={t}>
-              <LogList log={state.log} lang={lang} />
+              <LogList
+                log={state.log}
+                lang={lang}
+                onThrowDeferred={(entry) => send({ type: 'throwRetry', entryId: entry.id })}
+              />
             </Sheet>
           )}
 
@@ -488,7 +492,7 @@ function ThrowPromptOverlay({
             send({ type: 'throwDigital', id: msg.id });
           }}
         >
-          \ud83c\udfb2 {displayDice(lang, 'd20')}
+          🎲 {displayDice(lang, 'd20')}
           {modStr}
         </button>
       ) : (
@@ -496,7 +500,7 @@ function ThrowPromptOverlay({
           <label>
             {t('mob.d20Total')}
             <span className="roll-hint tnum">
-              \ud83c\udfb2 {displayDice(lang, 'd20')}
+              🎲 {displayDice(lang, 'd20')}
               {modStr}
             </span>
             <input
@@ -1985,7 +1989,16 @@ function DmgText({ lang, text }: { lang: Lang; text: string }) {
   );
 }
 
-function LogList({ log, lang }: { log: LogEntry[]; lang: Lang }) {
+function LogList({
+  log,
+  lang,
+  onThrowDeferred,
+}: {
+  log: LogEntry[];
+  lang: Lang;
+  /** Ask the DM to reopen a throw this character still owes. */
+  onThrowDeferred?: (entry: LogEntry) => void;
+}) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
@@ -1997,6 +2010,7 @@ function LogList({ log, lang }: { log: LogEntry[]; lang: Lang }) {
         log={log}
         lang={lang}
         t={(key, params) => translate(lang, key, params)}
+        onThrowDeferred={onThrowDeferred}
       />
       <div ref={endRef} />
     </div>

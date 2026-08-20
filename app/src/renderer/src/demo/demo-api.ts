@@ -1976,6 +1976,20 @@ export function createDemoApi(): Api {
       return;
     }
 
+    if (type === 'throwRetry') {
+      // Mirror of playerServer.ts: only the character who owes it may ask.
+      const combat = cur().combat;
+      const entry = combat?.log.find((e) => e.id === cmd.entryId);
+      if (!combat || !entry || entry.kind !== 'saveDeferred' || !entry.combatantId) return;
+      const target = combat.combatants.find((c) => c.id === entry.combatantId);
+      if (!target || target.type !== 'pc' || target.sourceId !== session.pcId) return;
+      if (reopenDeferredThrow(entry)) {
+        if (applyLogEntryDelete(combat, entry.id)) combat.log = [...combat.log];
+        save();
+      }
+      return;
+    }
+
     if (type === 'throwDigital' || type === 'throwManual') {
       const prompt = typeof cmd.id === 'string' ? phonePrompts.get(cmd.id) : undefined;
       if (!prompt || prompt.session !== session) return;

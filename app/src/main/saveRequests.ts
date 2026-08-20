@@ -211,8 +211,10 @@ export function resolveThrow(
   if (!target || target.result) return false;
   target.result = result;
   target.awaiting = null;
-  // Whoever else was holding this prompt can put it away.
+  // Whoever else was holding this prompt can put it away — including a card in
+  // the log, if this row had been deferred and someone answered it live.
   phoneCanceller?.(requestId, combatantId);
+  clearDeferredCards(requestId, combatantId);
   announce(req);
   if (req.targets.every((t) => t.result)) void finish(requestId, revealMs);
   return true;
@@ -291,25 +293,57 @@ export async function deferRequest(requestId: string): Promise<void> {
   parked.set(requestId, req);
   phoneCanceller?.(requestId, null);
   closeListener?.(requestId);
-  for (const t of owed) {
-    await store.appendLog({
-      kind: 'saveDeferred',
-      actorName: t.name,
-      actorType: t.type,
-      attackName: req.attackName,
-      ability: req.ability,
-      dc: req.dc,
-      amount: req.damage,
-      combatantId: t.combatantId,
-      // Points back at the parked request, so throwing the card resumes the
-      // real thing instead of a bare re-derived copy.
-      requestId,
-      // Marks it as a concentration check, so throwing it later still ends the
-      // spell on a failure rather than quietly logging a number.
-      conc: req.kind === 'concentration',
-      source: 'dm',
-    });
+  for (const t of owed) await fileDeferredCard(req, t, requestId);
+}
+
+async function fileDeferredCard(
+  req: SaveRequest,
+  t: ThrowTarget,
+  requestId: string,
+): Promise<void> {
+  await store.appendLog({
+    kind: 'saveDeferred',
+    actorName: t.name,
+    actorType: t.type,
+    attackName: req.attackName,
+    ability: req.ability,
+    dc: req.dc,
+    amount: req.damage,
+    combatantId: t.combatantId,
+    // Points back at the parked request, so throwing the card resumes the
+    // real thing instead of a bare re-derived copy.
+    requestId,
+    // Marks it as a concentration check, so throwing it later still ends the
+    // spell on a failure rather than quietly logging a number.
+    conc: req.kind === 'concentration',
+    source: 'dm',
+  });
+}
+
+/**
+ * One player stepped away from their own row. Everyone else's throw is still
+ * owed and stays exactly where it was — only this target is filed as a card.
+ *
+ * If the request was private to that player (they had picked it up off a card
+ * themselves) it goes back to being parked, since nobody is looking at it any
+ * more. If the DM is adjudicating alongside them, it stays live: their row
+ * simply stops waiting on a phone and the DM can take it.
+ */
+export async function deferTarget(requestId: string, combatantId: string): Promise<void> {
+  const req = requests.get(requestId);
+  if (!req) return;
+  const target = req.targets.find((t) => t.combatantId === combatantId && !t.result);
+  if (!target) return;
+  target.awaiting = null;
+  phoneCanceller?.(requestId, combatantId);
+  await fileDeferredCard(req, target, requestId);
+  if (req.pickedUpBy === 'phone') {
+    requests.delete(requestId);
+    parked.set(requestId, req);
+    closeListener?.(requestId);
+    return;
   }
+  announce(req);
 }
 
 /** Every live or parked request — swept on combat end and campaign switch. */

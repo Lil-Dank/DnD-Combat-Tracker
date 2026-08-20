@@ -1326,6 +1326,7 @@ export function createDemoApi(): Api {
     target.result = result;
     target.awaiting = null;
     cancelPhonePrompt(requestId, combatantId);
+    clearDeferredCards(requestId, combatantId);
     announceRequest(req);
     if (req.targets.every((t) => t.result)) {
       const done = saveFinishers.get(requestId);
@@ -1402,22 +1403,52 @@ export function createDemoApi(): Api {
     for (const cb of saveReqClosedListeners) cb(requestId);
     const combat = cur().combat;
     if (!combat) return;
-    for (const t of owed) {
-      pushLog(combat, {
-        kind: 'saveDeferred',
-        actorName: t.name,
-        actorType: t.type,
-        attackName: req.attackName,
-        ability: req.ability,
-        dc: req.dc,
-        amount: req.damage,
-        combatantId: t.combatantId,
-        requestId,
-        conc: req.kind === 'concentration',
-        source: 'dm',
-      });
-    }
+    for (const t of owed) fileDeferredCard(req, t, requestId);
     save();
+  }
+
+  function fileDeferredCard(
+    req: DemoSaveRequest,
+    t: DemoThrowTarget,
+    requestId: string,
+  ): void {
+    const combat = cur().combat;
+    if (!combat) return;
+    pushLog(combat, {
+      kind: 'saveDeferred',
+      actorName: t.name,
+      actorType: t.type,
+      attackName: req.attackName,
+      ability: req.ability,
+      dc: req.dc,
+      amount: req.damage,
+      combatantId: t.combatantId,
+      requestId,
+      conc: req.kind === 'concentration',
+      source: 'dm',
+    });
+  }
+
+  /**
+   * Mirror of saveRequests.ts: one player stepped away from their own row.
+   * Everyone else's throw stays exactly where it was.
+   */
+  function deferTarget(requestId: string, combatantId: string): void {
+    const req = saveRequests.get(requestId);
+    if (!req) return;
+    const target = req.targets.find((t) => t.combatantId === combatantId && !t.result);
+    if (!target) return;
+    target.awaiting = null;
+    cancelPhonePrompt(requestId, combatantId);
+    fileDeferredCard(req, target, requestId);
+    save();
+    if (req.pickedUpBy === 'phone') {
+      saveRequests.delete(requestId);
+      parkedRequests.set(requestId, req);
+      for (const cb of saveReqClosedListeners) cb(requestId);
+      return;
+    }
+    announceRequest(req);
   }
 
   function reopenDeferredThrow(
@@ -2068,6 +2099,14 @@ export function createDemoApi(): Api {
         if (applyLogEntryDelete(combat, entry.id)) combat.log = [...combat.log];
         save();
       }
+      return;
+    }
+
+    if (type === 'throwDefer') {
+      const prompt = typeof cmd.id === 'string' ? phonePrompts.get(cmd.id) : undefined;
+      if (!prompt || prompt.session !== session) return;
+      // Leave it registered: cancelPhonePrompt is what closes the phone.
+      deferTarget(prompt.requestId, prompt.combatantId);
       return;
     }
 

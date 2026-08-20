@@ -11,6 +11,7 @@ import { logAttackEvent } from './combatLog';
 import { reopenDeferredThrow } from './concentration';
 import {
   closeRequest,
+  deferTarget,
   getSaveRequest,
   openSaveRequest,
   openRequestIds,
@@ -1200,6 +1201,17 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
       if (reopenDeferredThrow(entry, { surface: 'phone', pcId: info.pcId! })) {
         await store.deleteLogEntry(entry.id);
       }
+      return;
+    }
+
+    case 'throwDefer': {
+      // The player backed out of a throw. Theirs alone: it becomes a card they
+      // (or the DM) can pick up later, and nobody else's row is touched.
+      const prompt = typeof cmd.id === 'string' ? phonePrompts.get(cmd.id) : undefined;
+      if (!prompt || prompt.socket !== socket) return;
+      // Leave the prompt registered: deferTarget's canceller is what takes it
+      // off the phone, and it can only find prompts that are still there.
+      await deferTarget(prompt.requestId, prompt.combatantId);
       return;
     }
 

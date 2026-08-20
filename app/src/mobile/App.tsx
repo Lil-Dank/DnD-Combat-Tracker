@@ -461,7 +461,16 @@ function ThrowPromptOverlay({
   }
 
   return (
-    <Sheet title={title} onClose={() => undefined} t={t} noBack>
+    <Sheet
+      title={title}
+      // Backing out is not skipping it: the throw becomes a card in the log
+      // that this character (or the DM) can pick up whenever they are ready.
+      onClose={() => {
+        setSent(true);
+        send({ type: 'throwDefer', id: msg.id });
+      }}
+      t={t}
+    >
       <p className="conc-info">
         {isConc
           ? t('mob.concInfo', { damage: msg.damage ?? 0, dc: msg.dc, spell })

@@ -1,5 +1,5 @@
 import streamDeck, { type KeyAction, type Device } from '@elgato/streamdeck';
-import { bridge, type BridgeAttack, type BridgeCombatant } from './bridge';
+import { bridge, type BridgeAttack, type BridgeCombatant, type BridgeCommand } from './bridge';
 import { rollD20, rollDice, rollPool } from './dice';
 import { pickerKeyImage, type KeyRole } from './key-image';
 import { L, conditionLabel, setPluginLang } from './i18n';
@@ -31,7 +31,9 @@ type Mode =
   | 'attackSelect'
   | 'targetSelect'
   | 'attackRoll'
+  | 'saveMode'
   | 'saveResult'
+  | 'saveEntry'
   | 'diceAmount'
   | 'diceType'
   | 'diceMod'
@@ -201,8 +203,13 @@ class Picker {
   applyDelayMs = 5000;
   /** Rolled save-action damage awaiting the "who saved?" answer. */
   private pendingDamage = 0;
-  /** Targets marked as having succeeded their saving throw (take half). */
-  private savedTargets: string[] = [];
+  /**
+   * Saving throws for the pending save action, by target id — rolled on the
+   * deck (die + the target's modifier) or typed on the numpad (die null).
+   */
+  private saveRolls = new Map<string, { die: number | null; total: number }>();
+  /** Target whose total the saveEntry numpad is filling in. */
+  private saveEntryId: string | null = null;
   /** Idle timeout: exit when a picker screen gets no input. */
   private idleTimer: NodeJS.Timeout | null = null;
   idleTimeoutMs = 90_000;
@@ -344,7 +351,8 @@ class Picker {
     this.rolledTotal = null;
     this.applyOp = null;
     this.pendingDamage = 0;
-    this.savedTargets = [];
+    this.saveRolls.clear();
+    this.saveEntryId = null;
     this.touchIdle();
     await streamDeck.profiles.switchToProfile(device.id, profile.name);
     await this.render();
@@ -378,11 +386,56 @@ class Picker {
       this.mode === 'attackSelect' ||
       this.mode === 'targetSelect' ||
       this.mode === 'attackRoll' ||
-      this.mode === 'saveResult';
+      this.mode === 'saveMode' ||
+      this.mode === 'saveResult' ||
+      this.mode === 'saveEntry';
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
       void this.exit();
     }, long ? this.idleTimeoutLongMs : this.idleTimeoutMs);
+  }
+
+  /** Targets whose entered total met the DC — they take half damage. */
+  private get savedTargets(): string[] {
+    const info = this.saveInfo;
+    if (!info) return [];
+    return this.selectedTargetCombatants()
+      .filter((c) => (this.saveRolls.get(c.id)?.total ?? -Infinity) >= info.dc)
+      .map((c) => c.id);
+  }
+
+  /** This action's save ability and DC, parsed from the bridge's "DEX 18". */
+  private get saveInfo(): { ability: string; dc: number } | null {
+    const raw = this.selectedAttack?.save;
+    if (!raw) return null;
+    const [ability, dc] = raw.split(' ');
+    const n = parseInt(dc ?? '', 10);
+    return ability && Number.isFinite(n) ? { ability, dc: n } : null;
+  }
+
+  /** The target's modifier for this save, when the app sent ability scores. */
+  private saveModFor(c: BridgeCombatant): number | null {
+    const info = this.saveInfo;
+    const mod = info ? c.saveMods?.[info.ability.toLowerCase()] : undefined;
+    return typeof mod === 'number' ? mod : null;
+  }
+
+  private rollSaveFor(c: BridgeCombatant): void {
+    const die = 1 + Math.floor(Math.random() * 20);
+    this.saveRolls.set(c.id, { die, total: die + (this.saveModFor(c) ?? 0) });
+  }
+
+  private get allSavesEntered(): boolean {
+    const targets = this.selectedTargetCombatants();
+    return targets.length > 0 && targets.every((c) => this.saveRolls.has(c.id));
+  }
+
+  /** Auto/Manual keys on the save-mode screen (same corners as more-dice). */
+  private get saveAutoSlot(): number {
+    return this.slotCount - 1 - this.cols;
+  }
+  private get saveManualSlot(): number {
+    return this.slotCount - 1;
   }
 
   /** Center-ish slot used as the confirm/roll screens' message display. */
@@ -731,6 +784,43 @@ class Picker {
       return BLANK;
     }
 
+    if (this.mode === 'saveMode') {
+      if (slot === 0) return K(L('back'), 'back');
+      if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
+      if (slot === this.confirmDisplaySlot) {
+        const info = this.saveInfo;
+        return K(
+          [
+            L('saveDmg', { amount: this.pendingDamage }),
+            info ? `${info.ability} ${info.dc}` : '',
+            L('saveHow'),
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          'display',
+        );
+      }
+      if (slot === this.saveAutoSlot) return K(L('saveAuto'), 'confirm');
+      if (slot === this.saveManualSlot) return K(L('saveManual'), 'item');
+      return BLANK;
+    }
+
+    // One target's total on the numpad. The modifier rides along as a hint so
+    // the DM can add it to a physically rolled d20 without leaving the screen.
+    if (this.mode === 'saveEntry') {
+      const key = numpadLayout(this.cols, this.rows)?.get(slot);
+      if (!key) return BLANK;
+      if (key.kind === 'display') {
+        const c = this.alive().find((x) => x.id === this.saveEntryId);
+        const mod = c ? this.saveModFor(c) : null;
+        const hint = mod === null ? '' : ` (${mod >= 0 ? '+' : ''}${mod})`;
+        const digits = this.digits === '' ? '_' : this.digits;
+        const name = wrapTitle(splitNumber(c?.displayName ?? '').base, 7, 1);
+        return K(`${digits}${hint}\n${name}`, 'display');
+      }
+      return K(key.label, numpadRole(key.kind));
+    }
+
     if (this.mode === 'saveResult') {
       if (slot === 0) return K(L('back'), 'back');
       if (slot === this.cancelSlot) return K(L('cancel'), 'cancel');
@@ -741,18 +831,24 @@ class Picker {
       );
       if (slot === this.confirmDisplaySlot) {
         if (this.applyTimer) return K(this.lastRoll, 'display');
-        return K(L('whoSaved', { amount: this.pendingDamage }), 'display');
+        // Doubles as the re-roll key for the whole area.
+        return K(L('rollSaves', { amount: this.pendingDamage }), 'item');
       }
       if (slot === this.doneSlot) {
         const half = Math.floor(this.pendingDamage / 2);
+        if (!this.allSavesEntered) return K(L('savesPending'), 'display');
         return K(`⚔ Apply\n${this.savedTargets.length}×½(${half})`, 'confirm');
       }
       if (paged && slot === pageSlot) return K(L('more'), 'page');
       const c = map.get(slot);
       if (!c) return BLANK;
+      const roll = this.saveRolls.get(c.id);
       const saved = this.savedTargets.includes(c.id);
+      if (!roll) {
+        return K(`—\n${this.targetName(c, 2)}`, c.type === 'pc' ? 'itemPc' : 'item');
+      }
       return K(
-        `${saved ? '✓½\n' : ''}${this.targetName(c, saved ? 2 : 3)}`,
+        `${roll.total} ${saved ? '✓½' : '✗'}\n${this.targetName(c, 2)}`,
         saved ? 'selected' : c.type === 'pc' ? 'itemPc' : 'item',
       );
     }
@@ -880,7 +976,9 @@ class Picker {
       if (this.mode === 'attackSelect') return this.pressAttackSelect(slot, action);
       if (this.mode === 'targetSelect') return this.pressTargetSelect(slot, action);
       if (this.mode === 'attackRoll') return this.pressAttackRoll(slot, action);
+      if (this.mode === 'saveMode') return this.pressSaveMode(slot, action);
       if (this.mode === 'saveResult') return this.pressSaveResult(slot, action);
+      if (this.mode === 'saveEntry') return this.pressSaveEntry(slot, action);
       if (this.mode === 'diceAmount' || this.mode === 'diceMod') return this.pressDiceNumpad(slot, action);
       if (this.mode === 'diceType') return this.pressDiceType(slot, action);
       if (this.mode === 'diceMore') return this.pressDiceMore(slot, action);
@@ -1106,9 +1204,10 @@ class Picker {
         // Saving-throw action: ask which targets succeeded (they take half)
         // before the apply countdown starts.
         this.pendingDamage = total;
-        this.savedTargets = [];
+        this.saveRolls.clear();
+        this.saveEntryId = null;
         this.lastRoll = summary.join('\n');
-        this.mode = 'saveResult';
+        this.mode = 'saveMode';
         await action.showOk();
         return this.render();
       }
@@ -1125,7 +1224,12 @@ class Picker {
   /** Shared 5 s countdown → apply amounts → exit. */
   private startDamageApply(
     summary: string[],
-    amounts: () => { id: string; amount: number; math?: string }[],
+    amounts: () => {
+      id: string;
+      amount: number;
+      math?: string;
+      save?: NonNullable<Extract<BridgeCommand, { type: 'applyDamage' }>['save']>;
+    }[],
   ): void {
     this.clearPendingApply();
     let secondsLeft = Math.max(1, Math.round(this.applyDelayMs / 1000));
@@ -1141,7 +1245,7 @@ class Picker {
     }
     this.applyTimer = setTimeout(async () => {
       this.clearPendingApply();
-      for (const { id, amount, math } of amounts()) {
+      for (const { id, amount, math, save } of amounts()) {
         bridge.send({
           type: 'applyDamage',
           actorId: id,
@@ -1150,11 +1254,70 @@ class Picker {
           actorType: this.attackerType,
           math,
           mathTypes: math ? this.lastDamageMathTypes : undefined,
+          save,
         });
       }
       this.sendAttackEvent('damageApplied');
       await this.exit();
     }, this.applyDelayMs);
+  }
+
+  /**
+   * Auto or manual? Auto rolls every target's save on the deck; manual leaves
+   * the list empty so each total can be typed on the numpad. Either way the
+   * other route stays available on the results screen.
+   */
+  private async pressSaveMode(slot: number, _action: KeyAction): Promise<void> {
+    if (slot === 0) {
+      this.mode = 'attackRoll';
+      this.lastRoll = `DMG ${this.pendingDamage}`;
+      return this.render();
+    }
+    if (slot === this.cancelSlot) return this.exit();
+    if (slot === this.saveAutoSlot) {
+      for (const c of this.selectedTargetCombatants()) this.rollSaveFor(c);
+      this.mode = 'saveResult';
+      return this.render();
+    }
+    if (slot === this.saveManualSlot) {
+      this.saveRolls.clear();
+      this.mode = 'saveResult';
+      return this.render();
+    }
+  }
+
+  /** The numpad, filling in one target's total. */
+  private async pressSaveEntry(slot: number, _action: KeyAction): Promise<void> {
+    const key = numpadLayout(this.cols, this.rows)?.get(slot);
+    if (!key) return;
+    switch (key.kind) {
+      case 'cancel':
+        return this.exit();
+      case 'digit':
+        if (this.digits.length < 3) this.digits += key.value!;
+        return this.render();
+      case 'clear':
+        this.digits = '';
+        return this.render();
+      case 'back':
+        this.digits = '';
+        this.saveEntryId = null;
+        this.mode = 'saveResult';
+        return this.render();
+      case 'enter': {
+        const total = parseInt(this.digits, 10);
+        // A typed total carries no die: the d20 is on the table, not here.
+        if (this.saveEntryId && Number.isFinite(total)) {
+          this.saveRolls.set(this.saveEntryId, { die: null, total });
+        }
+        this.digits = '';
+        this.saveEntryId = null;
+        this.mode = 'saveResult';
+        return this.render();
+      }
+      case 'display':
+        return;
+    }
   }
 
   private async pressSaveResult(slot: number, _action: KeyAction): Promise<void> {
@@ -1172,17 +1335,40 @@ class Picker {
       true,
       [this.confirmDisplaySlot],
     );
+    if (slot === this.confirmDisplaySlot) {
+      // Re-roll the whole area — also the way into rolling from manual mode.
+      for (const c of this.selectedTargetCombatants()) this.rollSaveFor(c);
+      return this.render();
+    }
     if (slot === this.doneSlot) {
+      if (!this.allSavesEntered) return;
       const full = this.pendingDamage;
       const half = Math.floor(full / 2);
+      const info = this.saveInfo;
       this.startDamageApply([`DMG ${full}`, `½ = ${half}×${this.savedTargets.length}`], () =>
-        this.targets.map((id) => ({
-          id,
-          amount: this.savedTargets.includes(id) ? half : full,
-          math: this.savedTargets.includes(id)
-            ? `${this.lastDamageMath} → ½ ${half}`
-            : this.lastDamageMath,
-        })),
+        this.targets.map((id) => {
+          const saved = this.savedTargets.includes(id);
+          const roll = this.saveRolls.get(id);
+          return {
+            id,
+            amount: saved ? half : full,
+            math: saved ? `${this.lastDamageMath} → ½ ${half}` : this.lastDamageMath,
+            // Rides along so the app logs the throw right before the damage,
+            // leaving the same card the DM window and the phones produce.
+            save:
+              info && roll
+                ? {
+                    ability: info.ability,
+                    dc: info.dc,
+                    die: roll.die ?? undefined,
+                    total: roll.total,
+                    saved,
+                    attackName: this.selectedAttack?.name,
+                    attackerName: this.actorName,
+                  }
+                : undefined,
+          };
+        }),
       );
       return this.render();
     }
@@ -1192,9 +1378,11 @@ class Picker {
     }
     const c = map.get(slot);
     if (!c) return;
-    this.savedTargets = this.savedTargets.includes(c.id)
-      ? this.savedTargets.filter((id) => id !== c.id)
-      : [...this.savedTargets, c.id];
+    // Pressing a target types its total — the way to record a physical roll,
+    // and the way to correct one the deck rolled.
+    this.saveEntryId = c.id;
+    this.digits = '';
+    this.mode = 'saveEntry';
     return this.render();
   }
 
@@ -1436,7 +1624,9 @@ class Picker {
       (this.mode === 'attackSelect' ||
         this.mode === 'targetSelect' ||
         this.mode === 'attackRoll' ||
-        this.mode === 'saveResult') &&
+        this.mode === 'saveMode' ||
+        this.mode === 'saveResult' ||
+        this.mode === 'saveEntry') &&
       this.actorId
     ) {
       if (!this.alive().some((c) => c.id === this.actorId)) {
@@ -1445,9 +1635,11 @@ class Picker {
     }
     // Save-result list: prune vanished targets (unless the apply in flight
     // is what removed them).
-    if (this.mode === 'saveResult' && !this.applyTimer) {
+    if ((this.mode === 'saveResult' || this.mode === 'saveMode') && !this.applyTimer) {
       this.targets = this.targets.filter((id) => this.alive().some((c) => c.id === id));
-      this.savedTargets = this.savedTargets.filter((id) => this.targets.includes(id));
+      for (const id of [...this.saveRolls.keys()]) {
+        if (!this.targets.includes(id)) this.saveRolls.delete(id);
+      }
       if (this.targets.length === 0) {
         this.mode = 'targetSelect';
         this.lastRoll = '';

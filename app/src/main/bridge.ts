@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { store } from './state';
 import type { AppState } from '../shared/types';
+import { ABILITY_KEYS, abilityMod } from '../shared/types';
 import { abilityCodeLabel, monsterName } from '../shared/i18n';
 import { handleAttackEvent, type AttackEventPayload } from './kenku';
 import { logAttackEvent, type AttackRollDetails } from './combatLog';
@@ -36,6 +37,21 @@ interface BridgeCommand {
   mathTypes?: (string | null)[];
   /** Optional attackEvent roll details for the combat log (v1.4+ plugins). */
   roll?: AttackRollDetails;
+  /**
+   * applyDamage from a save-based action (v3.6+ plugins): the throw this
+   * target made. Logged as its own entry immediately before the damage, so
+   * the deck leaves the same card as the DM window and the player web app.
+   */
+  save?: {
+    ability: string;
+    dc: number;
+    /** Absent when the DM declared the outcome without a number. */
+    die?: number;
+    total?: number;
+    saved: boolean;
+    attackName?: string;
+    attackerName?: string;
+  };
 }
 
 function stateMessage(state: AppState): string {
@@ -61,6 +77,12 @@ function stateMessage(state: AppState): string {
           isCurrentTurn: i === combat!.currentIndex,
           isDowned: c.isDowned,
           conditions: c.conditions,
+          // Ability modifiers, so the deck can roll a target's saving throw
+          // without a round trip. Absent when the creature has no scores;
+          // plugins older than v3.6 ignore the field.
+          saveMods: c.abilities
+            ? Object.fromEntries(ABILITY_KEYS.map((k) => [k, abilityMod(c.abilities![k])]))
+            : undefined,
           // Localized spell name the actor concentrates on, for the deck's
           // condition flow (labels arrive pre-translated, like action names).
           concentration: c.concentration
@@ -136,6 +158,7 @@ async function handleCommand(cmd: BridgeCommand): Promise<void> {
       return store.endCombat(ctx);
     case 'applyDamage':
       if (cmd.actorId && typeof cmd.amount === 'number') {
+        if (cmd.save) logDeckSave(cmd.actorId, cmd.save);
         return store.applyDamage(cmd.actorId, cmd.amount, ctx);
       }
       return;
@@ -171,6 +194,33 @@ async function handleCommand(cmd: BridgeCommand): Promise<void> {
     default:
       return;
   }
+}
+
+/**
+ * A saving throw the deck adjudicated, logged as its own entry just before
+ * the damage it caused — the same shape main/ipc.ts writes for the DM window
+ * and playerServer.ts writes for the player web app.
+ */
+function logDeckSave(
+  targetId: string,
+  save: NonNullable<BridgeCommand['save']>,
+): void {
+  const state = store.getState();
+  const target = state.combat?.combatants.find((c) => c.id === targetId);
+  if (!target) return;
+  void store.appendLog({
+    kind: 'save',
+    actorName: monsterName(state.settings.language, target.displayName),
+    actorType: target.type,
+    targetName: save.attackerName,
+    attackName: save.attackName,
+    ability: save.ability,
+    die: save.die,
+    total: save.total,
+    dc: save.dc,
+    outcome: save.saved ? 'saved' : 'failed',
+    source: 'deck',
+  });
 }
 
 /**

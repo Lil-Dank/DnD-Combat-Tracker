@@ -9,6 +9,14 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ### Changed
 
+- **The Stream Deck rolls saving throws too.** A save-based action now asks
+  Auto or Manual after the damage roll. Auto throws every target's d20 with
+  that creature's own modifier and shows each total against the DC; Manual
+  leaves them blank so a physically rolled total can be typed on the numpad,
+  with the modifier shown as a hint. Either way a target key opens the numpad
+  to correct one, the centre key re-rolls the area, and Apply waits until every
+  throw is in. Each one is logged, so a deck-run area attack now leaves the
+  same card as the DM window.
 - **The DM's attack modal rolls saving throws instead of just asking who made
   them.** A save-based action — a breath weapon, Fireball — now gets a row per
   target with a digital d20 button showing that target's modifier, a field for a

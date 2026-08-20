@@ -31,7 +31,7 @@ import type {
   Spell,
   SpellSlots,
 } from '../../../shared/types';
-import { DEFAULT_SETTINGS, abilityMod, normalizeSettings } from '../../../shared/types';
+import { ABILITY_KEYS, DEFAULT_SETTINGS, abilityMod, normalizeSettings } from '../../../shared/types';
 import { translate } from '../../../shared/i18n';
 import { rollD20, stripDiceResults, type RollMode } from '../../../shared/dice';
 import { spellToAction, spellActionName } from '../../../shared/spellAction';
@@ -125,6 +125,16 @@ interface BridgeCommand {
     die?: number;
     dice?: number[];
     total?: number;
+  };
+  /** Save-based applyDamage: the throw this target made (mirror of bridge.ts). */
+  save?: {
+    ability: string;
+    dc: number;
+    die?: number;
+    total?: number;
+    saved: boolean;
+    attackName?: string;
+    attackerName?: string;
   };
 }
 
@@ -530,6 +540,27 @@ export function createDemoApi(): Api {
       }
     }
     cur().combat = null;
+    save();
+  }
+
+  /** Mirror of bridge.ts logDeckSave: one saving throw the deck adjudicated. */
+  function logDeckSave(targetId: string, info: NonNullable<BridgeCommand['save']>): void {
+    const combat = cur().combat;
+    const target = combat?.combatants.find((c) => c.id === targetId);
+    if (!combat || !target) return;
+    pushLog(combat, {
+      kind: 'save',
+      actorName: target.displayName,
+      actorType: target.type,
+      targetName: info.attackerName,
+      attackName: info.attackName,
+      ability: info.ability,
+      die: info.die,
+      total: info.total,
+      dc: info.dc,
+      outcome: info.saved ? 'saved' : 'failed',
+      source: 'deck',
+    });
     save();
   }
 
@@ -1036,6 +1067,11 @@ export function createDemoApi(): Api {
             isCurrentTurn: i === combat.currentIndex,
             isDowned: c.isDowned,
             conditions: c.conditions,
+            // Mirror of bridge.ts: ability modifiers so the deck can roll a
+            // target's saving throw itself.
+            saveMods: c.abilities
+              ? Object.fromEntries(ABILITY_KEYS.map((k) => [k, abilityMod(c.abilities![k])]))
+              : undefined,
             // Mirror of bridge.ts: pre-localized concentration label.
             concentration: c.concentration
               ? (lang === 'de' && c.concentration.deName) || c.concentration.name
@@ -1087,7 +1123,11 @@ export function createDemoApi(): Api {
         logAttackRoll(cmd, 'deck');
         break;
       case 'applyDamage':
-        if (cmd.actorId && typeof cmd.amount === 'number') applyDamage(cmd.actorId, cmd.amount, deckCtx(cmd));
+        if (cmd.actorId && typeof cmd.amount === 'number') {
+          // Mirror of bridge.ts: a save-based action logs the throw first.
+          if (cmd.save) logDeckSave(cmd.actorId, cmd.save);
+          applyDamage(cmd.actorId, cmd.amount, deckCtx(cmd));
+        }
         break;
       case 'applyHeal':
         if (cmd.actorId && typeof cmd.amount === 'number') applyHeal(cmd.actorId, cmd.amount, deckCtx(cmd));

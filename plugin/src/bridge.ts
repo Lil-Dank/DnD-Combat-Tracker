@@ -41,6 +41,13 @@ export interface BridgeCombatant {
   conditions: string[];
   /** Localized spell name the actor is concentrating on, or null/absent. */
   concentration?: string | null;
+  /**
+   * Ability modifiers, so the save screen can roll a target's throw and show
+   * the modifier as a hint for a physical one. Absent on pre-3.6 apps and on
+   * creatures with no ability scores — the screen then offers manual entry
+   * only, with no hint.
+   */
+  saveMods?: Record<string, number>;
   attacks?: BridgeAttack[];
 }
 
@@ -67,6 +74,19 @@ export type BridgeCommand =
       math?: string;
       /** Damage type per bracket group of `math`, for log tinting. */
       mathTypes?: (string | null)[];
+      /**
+       * Save-based actions: the throw this target made, logged app-side as
+       * its own entry just before the damage.
+       */
+      save?: {
+        ability: string;
+        dc: number;
+        die?: number;
+        total?: number;
+        saved: boolean;
+        attackName?: string;
+        attackerName?: string;
+      };
     }
   | { type: 'applyHeal'; actorId: string; amount: number }
   | { type: 'toggleCondition'; actorId: string; condition: string }

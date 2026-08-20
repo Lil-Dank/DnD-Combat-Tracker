@@ -159,6 +159,11 @@
       "conditions": ["Poisoned"], // canonical English values (see below)
       "concentration": null,      // spell name being concentrated on
                                   // (localized to `language`), or null
+      "saveMods": {               // v3.6+; ability modifiers, so a client can
+        "str": -1, "dex": 2,      // roll this creature's saving throw itself.
+        "con": 0,  "int": -2,     // Absent when the creature has no scores.
+        "wis": 0,  "cha": -2
+      },
       "attacks": [                // rollable actions only
         {
           "id": "srd-2024_goblin.scimitar",
@@ -214,7 +219,12 @@
  "actorName":"Goblin 2",
  "actorType":"monster",
  "math":"1d6 [4] +2 = 6",
- "mathTypes":["slashing"]}</code></td>
+ "mathTypes":["slashing"],
+ "save":{"ability":"DEX","dc":11,
+         "die":14,"total":16,
+         "saved":true,
+         "attackName":"Acid Breath",
+         "attackerName":"Wyrmling"}}</code></td>
         <td>Damage floors at 0 HP; monsters die and leave the order, PCs go
           down. The trailing fields are optional: <code>actorName</code> /
           <code>actorType</code> / <code>math</code> (v2.2+) attribute the
@@ -223,7 +233,12 @@
           <code>mathTypes</code> (v3.1+) names the canonical damage type of
           each <code>[…]</code> bracket group in <code>math</code>, in order
           (<code>null</code> for unknown), so the log tints the rolled
-          numbers.</td>
+          numbers. <code>save</code> (v3.6+) reports the saving throw this
+          target made against a save-based action; the app writes it to the
+          log as its own entry immediately before the damage, so the card
+          matches one produced in the app window. Omit <code>die</code> when
+          the total was not rolled by the client (a physical d20 typed in),
+          and omit <code>total</code> too when only the verdict is known.</td>
       </tr>
       <tr>
         <td><code>applyHeal</code></td>

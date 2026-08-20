@@ -583,7 +583,7 @@ const en: Dict = {
   'attack.pickAttack': 'Pick an attack',
   'attack.rollAttack': '🎲 Roll Attack',
   'attack.rollDamage': '🎲 Roll Damage',
-  'attack.whoSaved': 'Who saved? →',
+  'attack.whoSaved': 'Saving throws →',
   'attack.apply': '⚔ Apply {total}',
 
   'dice.amount': 'Amount',
@@ -1131,7 +1131,7 @@ const de: Dict = {
   'attack.pickAttack': 'Angriff wählen',
   'attack.rollAttack': '🎲 Angriff würfeln',
   'attack.rollDamage': '🎲 Schaden würfeln',
-  'attack.whoSaved': 'Wer hat bestanden? →',
+  'attack.whoSaved': 'Rettungswürfe →',
   'attack.apply': '⚔ {total} anwenden',
 
   'dice.amount': 'Anzahl',

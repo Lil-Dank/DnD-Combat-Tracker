@@ -7,6 +7,14 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ## [Unreleased]
 
+### Fixed
+
+- Damage that arrives without an attack roll of its own — a saving throw, an
+  area spell, the dice roller — now shows the same dark composition row as a
+  weapon hit, with what was thrown, the total, and the per-die breakdown behind
+  the chevron. It previously rendered as a bare line of math, or as nothing at
+  all on the player phone.
+
 ## [3.5.0] — 2026-08-20
 
 ### Added

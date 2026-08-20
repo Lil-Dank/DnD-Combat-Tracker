@@ -323,7 +323,10 @@ export function createDemoApi(): Api {
 
   /** Mirror of main/state.ts pushLog: structured entries, rendered via i18n. */
   function pushLog(combat: Combat, entry: Omit<LogEntry, 'id' | 'ts' | 'round'>): void {
-    combat.log.push({ ...entry, id: uuid(), ts: Date.now(), round: combat.round });
+    // A fresh array, not a push: unlike the real app (whose state crosses IPC
+    // as new objects) the demo hands React these very objects, and the log
+    // view memoises on the array identity. Mutating in place renders nothing.
+    combat.log = [...combat.log, { ...entry, id: uuid(), ts: Date.now(), round: combat.round }];
   }
 
   function logTurn(combat: Combat, ctx: ActionCtx): void {
@@ -879,7 +882,8 @@ export function createDemoApi(): Api {
       }),
       entry({
         kind: 'damage', actorName: pName(0), actorType: 'pc', targetName: mName(0),
-        targetType: 'monster', amount: 7, source: 'player', round: 1,
+        targetType: 'monster', amount: 7, math: '1d8 [4] +3 = 7', mathTypes: ['piercing'],
+        source: 'player', round: 1,
       }),
       entry({ kind: 'turn', actorName: mName(0), actorType: 'monster', source: 'deck', round: 1 }),
       entry({
@@ -889,7 +893,8 @@ export function createDemoApi(): Api {
       }),
       entry({
         kind: 'damage', actorName: mName(0), actorType: 'monster', targetName: pName(0),
-        targetType: 'pc', amount: 6, source: 'deck', round: 1,
+        targetType: 'pc', amount: 6, math: '1d6 [4] +2 = 6', mathTypes: ['slashing'],
+        source: 'deck', round: 1,
       }),
       entry({
         kind: 'conditionAdded', targetName: mName(1), targetType: 'monster',
@@ -911,7 +916,7 @@ export function createDemoApi(): Api {
       {
         kind: 'damage', actorName: 'Owlbear 1', actorType: 'monster',
         targetName: 'Thorin Oakenshield', targetType: 'pc', amount: 14,
-        source: 'deck', round: 1,
+        math: '2d8 [5+4] +5 = 14', mathTypes: ['slashing'], source: 'deck', round: 1,
       },
       {
         kind: 'attackRoll', actorName: 'Thorin Oakenshield', actorType: 'pc',
@@ -921,7 +926,7 @@ export function createDemoApi(): Api {
       {
         kind: 'damage', actorName: 'Thorin Oakenshield', actorType: 'pc',
         targetName: 'Owlbear 1', targetType: 'monster', amount: 18,
-        source: 'player', round: 2,
+        math: '4d8 [6+2+5+1] +4 = 18', mathTypes: ['bludgeoning'], source: 'player', round: 2,
       },
       { kind: 'kill', targetName: 'Owlbear 1', targetType: 'monster', source: 'player', round: 2 },
       { kind: 'combatEnd', source: 'dm', round: 2 },
@@ -1115,6 +1120,9 @@ export function createDemoApi(): Api {
     attackName: string;
     damage: number;
     dc: number | undefined;
+    /** The roll behind the damage, so the log can show the composition. */
+    math: string | undefined;
+    mathTypes: (string | null)[] | undefined;
     /** Damage on a successful save (mirror of playerServer.ts). */
     onSuccess: 'half' | 'none';
     targetIds: string[];
@@ -1562,10 +1570,10 @@ export function createDemoApi(): Api {
       }
       if (action.type === 'save' || action.save) {
         const rolledSave = rollActionDamage(action, upcastExtraOf(action, cmd.slotLevel));
-        const damage =
-          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0
-            ? (cmd.damage as number)
-            : rolledSave.total;
+        // A typed-in total has no dice behind it, so nothing to show or reveal.
+        const savedManual =
+          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0;
+        const damage = savedManual ? (cmd.damage as number) : rolledSave.total;
         const pending: PendingSave = {
           id: uuid(),
           pcId,
@@ -1574,13 +1582,13 @@ export function createDemoApi(): Api {
           attackName: action.name,
           damage,
           dc: action.save?.dc,
+          math: savedManual ? undefined : rolledSave.math,
+          mathTypes: savedManual ? undefined : rolledSave.mathTypes,
           onSuccess: action.save?.onSuccess ?? 'half',
           targetIds,
           session,
         };
         pendingSaves.set(pending.id, pending);
-        const savedManual =
-          type === 'attackManual' && Number.isInteger(cmd.damage) && (cmd.damage as number) > 0;
         sendTo({
           type: 'savePending',
           id: pending.id,
@@ -1860,6 +1868,14 @@ export function createDemoApi(): Api {
           source: 'player',
           actorName: pending.actorName,
           actorType: 'pc',
+          // Mirror of playerServer.ts: a halved save still shows what was
+          // thrown, with the halving spelled out.
+          math: pending.math
+            ? r.saved
+              ? `${pending.math} → ½ ${amount}`
+              : pending.math
+            : undefined,
+          mathTypes: pending.mathTypes,
           sourceName: sourceNameFor(pending.pcId),
         });
       }

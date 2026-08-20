@@ -141,6 +141,52 @@ export function LogCards({
   const nameSpan = (name: string | undefined, type: CombatantType | undefined) =>
     name ? <b className={`sc seg-${type ?? 'none'}`}>{name}</b> : null;
 
+  /**
+   * The dark composition pill: "2d6 +4 = 19" with the total on the right, and
+   * the per-die breakdown behind a chevron when the entry still carries one.
+   * Shared by attack cards and by damage that arrived on its own (area spells,
+   * saving throws, the dice roller), so every roll reads the same.
+   */
+  const damageRow = (d: LogEntry, opts: { caption?: boolean } = {}) => {
+    const dmgType = entryDamageType(d);
+    const key = `dmg-${d.id}`;
+    // "2d6 [3+5] +4 = 12" → "2d6 +4" for the row; the full math expands.
+    // Redacted live math ("2d6 +4 = 12", no brackets) still shows what was
+    // thrown but has no per-die results left to reveal.
+    const formula = d.math
+      ? displayDice(lang, d.math.replace(/\s*\[[^\]]*\]/g, '').replace(/\s*=.*$/, ''))
+      : null;
+    const expands = !!d.math && d.math.includes('[');
+    return (
+      <div className="lb-dmg">
+        {opts.caption !== false && (
+          <span className="dmg-label sc">
+            {t('log.card.damageLabel')}
+            {dmgType && (
+              <>
+                {' — '}
+                <span className={`type dt-${dmgType}`}>{damageTypeLabel(lang, dmgType)}</span>
+              </>
+            )}
+          </span>
+        )}
+        <div
+          className={`lb-dmg-row ${open.has(key) ? 'open' : ''} ${expands ? '' : 'noclick'}`}
+          onClick={() => expands && toggle(key)}
+        >
+          {formula && <span className="formula tnum">{formula} =</span>}
+          <span className={`total tnum ${dmgType ? `dt-${dmgType}` : ''}`}>{d.amount}</span>
+          {expands && <span className="chev">▶</span>}
+        </div>
+        {expands && d.math && open.has(key) && (
+          <div className="lb-breakdown tnum">
+            <SegText segs={rollMathSegments(displayDice(lang, d.math), d.mathTypes)} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderAttack = (b: CardBlock & { kind: 'attack' }) => {
     const r = b.roll;
     const hasNumbers = r.total !== undefined;
@@ -152,15 +198,6 @@ export function LogCards({
     // Die-less manual totals have no composition to reveal ("= 18").
     const rollExpands = !!rollBreakdown && r.die !== undefined;
     const d = b.damage;
-    const dmgType = d ? entryDamageType(d) : null;
-    const dmgKey = d ? `dmg-${d.id}` : '';
-    // "2d6 [3+5] +4 = 12" → formula "2d6 +4" for the row; full math expands.
-    // Redacted live math ("2d6 +4 = 12", no brackets) still shows the thrown
-    // composition but has no per-die results left to expand.
-    const formula = d?.math
-      ? displayDice(lang, d.math.replace(/\s*\[[^\]]*\]/g, '').replace(/\s*=.*$/, ''))
-      : null;
-    const dmgExpands = !!d?.math && d.math.includes('[');
     return (
       <div key={b.key} className="log-block" data-kind="attack">
         {tools(r)}
@@ -208,32 +245,7 @@ export function LogCards({
             </span>
           </div>
         )}
-        {d && (
-          <div className="lb-dmg">
-            <span className="dmg-label sc">
-              {t('log.card.damageLabel')}
-              {dmgType && (
-                <>
-                  {' — '}
-                  <span className={`type dt-${dmgType}`}>{damageTypeLabel(lang, dmgType)}</span>
-                </>
-              )}
-            </span>
-            <div
-              className={`lb-dmg-row ${open.has(dmgKey) ? 'open' : ''} ${dmgExpands ? '' : 'noclick'}`}
-              onClick={() => dmgExpands && toggle(dmgKey)}
-            >
-              {formula && <span className="formula tnum">{formula} =</span>}
-              <span className={`total tnum ${dmgType ? `dt-${dmgType}` : ''}`}>{d.amount}</span>
-              {dmgExpands && <span className="chev">▶</span>}
-            </div>
-            {dmgExpands && d.math && open.has(dmgKey) && (
-              <div className="lb-breakdown tnum">
-                <SegText segs={rollMathSegments(displayDice(lang, d.math), d.mathTypes)} />
-              </div>
-            )}
-          </div>
-        )}
+        {d && damageRow(d)}
         {editor(r)}
         {d && editing === d.id && editor(d)}
       </div>
@@ -290,21 +302,18 @@ export function LogCards({
   const renderTextBlock = (b: CardBlock & { kind: 'take' | 'heal' | 'condition' | 'downkill' }) => {
     const e = b.entry;
     const cls = b.kind === 'downkill' ? 'log-block lb-down' : 'log-block';
-    // Unpaired damage with math (AoE spells, dice-roller hits): this line is
-    // the roll's only home, so show the composition here. Paired damage
-    // already renders its math on the attacker's card.
-    const showMath = b.kind === 'take' && !b.paired && !!e.math;
+    // Damage that arrived without an attack card of its own — a saving throw,
+    // an area spell, the dice roller — carries its roll here, because this
+    // line is the only place it can be shown. Paired damage already renders
+    // its pill on the attacker's card.
+    const ownRoll = b.kind === 'take' && !b.paired && !!e.math;
     return (
       <div key={b.key} className={cls} data-kind={b.kind}>
         {tools(e)}
         <div className="lb-effect">
           <SegText segs={logCardSegments(lang, e)} />
         </div>
-        {showMath && (
-          <div className="lb-breakdown tnum">
-            <SegText segs={rollMathSegments(displayDice(lang, e.math!), e.mathTypes)} />
-          </div>
-        )}
+        {ownRoll && damageRow(e, { caption: false })}
         {editor(e)}
       </div>
     );

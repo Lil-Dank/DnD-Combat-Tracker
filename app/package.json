@@ -11,7 +11,9 @@
     "build": "electron-vite build && npm run build:mobile",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "predist": "node scripts/free-release.cjs",
     "dist": "electron-vite build && npm run build:mobile && electron-builder --win",
+    "preunpack": "node scripts/free-release.cjs",
     "unpack": "electron-vite build && npm run build:mobile && electron-builder --win --dir",
     "build:mobile": "vite build -c vite.mobile.config.mts",
     "dev:mobile": "vite build -c vite.mobile.config.mts --watch"

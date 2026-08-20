@@ -17,7 +17,7 @@ import { PlayerWebQrModal } from './PlayerWebQrModal';
 import { PlayerSaveModal } from './PlayerSaveModal';
 import type { PlayerSavePendingInfo } from '../../preload/index';
 import { translate } from '../../shared/i18n';
-import { PALETTE_BY_ID } from '../../shared/brand';
+import { DEFAULT_PALETTE, PALETTE_BY_ID } from '../../shared/brand';
 import type { IconName } from '../../shared/icons';
 import { Icon } from '../../components/Icon';
 import { BrandLockup } from '../../components/BrandMark';
@@ -59,11 +59,19 @@ export function App() {
     // only — the Player View has its own fixed styling + background color).
     // data-scheme carries the light/dark trait, so rules that depend on the
     // ground key off it instead of enumerating every theme id.
+    // The Player View is projected or keyed and must never inherit the DM's
+    // theme — the body carries --font-ui and --bg, so PHB Style's serif and a
+    // parchment ground would otherwise reach the players' screen.
+    if (isPlayerView) {
+      document.documentElement.dataset.theme = DEFAULT_PALETTE;
+      document.documentElement.dataset.scheme = 'dark';
+      return;
+    }
     if (!state) return;
     const palette = PALETTE_BY_ID[state.settings.theme];
     document.documentElement.dataset.theme = state.settings.theme;
     document.documentElement.dataset.scheme = palette?.scheme ?? 'dark';
-  }, [state?.settings.theme]);
+  }, [state?.settings.theme, isPlayerView]);
 
   useEffect(() => {
     // A campaign switch invalidates cross-screen leftovers: a preselected

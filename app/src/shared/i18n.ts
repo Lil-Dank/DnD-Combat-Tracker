@@ -422,6 +422,8 @@ const en: Dict = {
   'mob.heal': 'Heal',
   'mob.attack': 'Attack',
   'mob.myAttacks': 'My Attacks',
+  /* Ellipsis: the button opens a sheet with more behind it. */
+  'mob.myAttacksMore': 'My attacks…',
   'mob.logTitle': 'Combat log',
   'mob.pickTargets': 'Pick target(s)',
   'mob.pickAttack': 'Pick an attack',
@@ -959,6 +961,7 @@ const de: Dict = {
   'mob.heal': 'Heilen',
   'mob.attack': 'Angriff',
   'mob.myAttacks': 'Meine Angriffe',
+  'mob.myAttacksMore': 'Meine Angriffe…',
   'mob.logTitle': 'Kampflog',
   'mob.pickTargets': 'Ziel(e) wählen',
   'mob.pickAttack': 'Angriff wählen',

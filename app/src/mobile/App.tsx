@@ -40,6 +40,8 @@ import type {
 import { PlayerSocket, deviceToken } from './ws';
 import { uuid } from '../shared/uuid';
 import { DamageEditor } from '../components/DamageEditor';
+import { Icon } from '../components/Icon';
+import type { IconName } from '../shared/icons';
 import { LogCards } from '../components/LogCards';
 
 type View =
@@ -223,22 +225,27 @@ export function App() {
                   disabled={!state.combatActive || (!canAct && !canSelfHp)}
                   onClick={() => setView({ id: 'hp', mode: 'damage' })}
                 >
-                  💥 {t('mob.damage')}
+                  <Icon name="burst" size={19} />
+                  {t('mob.damage')}
                 </button>
                 <button
                   disabled={!state.combatActive || (!canAct && !canSelfHp)}
                   onClick={() => setView({ id: 'hp', mode: 'heal' })}
                 >
-                  ✚ {t('mob.heal')}
+                  <Icon name="plus" size={19} />
+                  {t('mob.heal')}
                 </button>
                 <button
                   disabled={!state.combatActive || !canAct || you.attacks.filter(rollable).length === 0}
                   onClick={() => setView({ id: 'attack' })}
                 >
-                  ⚔ {t('mob.attack')}
+                  <Icon name="swords" size={19} />
+                  {t('mob.attack')}
                 </button>
-                <button onClick={() => setView({ id: 'myAttacks' })}>
-                  📝 {t('mob.myAttacks')}
+                {/* Navigation, not an action: no icon, and the ellipsis says
+                    there is more behind it. */}
+                <button className="ghost" onClick={() => setView({ id: 'myAttacks' })}>
+                  {t('mob.myAttacksMore')}
                 </button>
               </nav>
             </>
@@ -609,10 +616,11 @@ function CharacterCard({
       <PhoneSlotPips slots={you.spellSlots} />
       <div className="card-actions">
         <button className="big" onClick={onActions}>
-          📝 {t('mob.myAttacks')}
+          {t('mob.myAttacksMore')}
         </button>
         <button className="big" onClick={onSpellbook}>
-          📖 {t('spellbook.title')}
+          <Icon name="book" size={18} />
+          {t('spellbook.title')}
         </button>
         {you.spellSlots && (
           <button
@@ -670,7 +678,7 @@ function SpellbookSheet({
   );
 
   return (
-    <Sheet title={`📖 ${t('spellbook.title')}`} onClose={onClose} t={t}>
+    <Sheet title={t('spellbook.title')} icon="book" onClose={onClose} t={t}>
       {!spellList ? (
         <p className="muted">{t('mob.connecting')}</p>
       ) : spellList.length === 0 ? (
@@ -819,7 +827,7 @@ function HpFlow({
   const valid = targets.length > 0 && Number.isInteger(parsed) && parsed >= 1 && parsed <= 999;
 
   return (
-    <Sheet title={`${mode === 'damage' ? '💥' : '✚'} ${t(`mob.${mode}`)}`} onClose={onCancel} t={t}>
+    <Sheet title={t(`mob.${mode}`)} icon={mode === 'damage' ? 'burst' : 'plus'} onClose={onCancel} t={t}>
       <h3>{t('mob.pickTargets')}</h3>
       <div className="target-grid">
         {state.combatants
@@ -1245,7 +1253,7 @@ function AttackFlow({
   }
 
   return (
-    <Sheet title={`⚔ ${t('mob.attack')}`} onClose={onClose} t={t}>
+    <Sheet title={t('mob.attack')} icon="swords" onClose={onClose} t={t}>
       {!attack && (
         <>
           <h3>{t('mob.pickAttack')}</h3>
@@ -1648,7 +1656,7 @@ function MyAttacks({
   }
 
   return (
-    <Sheet title={`📝 ${t('mob.myAttacks')}`} onClose={onClose} t={t}>
+    <Sheet title={t('mob.myAttacks')} onClose={onClose} t={t}>
       {!form && (
         <>
           <ul className="attack-list">
@@ -1696,10 +1704,12 @@ function MyAttacks({
               outline style so they read apart from the editor buttons. */}
           <div className="sheet-nav-row">
             <button className="big ghost" onClick={onSpellbook}>
-              📖 {t('spellbook.title')}
+              <Icon name="book" size={18} />
+              {t('spellbook.title')}
             </button>
             <button className="big ghost" onClick={onArchive}>
-              📜 {t('mob.archive')}
+              <Icon name="archive" size={18} />
+              {t('mob.archive')}
             </button>
           </div>
         </>
@@ -1959,12 +1969,15 @@ function LogList({ log, lang }: { log: LogEntry[]; lang: Lang }) {
 
 function Sheet({
   title,
+  icon,
   onClose,
   t,
   children,
   noBack = false,
 }: {
   title: string;
+  /** Matches the button that opened the sheet. */
+  icon?: IconName;
   onClose: () => void;
   t: (k: string) => string;
   children: React.ReactNode;
@@ -1979,7 +1992,10 @@ function Sheet({
             {t('common.back')}
           </button>
         )}
-        <h2>{title}</h2>
+        <h2>
+          {icon && <Icon name={icon} size={19} />}
+          {title}
+        </h2>
       </header>
       <div className="sheet-body">{children}</div>
     </div>

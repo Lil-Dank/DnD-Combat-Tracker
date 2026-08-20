@@ -954,6 +954,7 @@ h3 {
 }
 
 .lb-roll .die { font-size: 14px; color: var(--muted); }
+.lb-roll .formula { font-size: 13.5px; color: var(--muted); }
 .lb-roll .die.dropped { text-decoration: line-through; opacity: 0.45; }
 
 .lb-roll .total {

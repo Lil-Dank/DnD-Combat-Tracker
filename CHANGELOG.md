@@ -14,6 +14,10 @@ to its GitHub release, where the installer and the packed plugin are attached.
   weapon hit, with what was thrown, the total, and the per-die breakdown behind
   the chevron. It previously rendered as a bare line of math, or as nothing at
   all on the player phone.
+- The player phone now shows what was thrown. Every roll in the live combat log
+  carries its composition — `d20 + 5` on an attack, `3d4 +2` on damage — while
+  the individual die results stay DM-side. Attack rolls previously reached the
+  phone as a bare verdict with no dice at all.
 
 ## [3.5.0] — 2026-08-20
 

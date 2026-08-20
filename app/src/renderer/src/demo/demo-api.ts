@@ -533,8 +533,15 @@ export function createDemoApi(): Api {
     save();
   }
 
-  /** Log an attack roll reported by the deck sim (verdict phases only). */
-  function logAttackRoll(cmd: BridgeCommand): void {
+  /**
+   * Log an attack roll from any surface (verdict phases only) — the demo's
+   * stand-in for main/combatLog.ts, which the deck bridge and the DM's attack
+   * modal both reach through in the real app.
+   */
+  function logAttackRoll(
+    cmd: { phase?: string; roll?: BridgeCommand['roll'] },
+    source: LogSource,
+  ): void {
     const combat = cur().combat;
     const roll = cmd.roll;
     const outcome =
@@ -551,7 +558,7 @@ export function createDemoApi(): Api {
       dice: roll.dice && roll.dice.length > 1 ? roll.dice : undefined,
       total: roll.total,
       outcome,
-      source: 'deck',
+      source,
     });
     save();
   }
@@ -1064,7 +1071,7 @@ export function createDemoApi(): Api {
         break;
       case 'attackEvent':
         kenkuAttackEvent(cmd as unknown as { sourceId?: string; attackId: string; phase: string });
-        logAttackRoll(cmd);
+        logAttackRoll(cmd, 'deck');
         break;
       case 'applyDamage':
         if (cmd.actorId && typeof cmd.amount === 'number') applyDamage(cmd.actorId, cmd.amount, deckCtx(cmd));
@@ -1193,21 +1200,22 @@ export function createDemoApi(): Api {
   }
 
   function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
-    // Mirror of the real server: live rolls keep their thrown composition
-    // ("2d6 +4") but lose the per-die results; attack-roll numbers stay
-    // DM-side. Archived fights skip the filter entirely.
-    return log.map((e) =>
-      e.kind === 'attackRoll' || e.math !== undefined
-        ? {
-            ...e,
-            die: undefined,
-            dice: undefined,
-            total: e.kind === 'attackRoll' ? undefined : e.total,
-            math: e.math === undefined ? undefined : stripDiceResults(e.math),
-            // mathTypes stays: damage type is table knowledge too.
-          }
-        : e,
-    );
+    // Mirror of playerServer.ts: no breakdown, always the composition.
+    return log.map((e) => {
+      if (e.kind === 'attackRoll') {
+        return { ...e, die: undefined, dice: undefined, total: undefined, math: attackComposition(e) };
+      }
+      if (e.math === undefined) return e;
+      return { ...e, die: undefined, dice: undefined, math: stripDiceResults(e.math) };
+    });
+  }
+
+  /** "d20 + 5" — the throw, without what it came up or what it totalled. */
+  function attackComposition(e: LogEntry): string | undefined {
+    if (e.die === undefined || e.total === undefined) return undefined;
+    const mod = e.total - e.die;
+    if (mod === 0) return 'd20';
+    return `d20 ${mod > 0 ? '+' : '−'} ${Math.abs(mod)}`;
   }
 
   function playerStateMessage(session: PlayerSession): string {
@@ -2116,7 +2124,10 @@ export function createDemoApi(): Api {
     endCombat: async () => endCombatShared(),
     nextTurn: async () => nextTurn(),
     prevTurn: async () => prevTurn(),
-    applyDamage: async (id, amount) => applyDamage(id, amount),
+    // The ctx carries the roll the attack modal just made — dropping it left
+    // every DM-side damage entry in the demo with no composition to show.
+    applyDamage: async (id, amount, ctx) =>
+      applyDamage(id, amount, { source: 'dm', ...(ctx ?? {}) }),
     applyHeal: async (id, amount) => applyHeal(id, amount),
     toggleCondition: async (id, condition) => toggleCondition(id, condition),
     removeCombatant: async (id) => {
@@ -2194,7 +2205,10 @@ export function createDemoApi(): Api {
     kenkuStopAll: async () => demoKenkuStopAll(),
     kenkuSoundPlayback: async () => demoKenkuPlayback(),
     kenkuCheckConnection: async () => true,
-    kenkuAttackEvent: async (payload) => kenkuAttackEvent(payload),
+    kenkuAttackEvent: async (payload) => {
+      kenkuAttackEvent(payload);
+      logAttackRoll(payload, 'dm');
+    },
 
     updateSettings: async (patch) => {
       data.settings = { ...data.settings, ...patch };

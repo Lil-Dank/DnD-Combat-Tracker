@@ -219,28 +219,39 @@ function isBloodied(c: Combatant): boolean {
   return c.currentHp < c.maxHp * 0.5;
 }
 
-/**
- * The player log filter: no dice compositions on player surfaces. Attack-roll
- * numbers and damage math stay DM-side; save totals remain (table-announced).
- */
 function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
-  // Live-combat redaction: attack-roll numbers stay DM-side, and damage math
-  // keeps its composition ("2d6 +4" — what was thrown is table knowledge) but
-  // loses the per-die results in the brackets. Save totals remain - they're
-  // table-announced. Archived fights skip this filter entirely: once combat
-  // is over, players may browse the full breakdowns in Past Combats.
-  return log.map((e) =>
-    e.kind === 'attackRoll' || e.math !== undefined
-      ? {
-          ...e,
-          die: undefined,
-          dice: undefined,
-          total: e.kind === 'attackRoll' ? undefined : e.total,
-          math: e.math === undefined ? undefined : stripDiceResults(e.math),
-          // mathTypes stays: the damage TYPE is table knowledge too.
-        }
-      : e,
-  );
+  // One rule: players never see a dice-throw BREAKDOWN, but they always see
+  // its COMPOSITION.
+  //   composition — what was thrown:            2d8 +2
+  //   breakdown   — what each die came up:      2d8 [4+2] +2 = 8
+  // So the bracket groups go, the individual d20 results go, and an attack
+  // roll — which carries no math of its own — is given its composition here
+  // so the phone has something to show beside the verdict.
+  //
+  // This is live combat only. Archived fights skip the filter entirely: once
+  // the fight is over, players may browse the full breakdowns in Past Combats.
+  return log.map((e) => {
+    if (e.kind === 'attackRoll') {
+      return {
+        ...e,
+        die: undefined,
+        dice: undefined,
+        total: undefined,
+        math: attackComposition(e),
+      };
+    }
+    if (e.math === undefined) return e;
+    // mathTypes stays: the damage TYPE is table knowledge too.
+    return { ...e, die: undefined, dice: undefined, math: stripDiceResults(e.math) };
+  });
+}
+
+/** "d20 + 5" — the throw, without what it came up or what it totalled. */
+function attackComposition(e: LogEntry): string | undefined {
+  if (e.die === undefined || e.total === undefined) return undefined;
+  const mod = e.total - e.die;
+  if (mod === 0) return 'd20';
+  return `d20 ${mod > 0 ? '+' : '−'} ${Math.abs(mod)}`;
 }
 
 function playerStateMessage(state: AppState, info: SocketInfo): string {

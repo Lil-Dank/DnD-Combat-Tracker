@@ -237,9 +237,11 @@ export function LogCards({
             )}
           </>
         ) : (
-          // Redacted (phones): the verdict is public, the numbers are not.
+          // Phones: the composition and the verdict are public, the d20 and
+          // the total are not — those are the breakdown.
           <div className="lb-roll noclick">
             <span className="lbl">{t('log.card.attack')}</span>
+            {r.math && <span className="formula tnum">{displayDice(lang, r.math)}</span>}
             <span className={`verdict solo ${r.outcome ?? 'hit'}`}>
               {t(`log.card.outcome.${r.outcome ?? 'hit'}`)}
             </span>

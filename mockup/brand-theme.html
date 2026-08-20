@@ -43,6 +43,9 @@
   --conc: #a98be0;
 }
 .ui[data-scheme="light"] {
+  /* On bright grounds a 9%-alpha hairline vanishes — panels need real edges. */
+  --border-soft: color-mix(in oklab, var(--brand-text) 26%, transparent);
+  --row-hover: color-mix(in oklab, var(--brand-text) 8%, transparent);
   --danger: #c02626; --danger-soft: #a41c1c; --success: #16803c; --heal-color: #15803d;
   --pc-color: #2158c8; --monster-color: #a85a0e; --warn: #a35709; --miss: #8f2f2f;
   --conc: #6d4bb0;
@@ -176,6 +179,14 @@ h2.sec { font-size: 11.5px; letter-spacing: 1.2px; text-transform: uppercase; co
 .roll .vd { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--danger); }
 
 /* ---- specimen strips ---------------------------------------------------- */
+.lab { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
+.lab .cell { border: 1px solid #2a2a31; border-radius: 9px; overflow: hidden; }
+.lab .cell h5 { margin: 0; padding: 5px 9px; font-size: 10.5px; letter-spacing: .6px;
+  text-transform: uppercase; color: #7f858f; background: #16161a; font-weight: 600; }
+.lab .sb { background: var(--bg-panel); padding: 12px 10px; }
+.lab .sb + .sb { border-top: 1px solid var(--border); }
+.labname { font-size: 12px; color: #9aa0aa; margin: 12px 0 5px; }
+.labname b { color: #e8eaed; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(600px, 1fr)); gap: 16px; }
 .grid .gcap { font-size: 12px; color: #9aa0aa; margin: 0 0 5px; }
 .grid .gcap b { color: #e8eaed; font-weight: 600; }
@@ -211,7 +222,10 @@ Untick palettes to cut the set down to eight.</p>
     <label><input type="radio" name="ico" value="emoji"> today's emoji</label>
   </fieldset>
   <fieldset><b>Lock-up mark</b>
-    <label><input type="radio" name="lock" value="tile" checked> on tile</label>
+    <label><input type="radio" name="lock" value="tile" checked> tile</label>
+    <label><input type="radio" name="lock" value="inverse"> inverse</label>
+    <label><input type="radio" name="lock" value="shadow"> shadow</label>
+    <label><input type="radio" name="lock" value="stroke"> stroke</label>
     <label><input type="radio" name="lock" value="bare"> bare</label>
   </fieldset>
   <fieldset><b>Monsters glyph</b>
@@ -229,6 +243,9 @@ Untick palettes to cut the set down to eight.</p>
 <h2 class="sec">Sidebar icon set — 20px, the size that ships, and 32px to check the drawing</h2>
 <div class="iconwall ui" id="icons"></div>
 
+<h2 class="sec">Lock-up treatments — 28px as it ships, and 2× to inspect</h2>
+<div id="locklab"></div>
+
 <h2 class="sec">All palettes side by side — sidebar, active nav, current turn</h2>
 <div class="grid" id="grid"></div>
 
@@ -244,22 +261,28 @@ Untick palettes to cut the set down to eight.</p>
 const PALETTES = [
   { id:'arcane-gold', label:'Arcane gold', note:'Deep violet stack, gold on the active turn', scheme:'dark',
     tile:'#F4EFE4', ground:'#1B1730', back1:'#5A52A0', back2:'#443C7E', front:'#2A2450',
-    dot:'#8B84C4', accent:'#E0A33A', bar2:'#6B62A8', text:'#EFECFA', textMuted:'#A9A2D6', turn:'#A99BE8' },
+    dot:'#8B84C4', accent:'#E0A33A', bar2:'#6B62A8', text:'#EFECFA', textMuted:'#A9A2D6', turn:'#A99BE8',
+    on:{back1:'#443C7E',back2:'#8B84C4',front:'#EFECFA',dot:'#443C7E',accent:'#B7801F',bar2:'#8B84C4'}  },
   { id:'ember-slate', label:'Ember slate', note:'Cold slate, one ember', scheme:'dark',
     tile:'#EDEAE4', ground:'#1A1D21', back1:'#6E7783', back2:'#4A5058', front:'#2E333A',
-    dot:'#9AA3AD', accent:'#E2603A', bar2:'#6E7783', text:'#EDF1F4', textMuted:'#98A2AC', turn:'#6EA8D8' },
+    dot:'#9AA3AD', accent:'#E2603A', bar2:'#6E7783', text:'#EDF1F4', textMuted:'#98A2AC', turn:'#6EA8D8',
+    on:{back1:'#4A5058',back2:'#8A929C',front:'#EDF1F4',dot:'#4A5058',accent:'#C24A26',bar2:'#8A929C'}  },
   { id:'verdant-brass', label:'Verdant brass', note:'Deep green field, brass fittings', scheme:'dark',
     tile:'#E9F0EA', ground:'#12261F', back1:'#3F7461', back2:'#2F5C4C', front:'#1C3E34',
-    dot:'#7FB49B', accent:'#D9A441', bar2:'#4E8570', text:'#E6F1EA', textMuted:'#9FCBB6', turn:'#7FD4B0' },
+    dot:'#7FB49B', accent:'#D9A441', bar2:'#4E8570', text:'#E6F1EA', textMuted:'#9FCBB6', turn:'#7FD4B0',
+    on:{back1:'#2F5C4C',back2:'#7FB49B',front:'#E6F1EA',dot:'#2F5C4C',accent:'#B8892B',bar2:'#7FB49B'}  },
   { id:'violet-ink', label:'Violet ink', note:'Neutral near-black, arcane violet — the look today’s users know', scheme:'dark',
     tile:'#EFEDF2', ground:'#17161B', back1:'#6B5F86', back2:'#4A4160', front:'#26222F',
-    dot:'#9C90B8', accent:'#A96AF5', bar2:'#6B5F86', text:'#ECEAF2', textMuted:'#9E98AC', turn:'#E0B341' },
+    dot:'#9C90B8', accent:'#A96AF5', bar2:'#6B5F86', text:'#ECEAF2', textMuted:'#9E98AC', turn:'#E0B341',
+    on:{back1:'#4A4160',back2:'#9C90B8',front:'#ECEAF2',dot:'#4A4160',accent:'#8A4FD0',bar2:'#9C90B8'}  },
   { id:'midnight-cyan', label:'Midnight cyan', note:'Navy depth, cyan signal', scheme:'dark',
     tile:'#E8EDF2', ground:'#0F1E2B', back1:'#3C5877', back2:'#27405C', front:'#142639',
-    dot:'#7FA0C0', accent:'#3FC8D9', bar2:'#3C5877', text:'#E4ECF3', textMuted:'#8FAEC9', turn:'#F2A81E' },
+    dot:'#7FA0C0', accent:'#3FC8D9', bar2:'#3C5877', text:'#E4ECF3', textMuted:'#8FAEC9', turn:'#F2A81E',
+    on:{back1:'#27405C',back2:'#7FA0C0',front:'#E4ECF3',dot:'#27405C',accent:'#199FB2',bar2:'#7FA0C0'}  },
   { id:'parchment-inverted', label:'Parchment inverted', note:'Cream cards on a dark table', scheme:'dark',
     tile:'#241F2E', ground:'#241F2E', back1:'#8A7F66', back2:'#C4B99E', front:'#F2E9D4',
-    dot:'#8A7F66', accent:'#B5433A', bar2:'#C4B99E', text:'#F2E9D4', textMuted:'#B3A88E', turn:'#C4B99E' },
+    dot:'#8A7F66', accent:'#B5433A', bar2:'#C4B99E', text:'#F2E9D4', textMuted:'#B3A88E', turn:'#C4B99E',
+    on:{back1:'#8A7F66',back2:'#C4B99E',front:'#F2E9D4',dot:'#8A7F66',accent:'#B5433A',bar2:'#C4B99E'}  },
   { id:'steel-amber', label:'Steel amber', note:'Blue-grey steel, amber warning light', scheme:'dark',
     tile:'#ECEEF0', ground:'#1B222B', back1:'#566575', back2:'#3B4757', front:'#232C38',
     dot:'#93A3B4', accent:'#F2A81E', bar2:'#566575', text:'#EAEFF4', textMuted:'#9BAABA', turn:'#93C3E4' },
@@ -275,9 +298,12 @@ PALETTES.push(
   { id:'phb', label:'PHB Style', note:'Parchment and dark-red headings — unchanged, plus a distinct turn colour', scheme:'light', group:'paper',
     tile:'#58180d', ground:'#eee5ce', back1:'#c9ad6a', back2:'#e0cfa6', front:'#f9f2e2',
     dot:'#8a7f66', accent:'#58180d', bar2:'#a08a63', text:'#23180f', textMuted:'#6f5b3e', turn:'#8a5a12',
+    on:{back1:'#3B4757',back2:'#93A3B4',front:'#EAEFF4',dot:'#3B4757',accent:'#C98209',bar2:'#93A3B4'},
+    on:{back1:'#4E2F5A',back2:'#A588B0',front:'#F1E9F4',dot:'#4E2F5A',accent:'#17A97A',bar2:'#A588B0'},
+    on:{back1:'#c9ad6a',back2:'#a08a63',front:'#58180d',dot:'#f9f2e2',accent:'#f2c14e',bar2:'#c9ad6a'},
     pin: {
       '--bg':'#eee5ce', '--bg-panel':'#fdf1dc', '--bg-panel-2':'#e9dbbd', '--border':'#c9ad6a',
-      '--border-soft':'rgba(121,94,45,.3)', '--row-hover':'rgba(201,173,106,.18)',
+      '--border-soft':'rgba(121,94,45,.5)', '--row-hover':'rgba(201,173,106,.18)',
       '--text':'#23180f', '--text-muted':'#6f5b3e', '--accent':'#58180d', '--accent-dim':'#722f1e',
       '--danger':'#9c2b1b', '--danger-soft':'#9c2b1b', '--success':'#2f6b31', '--heal-color':'#2f6b31',
       '--pc-color':'#2a4b8d', '--monster-color':'#8a4b12', '--badge-bg':'#58180d',
@@ -288,9 +314,10 @@ PALETTES.push(
   { id:'light', label:'Light', note:'Plain light — unchanged, plus a distinct turn colour', scheme:'light', group:'paper',
     tile:'#1b1b1f', ground:'#f4f4f6', back1:'#6b6b76', back2:'#a1a1aa', front:'#f4f4f6',
     dot:'#6b6b76', accent:'#2563eb', bar2:'#a1a1aa', text:'#1b1b1f', textMuted:'#6b6b76', turn:'#b45309',
+    on:{back1:'#a1a1aa',back2:'#6b6b76',front:'#1b1b1f',dot:'#d4d4dc',accent:'#2563eb',bar2:'#6b6b76'},
     pin: {
       '--bg':'#f4f4f6', '--bg-panel':'#ffffff', '--bg-panel-2':'#ececf1', '--border':'#d4d4dc',
-      '--border-soft':'rgba(0,0,0,.09)', '--row-hover':'rgba(0,0,0,.045)',
+      '--border-soft':'rgba(0,0,0,.2)', '--row-hover':'rgba(0,0,0,.045)',
       '--text':'#1b1b1f', '--text-muted':'#6b6b76', '--accent':'#2563eb', '--accent-dim':'#1d4ed8',
       '--danger':'#dc2626', '--danger-soft':'#b91c1c', '--success':'#16a34a', '--heal-color':'#15803d',
       '--pc-color':'#2563eb', '--monster-color':'#c2600e', '--badge-bg':'#e0e7ff',
@@ -316,18 +343,26 @@ const onColor = (bg, p) => contrast(bg, p.text) >= contrast(bg, p.ground) ? p.te
    bar close up below ~36px, so they go. */
 function markSvg(size, opts = {}) {
   const full = size >= 40;
-  const tile = opts.tile !== false;
+  // treatment: tile | inverse | shadow | stroke | bare
+  const tr = opts.treatment ?? (opts.tile === false ? 'bare' : 'tile');
+  const tile = tr === 'tile';
+  const inv = tr === 'inverse';
+  // `inverse` uses the palette's on-panel role set — light cards on a dark
+  // sidebar, dark cards on a light one. Straight from the proof sheet.
+  const V = (r) => inv ? `var(--on-${r === 'accent' ? 'accent-bar' : r})` : `var(--brand-${r})`;
+  // A hairline in the panel colour keeps the cards apart when they sit bare.
+  const edge = tr === 'stroke' ? ' stroke="var(--bg-panel)" stroke-width="2.6"' : '';
   const card = (fill, rot) =>
-    `<rect x="14" y="35" width="72" height="26" rx="4" fill="${fill}"` +
+    `<rect x="14" y="35" width="72" height="26" rx="4" fill="${fill}"${edge}` +
     (rot ? ` transform="rotate(${rot} 18 48)"` : '') + '/>';
   const art = full
-    ? card('var(--brand-back-1)', -19) + card('var(--brand-back-2)', 19) + card('var(--brand-front)', 0) +
-      '<circle cx="28" cy="48" r="6.5" fill="var(--brand-dot)"/>' +
-      '<rect x="40" y="41" width="34" height="5" rx="2.5" fill="var(--brand-accent)"/>' +
-      '<rect x="40" y="50" width="21" height="5" rx="2.5" fill="var(--brand-bar-2)"/>'
-    : card('var(--brand-back-1)', 17) + card('var(--brand-front)', 0) +
-      '<circle cx="30" cy="48" r="8" fill="var(--brand-dot)"/>' +
-      '<rect x="44" y="43" width="32" height="10" rx="5" fill="var(--brand-accent)"/>';
+    ? card(V('back-1'), -19) + card(V('back-2'), 19) + card(V('front'), 0) +
+      `<circle cx="28" cy="48" r="6.5" fill="${V('dot')}"/>` +
+      `<rect x="40" y="41" width="34" height="5" rx="2.5" fill="${V('accent')}"/>` +
+      `<rect x="40" y="50" width="21" height="5" rx="2.5" fill="${V('bar-2')}"/>`
+    : card(V('back-1'), 17) + card(V('front'), 0) +
+      `<circle cx="30" cy="48" r="8" fill="${V('dot')}"/>` +
+      `<rect x="44" y="43" width="32" height="10" rx="5" fill="${V('accent')}"/>`;
   // Framing copied from the signed-off proof sheet: a square viewport centred
   // on the stack, NOT a tight bbox — the air around the fan is part of the mark.
   const pad = tile ? 0 : 0.06;
@@ -335,7 +370,8 @@ function markSvg(size, opts = {}) {
   const s = (size * (1 - pad * 2)) / Math.max(box[2], box[3]);
   const tx = size / 2 - (box[0] + box[2] / 2) * s;
   const ty = size / 2 - (box[1] + box[3] / 2) * s;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deck of Many Turns">` +
+  const shadow = tr === 'shadow' ? ' style="filter:drop-shadow(0 1.5px 2.5px rgba(0,0,0,.5))"' : '';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"${shadow} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deck of Many Turns">` +
     (tile ? `<rect width="${size}" height="${size}" rx="${(size * 0.21).toFixed(2)}" fill="var(--brand-tile)"/>` : '') +
     `<g transform="translate(${tx.toFixed(3)},${ty.toFixed(3)}) scale(${s.toFixed(4)})">${art}</g></svg>`;
 }
@@ -390,13 +426,15 @@ const FOOT = [
 
 /* ---- render -------------------------------------------------------------- */
 let monsterGlyph = 'horns';
-let lockupTile = true;
+let lockupTr = 'tile';
 const seedCss = p => [
   `--brand-tile:${p.tile}`, `--brand-ground:${p.ground}`, `--brand-back-1:${p.back1}`,
   `--brand-back-2:${p.back2}`, `--brand-front:${p.front}`, `--brand-dot:${p.dot}`,
   `--brand-accent:${p.accent}`, `--brand-bar-2:${p.bar2}`, `--brand-text:${p.text}`,
   `--brand-text-muted:${p.textMuted}`, `--brand-turn:${p.turn}`,
   `--on-accent:${onColor(mix(p.accent, p.ground, 0.24), p)}`,
+  `--on-back-1:${p.on.back1}`, `--on-back-2:${p.on.back2}`, `--on-front:${p.on.front}`,
+  `--on-dot:${p.on.dot}`, `--on-accent-bar:${p.on.accent}`, `--on-bar-2:${p.on.bar2}`,
   ...Object.entries(p.pin ?? {}).map(([k, v]) => `${k}:${v}`),
 ].join(';');
 
@@ -416,7 +454,7 @@ function appFragment(p, compact) {
   return `
   <div class="app ui" data-scheme="${p.scheme}" style="${seedCss(p)}">
     <nav class="sidebar">
-      <div class="lockup">${markSvg(28, { tile: lockupTile })}
+      <div class="lockup">${markSvg(28, { treatment: lockupTr })}
         <span class="wordmark"><span class="l1">DECK OF MANY</span><span class="l2">TURNS</span></span>
       </div>
       <div class="camp">Main Campaign</div>
@@ -462,6 +500,19 @@ function render() {
         </div>
         ${appFragment(p)}
       </section>`).join('');
+
+  const TREATMENTS = ['tile', 'inverse', 'shadow', 'stroke', 'bare'];
+  document.getElementById('locklab').innerHTML = shown.slice(0, 4).map(p => `
+    <p class="labname"><b>${p.label}</b></p>
+    <div class="lab ui" data-scheme="${p.scheme}" style="${seedCss(p)}">
+      ${TREATMENTS.map(tr => `
+        <div class="cell">
+          <h5>${tr}</h5>
+          <div class="sb"><div class="lockup">${markSvg(28, { treatment: tr })}
+            <span class="wordmark"><span class="l1">DECK OF MANY</span><span class="l2">TURNS</span></span></div></div>
+          <div class="sb" style="display:flex;justify-content:center">${markSvg(56, { treatment: tr })}</div>
+        </div>`).join('')}
+    </div>`).join('');
 
   document.getElementById('grid').innerHTML = shown.map(p => `
     <div>
@@ -519,7 +570,7 @@ document.getElementById('pals').addEventListener('change', () => { refreshCount(
 document.querySelectorAll('input[name=nav], input[name=ico]').forEach(r =>
   r.addEventListener('change', applyToggles));
 document.querySelectorAll('input[name=lock]').forEach(r =>
-  r.addEventListener('change', e => { lockupTile = e.target.value === 'tile'; render(); }));
+  r.addEventListener('change', e => { lockupTr = e.target.value; render(); }));
 document.querySelectorAll('input[name=mon]').forEach(r =>
   r.addEventListener('change', e => { monsterGlyph = e.target.value; render(); }));
 

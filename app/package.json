@@ -12,6 +12,7 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "dist": "electron-vite build && npm run build:mobile && electron-builder --win",
+    "unpack": "electron-vite build && npm run build:mobile && electron-builder --win --dir",
     "build:mobile": "vite build -c vite.mobile.config.mts",
     "dev:mobile": "vite build -c vite.mobile.config.mts --watch"
   },

@@ -754,6 +754,7 @@ npm install
 npm run dev        # live-reload dev session
 npm run dev:mobile # (second terminal) rebuild the player web bundle on change
 npm run build      # compile main/preload/renderer + player web bundle to out/
+npm run unpack     # → release/win-unpacked/ — runnable, no installer
 npm run dist       # → release/Deck of Many Turns Setup 3.5.1.exe (NSIS)
 ```
 

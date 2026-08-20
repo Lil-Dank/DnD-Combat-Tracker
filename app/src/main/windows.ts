@@ -1,6 +1,7 @@
 import { app, BrowserWindow, screen, shell } from 'electron';
 import * as path from 'path';
 import { JsonValue } from './storage';
+import { groundFor } from '../shared/brand';
 
 interface PlayerWindowState {
   bounds: { x: number; y: number; width: number; height: number } | null;
@@ -37,7 +38,8 @@ function loadRenderer(win: BrowserWindow, hash: string): void {
   }
 }
 
-export function createDmWindow(): BrowserWindow {
+/** `theme` only sets the pre-paint colour; the renderer takes over after. */
+export function createDmWindow(theme?: string): BrowserWindow {
   dmWindow = new BrowserWindow({
     icon: appIcon(),
     width: 1280,
@@ -47,7 +49,9 @@ export function createDmWindow(): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     title: 'Deck of Many Turns — DM',
-    backgroundColor: '#14101c',
+    // Pre-paint colour: reading the stored theme keeps launch from
+    // flashing one palette's ground before another one renders.
+    backgroundColor: groundFor(theme),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

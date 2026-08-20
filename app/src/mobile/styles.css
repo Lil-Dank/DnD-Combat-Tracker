@@ -1,23 +1,8 @@
 /* Player companion — mobile-first, thumb-friendly, dark. */
 
-:root {
-  --bg: #1a1423;
-  --panel: #262033;
-  --panel-2: #322a42;
-  --border: #453a5c;
-  --text: #efe9f7;
-  --muted: #a89ec2;
-  --accent: #c0392b;
-  --accent-2: #e74c3c;
-  --good: #4caf7d;
-  --bad: #e05555;
-  --gold: #d4af37;
-  --pc-color: #3b82f6;
-  --pc-tint: rgba(59, 130, 246, 0.14);
-  --monster-color: #d97706;
-  --monster-tint: rgba(217, 119, 6, 0.1);
-  --miss: #a03d3d;
-}
+/* Palette comes from assets/themes.css: the DM window's derivation block
+   declares --panel/--muted/--good/--bad and friends as aliases, so these
+   rules keep their own names. index.html pins the phone to one palette. */
 
 * {
   margin: 0;
@@ -285,7 +270,7 @@ h3 {
 }
 
 .init-row.current {
-  border-color: var(--gold);
+  border-color: var(--turn);
   background: var(--panel-2);
 }
 
@@ -562,20 +547,6 @@ h3 {
   font-size: 17px;
 }
 
-/* Damage-type tints (dt-<canonical type>), matching the DM window. */
-.dt-fire { color: #e0623c; }
-.dt-cold { color: #58a6d8; }
-.dt-lightning { color: #d8b93f; }
-.dt-thunder { color: #9d8fc0; }
-.dt-poison { color: #58b86a; }
-.dt-acid { color: #96b83a; }
-.dt-necrotic { color: #9d6fd0; }
-.dt-radiant { color: #e0c060; }
-.dt-psychic { color: #d070b8; }
-.dt-force { color: #7a9fe0; }
-.dt-bludgeoning { color: #b09a78; }
-.dt-piercing { color: #93a8bc; }
-.dt-slashing { color: #c08878; }
 
 .action-bar {
   position: fixed;

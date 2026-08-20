@@ -90,10 +90,10 @@ app.whenReady().then(async () => {
   startPlayerServer();
   store.onCombatEvent(handleCombatEvent);
   startKenkuStatusPolling();
-  createDmWindow();
+  createDmWindow(store.getState().settings.theme);
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createDmWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createDmWindow(store.getState().settings.theme);
   });
 });
 

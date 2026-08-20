@@ -23,7 +23,7 @@ import type {
   Spell,
   SpellSlots,
 } from '../shared/types';
-import { DEFAULT_SETTINGS } from '../shared/types';
+import { DEFAULT_SETTINGS, normalizeSettings } from '../shared/types';
 import { monsterName } from '../shared/i18n';
 import { applyLogEntryDelete, applyLogEntryEdit } from '../shared/logEdit';
 import { migrateActions } from './migrate';
@@ -120,13 +120,7 @@ export class AppStore {
     // Fill in any settings keys added after the file was first written.
     // Nested sections (kenku, playerWeb) merge sub-keys explicitly - a stored
     // file from before a new sub-key was added must still pick up its default.
-    const stored = this.settings.get();
-    await this.settings.set({
-      ...DEFAULT_SETTINGS,
-      ...stored,
-      kenku: { ...DEFAULT_SETTINGS.kenku, ...(stored.kenku ?? {}) },
-      playerWeb: { ...DEFAULT_SETTINGS.playerWeb, ...(stored.playerWeb ?? {}) },
-    });
+    await this.settings.set(normalizeSettings(this.settings.get()));
     // Legacy attack schema in the (global) monster library.
     for (const m of this.monsters.list()) {
       const migrated = migrateActions(m.attacks as unknown[]);

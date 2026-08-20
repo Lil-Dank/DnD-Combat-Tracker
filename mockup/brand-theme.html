@@ -263,13 +263,41 @@ const PALETTES = [
   { id:'steel-amber', label:'Steel amber', note:'Blue-grey steel, amber warning light', scheme:'dark',
     tile:'#ECEEF0', ground:'#1B222B', back1:'#566575', back2:'#3B4757', front:'#232C38',
     dot:'#93A3B4', accent:'#F2A81E', bar2:'#566575', text:'#EAEFF4', textMuted:'#9BAABA', turn:'#93C3E4' },
-  { id:'ink-bone', label:'Ink and bone', note:'Monochrome — accent is bone white', scheme:'dark',
-    tile:'#EFEDE8', ground:'#141312', back1:'#8E8B84', back2:'#57544E', front:'#1B1A18',
-    dot:'#A8A49C', accent:'#F5F2EA', bar2:'#57544E', text:'#F2EFE8', textMuted:'#9A968E', turn:'#C9A227' },
   { id:'plum-mint', label:'Plum and mint', note:'Plum stack, mint highlight', scheme:'dark',
     tile:'#F0EBF2', ground:'#1E1226', back1:'#6B4677', back2:'#4E2F5A', front:'#2E1A38',
     dot:'#A588B0', accent:'#4FD3A0', bar2:'#6B4677', text:'#F1E9F4', textMuted:'#B9A0C3', turn:'#C79BD6' },
 ];
+
+/* PHB Style and Light keep their hand-authored UI values via `pin`, and carry
+   brand tokens so the mark and lock-up recolour for them too. On a light panel
+   the mark wants the inverse role assignment: light cards on a dark tile. */
+PALETTES.push(
+  { id:'phb', label:'PHB Style', note:'Parchment and dark-red headings — unchanged, plus a distinct turn colour', scheme:'light', group:'paper',
+    tile:'#58180d', ground:'#eee5ce', back1:'#c9ad6a', back2:'#e0cfa6', front:'#f9f2e2',
+    dot:'#8a7f66', accent:'#58180d', bar2:'#a08a63', text:'#23180f', textMuted:'#6f5b3e', turn:'#8a5a12',
+    pin: {
+      '--bg':'#eee5ce', '--bg-panel':'#fdf1dc', '--bg-panel-2':'#e9dbbd', '--border':'#c9ad6a',
+      '--border-soft':'rgba(121,94,45,.3)', '--row-hover':'rgba(201,173,106,.18)',
+      '--text':'#23180f', '--text-muted':'#6f5b3e', '--accent':'#58180d', '--accent-dim':'#722f1e',
+      '--danger':'#9c2b1b', '--danger-soft':'#9c2b1b', '--success':'#2f6b31', '--heal-color':'#2f6b31',
+      '--pc-color':'#2a4b8d', '--monster-color':'#8a4b12', '--badge-bg':'#58180d',
+      '--badge-border':'#c9ad6a', '--badge-text':'#f9ecd9', '--warn':'#8a5a12', '--miss':'#7a2c20',
+      '--conc':'#5b3a86',
+      '--font-ui':"'Book Antiqua','Palatino Linotype',Palatino,Georgia,serif",
+    } },
+  { id:'light', label:'Light', note:'Plain light — unchanged, plus a distinct turn colour', scheme:'light', group:'paper',
+    tile:'#1b1b1f', ground:'#f4f4f6', back1:'#6b6b76', back2:'#a1a1aa', front:'#f4f4f6',
+    dot:'#6b6b76', accent:'#2563eb', bar2:'#a1a1aa', text:'#1b1b1f', textMuted:'#6b6b76', turn:'#b45309',
+    pin: {
+      '--bg':'#f4f4f6', '--bg-panel':'#ffffff', '--bg-panel-2':'#ececf1', '--border':'#d4d4dc',
+      '--border-soft':'rgba(0,0,0,.09)', '--row-hover':'rgba(0,0,0,.045)',
+      '--text':'#1b1b1f', '--text-muted':'#6b6b76', '--accent':'#2563eb', '--accent-dim':'#1d4ed8',
+      '--danger':'#dc2626', '--danger-soft':'#b91c1c', '--success':'#16a34a', '--heal-color':'#15803d',
+      '--pc-color':'#2563eb', '--monster-color':'#c2600e', '--badge-bg':'#e0e7ff',
+      '--badge-border':'#a5b4fc', '--badge-text':'#3730a3', '--warn':'#b45309', '--miss':'#8f2f2f',
+      '--conc':'#6d4bb0',
+    } },
+);
 
 /* ---- colour maths (mirrors what build-themes.mjs will do) ---------------- */
 const rgb = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16));
@@ -369,6 +397,7 @@ const seedCss = p => [
   `--brand-accent:${p.accent}`, `--brand-bar-2:${p.bar2}`, `--brand-text:${p.text}`,
   `--brand-text-muted:${p.textMuted}`, `--brand-turn:${p.turn}`,
   `--on-accent:${onColor(mix(p.accent, p.ground, 0.24), p)}`,
+  ...Object.entries(p.pin ?? {}).map(([k, v]) => `${k}:${v}`),
 ].join(';');
 
 const resolveIcon = n => (n === 'MONSTER' ? monsterGlyph : n);

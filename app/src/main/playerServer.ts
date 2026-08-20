@@ -12,6 +12,7 @@ import { reopenDeferredThrow } from './concentration';
 import {
   closeRequest,
   getSaveRequest,
+  openSaveRequest,
   openRequestIds,
   resolveThrow,
   setPhoneSurface,
@@ -733,15 +734,26 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
     math: manual ? undefined : rolled.math,
     mathTypes: manual ? undefined : rolled.mathTypes,
   });
-  savePendingListener?.({
-    id: pending.id,
-    actorName: pending.actorName,
-    attackName: pending.attackName,
+  // The DM adjudicates through the same request every other throw uses, so
+  // targets on connected phones roll their own and putting it off leaves a card
+  // in the log rather than dropping the throw.
+  openSaveRequest({
+    kind: 'save',
     ability: pending.ability,
     dc: pending.dc,
-    damage: pending.damage,
-    onSuccess: pending.onSuccess,
-    targetIds: pending.targetIds,
+    attackName: pending.attackName,
+    attackerName: pending.actorName,
+    combatantIds: targetIds,
+    onResolved: (req) =>
+      resolvePendingSave(
+        pending.id,
+        req.targets.map((t) => ({
+          targetId: t.combatantId,
+          saved: (t.result?.total ?? 0) >= req.dc,
+          total: t.result?.total,
+          die: t.result?.die ?? undefined,
+        })),
+      ),
   });
 }
 

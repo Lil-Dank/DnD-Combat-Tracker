@@ -1222,6 +1222,8 @@ export function createDemoApi(): Api {
 
   const saveRequests = new Map<string, DemoSaveRequest>();
   const saveFinishers = new Map<string, (req: DemoSaveRequest) => void>();
+  /** Deferred requests: they keep their finisher, and with it the damage. */
+  const parkedRequests = new Map<string, DemoSaveRequest>();
   const saveReqListeners = new Set<(req: DemoSaveRequest) => void>();
   const saveReqClosedListeners = new Set<(id: string) => void>();
   /** Prompts sitting on a phone-sim, keyed by prompt id. */
@@ -1328,8 +1330,36 @@ export function createDemoApi(): Api {
     if (!saveRequests.has(requestId)) return;
     saveRequests.delete(requestId);
     saveFinishers.delete(requestId);
+    parkedRequests.delete(requestId);
     cancelPhonePrompt(requestId, null);
     for (const cb of saveReqClosedListeners) cb(requestId);
+  }
+
+  function resumeSaveRequest(requestId: string): DemoSaveRequest | null {
+    const req = parkedRequests.get(requestId);
+    if (!req) return null;
+    parkedRequests.delete(requestId);
+    saveRequests.set(requestId, req);
+    // An area save files one card per target, all pointing at this request.
+    // Resuming answers all of them, so none may be left behind as an orphan.
+    const combat = cur().combat;
+    if (combat) {
+      let removed = false;
+      for (const e of [...combat.log]) {
+        if (e.kind === 'saveDeferred' && e.requestId === requestId) {
+          if (applyLogEntryDelete(combat, e.id)) removed = true;
+        }
+      }
+      if (removed) {
+        combat.log = [...combat.log];
+        save();
+      }
+    }
+    for (const t of req.targets) {
+      if (t.pcId && !t.result) t.awaiting = promptPhoneForThrow(req, t);
+    }
+    for (const cb of saveReqListeners) cb(req);
+    return req;
   }
 
   /** Dismiss: file each unanswered row as a card that can still be thrown. */
@@ -1337,7 +1367,12 @@ export function createDemoApi(): Api {
     const req = saveRequests.get(requestId);
     if (!req) return;
     const owed = req.targets.filter((t) => !t.result);
-    closeSaveRequest(requestId);
+    // Park rather than close: closing drops the finisher, and with it the
+    // damage or the spell this throw was going to decide.
+    saveRequests.delete(requestId);
+    parkedRequests.set(requestId, req);
+    cancelPhonePrompt(requestId, null);
+    for (const cb of saveReqClosedListeners) cb(requestId);
     const combat = cur().combat;
     if (!combat) return;
     for (const t of owed) {
@@ -1350,6 +1385,7 @@ export function createDemoApi(): Api {
         dc: req.dc,
         amount: req.damage,
         combatantId: t.combatantId,
+        requestId,
         conc: req.kind === 'concentration',
         source: 'dm',
       });
@@ -1358,6 +1394,8 @@ export function createDemoApi(): Api {
   }
 
   function reopenDeferredThrow(entry: LogEntry): boolean {
+    // The parked original first: it still carries what the throw decides.
+    if (entry.requestId && resumeSaveRequest(entry.requestId)) return true;
     if (!entry.combatantId || !entry.ability || entry.dc === undefined) return false;
     const combatantId = entry.combatantId;
     const isConc = entry.conc === true;
@@ -1822,18 +1860,28 @@ export function createDemoApi(): Api {
           math: savedManual ? undefined : rolledSave.math,
           mathTypes: savedManual ? undefined : rolledSave.mathTypes,
         });
-        for (const cb of savePendingListeners) {
-          cb({
-            id: pending.id,
-            actorName: pending.actorName,
-            attackName: pending.attackName,
-            ability: pending.ability,
-            dc: action.save?.dc ?? 10,
-            damage: pending.damage,
-            onSuccess: action.save?.onSuccess ?? 'half',
-            targetIds: pending.targetIds,
-          });
-        }
+        // Mirror of playerServer.ts: the DM adjudicates through the same
+        // request every other throw uses, so phones roll their own and putting
+        // it off leaves a card in the log.
+        const dc = action.save?.dc ?? 10;
+        openSaveRequest({
+          kind: 'save',
+          ability: pending.ability,
+          dc,
+          attackName: pending.attackName,
+          attackerName: pending.actorName,
+          combatantIds: pending.targetIds,
+          onResolved: (req) =>
+            resolvePlayerSave(
+              pending.id,
+              req.targets.map((t) => ({
+                targetId: t.combatantId,
+                saved: (t.result?.total ?? 0) >= req.dc,
+                total: t.result?.total,
+                die: t.result?.die ?? undefined,
+              })),
+            ),
+        });
         return;
       }
       const combat = cur().combat;

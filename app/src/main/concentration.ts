@@ -1,5 +1,5 @@
 import { store } from './state';
-import { openSaveRequest, type SaveRequest } from './saveRequests';
+import { openSaveRequest, resumeRequest, type SaveRequest } from './saveRequests';
 import { translate } from '../shared/i18n';
 
 /**
@@ -43,7 +43,11 @@ export function reopenDeferredThrow(entry: {
   attackName?: string;
   amount?: number;
   conc?: boolean;
+  requestId?: string;
 }): boolean {
+  // The parked original first: it still carries what the throw decides. Only
+  // when it is gone (a restart, a finished combat) do we rebuild a bare one.
+  if (entry.requestId && resumeRequest(entry.requestId)) return true;
   if (!entry.combatantId || !entry.ability || entry.dc === undefined) return false;
   const combatantId = entry.combatantId;
   const isConc = entry.conc === true;

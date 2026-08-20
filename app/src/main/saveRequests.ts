@@ -79,6 +79,13 @@ export interface SaveRequestInput {
 
 const requests = new Map<string, SaveRequest>();
 const finishers = new Map<string, NonNullable<SaveRequestInput['onResolved']>>();
+/**
+ * Requests the DM put off. They keep their finisher, because that is where the
+ * consequences live — the damage a Fireball still owes its targets, the spell a
+ * failed check still ends. Throwing the card in the log resumes this exact
+ * request, so nothing is recomputed and nothing is lost.
+ */
+const parked = new Map<string, SaveRequest>();
 
 // ---- surface hooks ----------------------------------------------------------
 // Registered by the surfaces themselves so this module imports none of them —
@@ -213,8 +220,25 @@ export function closeRequest(requestId: string): void {
   if (!requests.has(requestId)) return;
   requests.delete(requestId);
   finishers.delete(requestId);
+  parked.delete(requestId);
   phoneCanceller?.(requestId, null);
   closeListener?.(requestId);
+}
+
+/** Put a parked request back on the table, re-prompting anyone who can answer. */
+export function resumeRequest(requestId: string): SaveRequest | null {
+  const req = parked.get(requestId);
+  if (!req) return null;
+  parked.delete(requestId);
+  requests.set(requestId, req);
+  // An area save files one card per target, all pointing at this request.
+  // Resuming answers all of them, so none may be left behind as an orphan.
+  clearDeferredCards(requestId);
+  for (const t of req.targets) {
+    if (t.pcId && !t.result) t.awaiting = phonePrompter?.(req, t) ?? null;
+  }
+  changeListener?.(req);
+  return req;
 }
 
 /**
@@ -228,7 +252,12 @@ export async function deferRequest(requestId: string): Promise<void> {
   const req = requests.get(requestId);
   if (!req) return;
   const owed = req.targets.filter((t) => !t.result);
-  closeRequest(requestId);
+  // Park rather than close: closeRequest would drop the finisher, and with it
+  // the damage or the spell this throw was going to decide.
+  requests.delete(requestId);
+  parked.set(requestId, req);
+  phoneCanceller?.(requestId, null);
+  closeListener?.(requestId);
   for (const t of owed) {
     await store.appendLog({
       kind: 'saveDeferred',
@@ -239,6 +268,9 @@ export async function deferRequest(requestId: string): Promise<void> {
       dc: req.dc,
       amount: req.damage,
       combatantId: t.combatantId,
+      // Points back at the parked request, so throwing the card resumes the
+      // real thing instead of a bare re-derived copy.
+      requestId,
       // Marks it as a concentration check, so throwing it later still ends the
       // spell on a failure rather than quietly logging a number.
       conc: req.kind === 'concentration',
@@ -247,7 +279,23 @@ export async function deferRequest(requestId: string): Promise<void> {
   }
 }
 
-/** Every open request — used to sweep on combat end and campaign switch. */
+/** Every live or parked request — swept on combat end and campaign switch. */
 export function openRequestIds(): string[] {
-  return [...requests.keys()];
+  return [...new Set([...requests.keys(), ...parked.keys()])];
+}
+
+/** Drop every deferred card filed from one request. */
+function clearDeferredCards(requestId: string): void {
+  const log = store.getState().combat?.log ?? [];
+  for (const e of log) {
+    if (e.kind === 'saveDeferred' && e.requestId === requestId) {
+      void store.deleteLogEntry(e.id);
+    }
+  }
+}
+
+/** A parked request is gone once its combat is: drop it with the live ones. */
+export function forgetParked(requestId: string): void {
+  parked.delete(requestId);
+  finishers.delete(requestId);
 }

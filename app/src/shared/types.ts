@@ -376,6 +376,13 @@ export interface LogEntry {
    * still drop the spell.
    */
   combatantId?: string;
+  /**
+   * saveDeferred entries: the parked request this was filed from. Resuming it
+   * keeps whatever the throw was going to decide — damage still owed, a spell
+   * still at stake. Absent after a restart, when the card falls back to a bare
+   * re-derived throw.
+   */
+  requestId?: string;
   /** damage entries: the dice composition ("2d6 [3+5] +4 = 12"), DM-only. */
   math?: string;
   /** Damage type per bracket group of `math`, for type-tinted rendering. */

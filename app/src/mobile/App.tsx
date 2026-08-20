@@ -405,15 +405,28 @@ function ConcSaveOverlay({
   const [manual, setManual] = useState(false);
   const [total, setTotal] = useState('');
   const [sent, setSent] = useState(false);
+  // The dice have to be in the air for a beat or the roll has no weight. Same
+  // recipe as AttackFlow's fireDigitalSave: hold the result until BOTH the
+  // tumble has run its course and the server has answered.
+  const [tumbling, setTumbling] = useState(false);
+  const [tumbleDone, setTumbleDone] = useState(false);
   const spell = lang === 'de' && msg.deName ? msg.deName : msg.spellName;
   const modStr =
     msg.conMod === null ? '' : ` ${msg.conMod >= 0 ? '+' : '−'}${Math.abs(msg.conMod)}`;
+
+  if (tumbling && !(tumbleDone && result)) {
+    return (
+      <Sheet title={`Ⓒ ${spell}`} onClose={() => undefined} t={t} noBack>
+        <RollingDice label={t('mob.rolling')} sizes={[20]} />
+      </Sheet>
+    );
+  }
 
   if (result) {
     return (
       <Sheet title={`Ⓒ ${spell}`} onClose={onDone} t={t}>
         <div className="result">
-          {result.die != null && <DiceValues dice={[result.die]} size={80} />}
+          {result.die != null && <DiceValues dice={[result.die]} size={80} settled />}
           <div className={`verdict ${result.saved ? 'hit' : 'miss'}`}>
             {t(result.saved ? 'mob.concKept' : 'mob.concLost', { spell })}
           </div>
@@ -447,6 +460,9 @@ function ConcSaveOverlay({
           disabled={sent}
           onClick={() => {
             setSent(true);
+            setTumbling(true);
+            setTumbleDone(false);
+            setTimeout(() => setTumbleDone(true), 3000);
             send({ type: 'concSaveDigital', id: msg.id });
           }}
         >

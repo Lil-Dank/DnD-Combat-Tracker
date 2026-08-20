@@ -1206,35 +1206,14 @@ export function createDemoApi(): Api {
   }
   const concSaves = new Map<string, ConcSave>();
 
-  function resolveConcSave(pending: ConcSave, die: number | null, total: number): void {
+  function resolveConcSave(
+    pending: ConcSave,
+    die: number | null,
+    total: number,
+    revealMs = 0,
+  ): void {
     concSaves.delete(pending.id);
     const saved = total >= pending.dc;
-    const lang = data.settings.language;
-    const label = `${translate(lang, 'spellbook.concentration')} (${
-      lang === 'de' && pending.deName ? pending.deName : pending.spellName
-    })`;
-    const pc = cur().pcs.find((p) => p.id === pending.pcId);
-    const combat = cur().combat;
-    if (combat) {
-      pushLog(combat, {
-        kind: 'save',
-        actorName: pc?.name ?? '?',
-        actorType: 'pc',
-        attackName: label,
-        die: die ?? undefined,
-        total,
-        dc: pending.dc,
-        ability: 'CON',
-        outcome: saved ? 'saved' : 'failed',
-        source: 'player',
-        sourceName: sourceNameFor(pending.pcId),
-      });
-      if (!saved) {
-        const c = combat.combatants.find((x) => x.id === pending.combatantId);
-        if (c) c.concentration = null;
-      }
-    }
-    save();
     pending.session.onMessage(
       JSON.stringify({
         type: 'concSaveResult',
@@ -1247,6 +1226,36 @@ export function createDemoApi(): Api {
         deName: pending.deName,
       }),
     );
+    const lang = data.settings.language;
+    const label = `${translate(lang, 'spellbook.concentration')} (${
+      lang === 'de' && pending.deName ? pending.deName : pending.spellName
+    })`;
+    const pc = cur().pcs.find((p) => p.id === pending.pcId);
+    const commit = (): void => {
+      const combat = cur().combat;
+      if (combat) {
+        pushLog(combat, {
+          kind: 'save',
+          actorName: pc?.name ?? '?',
+          actorType: 'pc',
+          attackName: label,
+          die: die ?? undefined,
+          total,
+          dc: pending.dc,
+          ability: 'CON',
+          outcome: saved ? 'saved' : 'failed',
+          source: 'player',
+          sourceName: sourceNameFor(pending.pcId),
+        });
+        if (!saved) {
+          const c = combat.combatants.find((x) => x.id === pending.combatantId);
+          if (c) c.concentration = null;
+        }
+      }
+      save();
+    };
+    if (revealMs > 0) setTimeout(commit, revealMs);
+    else commit();
   }
 
   function tokenPcId(token: string | null): string | null {
@@ -1821,7 +1830,8 @@ export function createDemoApi(): Api {
       const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
       if (!pending || pending.session !== session) return;
       const die = 1 + Math.floor(Math.random() * 20);
-      resolveConcSave(pending, die, die + (pending.conMod ?? 0));
+      // Digital only: the phone tumbles, so hold the table-visible half back.
+      resolveConcSave(pending, die, die + (pending.conMod ?? 0), 3600);
       return;
     }
 

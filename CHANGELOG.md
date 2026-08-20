@@ -7,6 +7,14 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A concentration check rolled on the phone now tumbles like every other
+  digital roll.** The dice were skipped entirely — the die appeared already
+  settled on its result. The table-visible half, the log entry and the spell
+  dropping off the DM's combat row, now waits for the roll to land too, so
+  nobody learns the outcome before the player who threw it.
+
 ### Changed
 
 - **The Stream Deck rolls saving throws too.** A save-based action now asks

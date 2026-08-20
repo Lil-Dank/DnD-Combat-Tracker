@@ -780,29 +780,23 @@ export function dismissPendingSave(id: string): void {
   send(pending.socket, { type: 'saveResolved', id, cancelled: true, results: [] });
 }
 
-/** Verdict on a Concentration check: log it, break the spell on a failure. */
-async function resolveConcSave(pending: ConcSave, die: number | null, total: number): Promise<void> {
+/**
+ * Verdict on a Concentration check: log it, break the spell on a failure.
+ *
+ * `revealMs` holds the table-visible half back while the roller's own dice are
+ * still in the air, the same contract attackRollDigital keeps. The roller gets
+ * their result immediately — their phone owns the suspense — but the log entry
+ * and the spell dropping off the DM's combat row wait, so the table doesn't
+ * learn the outcome before the player does.
+ */
+async function resolveConcSave(
+  pending: ConcSave,
+  die: number | null,
+  total: number,
+  revealMs = 0,
+): Promise<void> {
   concSaves.delete(pending.id);
   const saved = total >= pending.dc;
-  const lang = store.getState().settings.language;
-  const label = `${translate(lang, 'spellbook.concentration')} (${
-    lang === 'de' && pending.deName ? pending.deName : pending.spellName
-  })`;
-  const pc = store.getState().pcs.find((p) => p.id === pending.pcId);
-  await store.appendLog({
-    kind: 'save',
-    actorName: pc?.name ?? '?',
-    actorType: 'pc',
-    attackName: label,
-    die: die ?? undefined,
-    total,
-    dc: pending.dc,
-    ability: 'CON',
-    outcome: saved ? 'saved' : 'failed',
-    source: 'player',
-    sourceName: sourceNameOf(sockets.get(pending.socket)),
-  });
-  if (!saved) await store.setConcentration(pending.combatantId, null);
   send(pending.socket, {
     type: 'concSaveResult',
     id: pending.id,
@@ -813,6 +807,30 @@ async function resolveConcSave(pending: ConcSave, die: number | null, total: num
     spellName: pending.spellName,
     deName: pending.deName,
   });
+  const lang = store.getState().settings.language;
+  const label = `${translate(lang, 'spellbook.concentration')} (${
+    lang === 'de' && pending.deName ? pending.deName : pending.spellName
+  })`;
+  const pc = store.getState().pcs.find((p) => p.id === pending.pcId);
+  const sourceName = sourceNameOf(sockets.get(pending.socket));
+  const commit = async (): Promise<void> => {
+    await store.appendLog({
+      kind: 'save',
+      actorName: pc?.name ?? '?',
+      actorType: 'pc',
+      attackName: label,
+      die: die ?? undefined,
+      total,
+      dc: pending.dc,
+      ability: 'CON',
+      outcome: saved ? 'saved' : 'failed',
+      source: 'player',
+      sourceName,
+    });
+    if (!saved) await store.setConcentration(pending.combatantId, null);
+  };
+  if (revealMs > 0) setTimeout(() => void commit(), revealMs);
+  else await commit();
 }
 
 /** Combat ended or campaign switched before the player answered. */
@@ -1158,7 +1176,8 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
       const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
       if (!pending || pending.socket !== socket) return;
       const die = Math.floor(Math.random() * 20) + 1;
-      await resolveConcSave(pending, die, die + (pending.conMod ?? 0));
+      // Digital only: the phone tumbles, so hold the table-visible half back.
+      await resolveConcSave(pending, die, die + (pending.conMod ?? 0), ATTACK_REVEAL_MS);
       return;
     }
 

@@ -359,12 +359,6 @@ h3 {
   z-index: 20;
 }
 
-.log-peek .peek-label {
-  flex-shrink: 0;
-  color: var(--gold);
-  font-weight: 600;
-}
-
 .log-peek .peek-entry {
   flex: 1;
   min-width: 0;

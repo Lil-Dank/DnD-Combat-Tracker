@@ -1822,7 +1822,6 @@ function LogPeek({
   if (!last) return null;
   return (
     <button className="log-peek" onClick={onOpen}>
-      <span className="peek-label">📜 {translate(lang, 'mob.logTitle')}</span>
       <span className="peek-entry">{logEntryText(lang, last)}</span>
       <span className="peek-chevron">▴</span>
     </button>

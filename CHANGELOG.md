@@ -7,6 +7,12 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ## [Unreleased]
 
+### Changed
+
+- The player phone's combat-log bar drops its "Combat log" caption. On a phone
+  that caption took a fixed slice of a single-line bar; the latest entry now
+  gets the full width. The sheet it opens still carries the title.
+
 ## [3.5.1] — 2026-08-20
 
 ### Fixed

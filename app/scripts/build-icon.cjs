@@ -20,7 +20,8 @@
 //   resources/icon.ico          - same file, shipped so BrowserWindows use it
 //   resources/icon.png          - 256 px PNG (fallback for non-Windows)
 //   build/icon-{16..256}.png    - previews, for eyeballing the small sizes
-//   ../docs/images/logo.png     - 512 px logo for the README header
+//   ../docs/images/logo.png     - 512 px standalone mark (the README leads
+//     with the banner instead, but this is the one to hand anyone who asks)
 //   ../docs/images/social-preview.png - 1200x630 banner for GitHub's social
 //     preview (upload manually: repo Settings -> Social preview)
 //   ../plugin/.../imgs/plugin/icon.png + icon@2x.png - the Stream Deck
@@ -71,7 +72,9 @@ function bannerSvg() {
       active ? P.accent : '#FFFFFF'
     }" opacity="${active ? 0.24 : 0.05}"/>`;
   }).join('');
-  const mark = markSvg(300, { treatment: 'shadow', variant: 'full', colors: {
+  // No shadow here: on the banner the mark is already inverted to light cards
+  // against the ground, so it separates on its own.
+  const mark = markSvg(300, { treatment: 'bare', variant: 'full', colors: {
     ...COLORS, back1: P.on.back1, back2: P.on.back2, front: P.on.front,
     dot: P.on.dot, accent: P.on.accent, bar2: P.on.bar2,
   } });

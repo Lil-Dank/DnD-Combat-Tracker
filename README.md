@@ -1,12 +1,13 @@
 <div align="center">
 
-<img src="docs/images/logo.png" width="150" alt="Deck of Many Turns logo: a fanned stack of cards whose front card shows an initiative row">
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
+![Electron](https://img.shields.io/badge/Electron-37-47848F?logo=electron&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
+![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
+![Release](https://img.shields.io/badge/release-v3.5.0-success)
 
-# Deck of Many Turns
-
-> <sub><em>The name is a play on the <strong>Deck of Many Things</strong>, D&D's most infamous
-> magic item — chosen because this project started with a single idea: a D&D combat
-> tracker whose flow of turns is controlled from an Elgato Stream <strong>Deck</strong>.</em></sub>
+![Deck of Many Turns — initiative tracking for 5e combat, with a Player View, player phones and Stream Deck control](docs/images/social-preview.png)
 
 **A Windows desktop app for Dungeon Masters to run D&D combat — with a second-monitor
 Player View, a phone companion for the players, and an Elgato Stream Deck plugin for
@@ -18,12 +19,9 @@ Everything runs on one machine. No network, no cloud, no accounts, no telemetry.
 in your browser, with a simulated player phone, a simulated Stream Deck and a combat
 already in progress.
 
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
-![Electron](https://img.shields.io/badge/Electron-37-47848F?logo=electron&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
-![Stream Deck](https://img.shields.io/badge/Stream%20Deck-SDK%20v2-000000?logo=elgato&logoColor=white)
-![Release](https://img.shields.io/badge/release-v3.5.0-success)
+> <sub><em>The name is a play on the <strong>Deck of Many Things</strong>, D&D's most infamous
+> magic item — chosen because this project started with a single idea: a D&D combat
+> tracker whose flow of turns is controlled from an Elgato Stream <strong>Deck</strong>.</em></sub>
 
 </div>
 
@@ -45,32 +43,32 @@ name, and the combat log keeps the story on the right.</i>
 
 </div>
 
-![Deck of Many Turns](docs/images/social-preview.png)
+---
 
 ## Run the fight, not the software
 
 You are three encounters deep, four players are talking at once, and the goblin that
 went down two rounds ago is somehow still on the initiative list. **Deck of Many Turns
-is the screen behind your DM screen** — a Windows app that holds initiative, hit points
-and conditions for a table that is sitting in the same room as you. Not a virtual
-tabletop. No maps, no tokens, no subscription, no account, no cloud. It opens in a
-second, it runs on one machine, and your campaign is plain JSON on your own disk.
+is the screen behind your DM screen.** Not a virtual tabletop — no maps, no tokens, no
+grid. It holds initiative, hit points and conditions for a table sitting in the same
+room as you, it opens in a second, and your campaign is plain JSON on your own disk.
 
-|  |  |
+Three things it does, and it does them at the table:
+
+| | |
 | --- | --- |
-| **Run the fight** | Roll initiative for everyone or just the monsters, drag to settle ties, resolve attacks against AC with crits and save-for-half, and watch it all land in an [editable combat log](#combat-log--archive) — fix a number and the HP follows. [→ Combat](#combat) |
-| **Show your table** | A second-monitor [Player View](#player-view--and-the-chroma-key-setup) with no numbers on the monsters, just a bloodied glow. Built opaque and green-free so it keys straight into OBS. [→ Player View](#player-view--and-the-chroma-key-setup) |
-| **Hand out the controls** | Players scan a QR code and get [their character on their own phone](#player-phone-companion) — attacks, damage, healing, spell slots, gated to their turn. Nothing to install. [→ Phones](#player-phone-companion) |
+| ⚔️ **Run the fight** | Roll initiative for everyone or just the monsters, drag to settle ties, resolve attacks against AC with crits and save-for-half. Every action lands in a [combat log you can edit](#combat-log--archive) — correct a number and the HP follows it. |
+| 📺 **Show your table** | A second monitor gets the [Player View](#player-view--and-the-chroma-key-setup): initiative order, no numbers on the monsters, just a bloodied glow as they drop. Built fully opaque and green-free, so it keys straight into OBS. |
+| 📱 **Hand out the controls** | Players scan a QR code and get [their own character on their own phone](#player-phone-companion) — attacks, damage, healing, spell slots, gated to their turn. No app installs, no accounts, just your LAN. |
 
-**Plays well with** [Elgato Stream Deck](#stream-deck) — real keys for turns, damage and
-conditions, rendering their own labels · [Kenku FM](#kenku-fm-audio) — battle playlists
-and per-attack sound effects · [OBS](#player-view--and-the-chroma-key-setup) — the
-Player View is a keyable source · any phone with a browser · English and Deutsch, with
-game terms straight from the SRD 5.2.1.
+And a [Stream Deck](#stream-deck) beside your notes, if you have one: turn control, a
+damage and healing numpad, multi-actor conditions and monster attack rolls on hardware
+keys that render their own labels.
 
-**[▶ Try it in your browser](https://lil-dank.github.io/deck-of-many-turns/)** — the
-real app, seeded with a fight in progress, a simulated player phone and a simulated
-Stream Deck. Nothing to download.
+**Plays well with** [Elgato Stream Deck](#stream-deck) · [Kenku FM](#kenku-fm-audio) for
+battle playlists and per-attack sound effects · [OBS](#player-view--and-the-chroma-key-setup)
+· any phone with a browser · **English and Deutsch**, with game terms taken from the
+SRD 5.2.1 in each language.
 
 ---
 

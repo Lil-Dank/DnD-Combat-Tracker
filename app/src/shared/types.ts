@@ -351,7 +351,7 @@ export interface LogEntry {
   targetType?: CombatantType;
   /** Damage/heal amount. */
   amount?: number;
-  /** Attack rolls: the raw d20. */
+  /** Attack rolls and saving throws: the raw d20. */
   die?: number;
   /** Attack rolls: die + toHit; saves: the save total. */
   total?: number;
@@ -366,6 +366,8 @@ export interface LogEntry {
   conc?: boolean;
   /** save entries: the DC rolled against (written since the card log). */
   dc?: number;
+  /** save entries: the ability code thrown against it ("DEX"). */
+  ability?: string;
   /** damage entries: the dice composition ("2d6 [3+5] +4 = 12"), DM-only. */
   math?: string;
   /** Damage type per bracket group of `math`, for type-tinted rendering. */
@@ -400,6 +402,7 @@ export type LogEntryPatch = Partial<
     | 'attackName'
     | 'slotLevel'
     | 'dc'
+    | 'ability'
     | 'condition'
     | 'damageType'
   >

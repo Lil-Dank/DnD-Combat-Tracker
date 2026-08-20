@@ -9,6 +9,13 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ### Changed
 
+- **Saving throws in the combat log now show the throw, not just its sum.**
+  A save adjudicated in the DM's modal records the d20 behind the total, so the
+  card reads `17 +2 19 vs DC 14` the way an attack roll does — it previously
+  logged the total alone. The card also names the throw: *Fireball DEX saving
+  throw* instead of a bare spell name over a `SAVE` row. Player phones keep the
+  total and the verdict but not the d20, which would give away the roller's
+  ability modifier.
 - The player phone's combat-log bar drops its "Combat log" caption. On a phone
   that caption took a fixed slice of a single-line bar; the latest entry now
   gets the full width. The sheet it opens still carries the title.

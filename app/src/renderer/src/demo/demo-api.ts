@@ -907,6 +907,19 @@ export function createDemoApi(): Api {
         kind: 'conditionAdded', targetName: mName(1), targetType: 'monster',
         condition: 'Prone', source: 'dm', round: 1,
       }),
+      entry({ kind: 'turn', actorName: pName(1), actorType: 'pc', source: 'dm', round: 1 }),
+      // A save-based hit, so the log shows a saving-throw card on arrival —
+      // DC 14 matches the Fireball attached to this PC further up.
+      entry({
+        kind: 'save', actorName: mName(0), actorType: 'monster', targetName: pName(1),
+        targetType: 'pc', attackName: 'Fireball', ability: 'DEX',
+        die: 9, total: 12, dc: 14, outcome: 'failed', source: 'dm', round: 1,
+      }),
+      entry({
+        kind: 'damage', actorName: pName(1), actorType: 'pc', targetName: mName(0),
+        targetType: 'monster', amount: 24,
+        math: '8d6 [5+4+2+6+1+3+2+1] = 24', mathTypes: ['fire'], source: 'player', round: 1,
+      }),
       entry({ kind: 'turn', actorName: mName(0), actorType: 'monster', source: 'dm', round: 2 }),
     );
 
@@ -1127,6 +1140,8 @@ export function createDemoApi(): Api {
     attackName: string;
     damage: number;
     dc: number | undefined;
+    /** Ability code thrown against the DC, for the log's heading. */
+    ability: string;
     /** The roll behind the damage, so the log can show the composition. */
     math: string | undefined;
     mathTypes: (string | null)[] | undefined;
@@ -1169,6 +1184,7 @@ export function createDemoApi(): Api {
         die: die ?? undefined,
         total,
         dc: pending.dc,
+        ability: 'CON',
         outcome: saved ? 'saved' : 'failed',
         source: 'player',
         sourceName: sourceNameFor(pending.pcId),
@@ -1205,6 +1221,7 @@ export function createDemoApi(): Api {
       if (e.kind === 'attackRoll') {
         return { ...e, die: undefined, dice: undefined, total: undefined, math: attackComposition(e) };
       }
+      if (e.kind === 'save') return { ...e, die: undefined, dice: undefined };
       if (e.math === undefined) return e;
       return { ...e, die: undefined, dice: undefined, math: stripDiceResults(e.math) };
     });
@@ -1590,6 +1607,7 @@ export function createDemoApi(): Api {
           attackName: action.name,
           damage,
           dc: action.save?.dc,
+          ability: action.save?.ability ?? 'DEX',
           math: savedManual ? undefined : rolledSave.math,
           mathTypes: savedManual ? undefined : rolledSave.mathTypes,
           onSuccess: action.save?.onSuccess ?? 'half',
@@ -1610,7 +1628,7 @@ export function createDemoApi(): Api {
             id: pending.id,
             actorName: pending.actorName,
             attackName: pending.attackName,
-            ability: action.save?.ability ?? 'DEX',
+            ability: pending.ability,
             dc: action.save?.dc ?? 10,
             damage: pending.damage,
             onSuccess: action.save?.onSuccess ?? 'half',
@@ -1845,7 +1863,7 @@ export function createDemoApi(): Api {
 
   function resolvePlayerSave(
     id: string,
-    results: Array<{ targetId: string; saved: boolean; total?: number }>,
+    results: Array<{ targetId: string; saved: boolean; total?: number; die?: number }>,
   ): void {
     const pending = pendingSaves.get(id);
     if (!pending) return;
@@ -1865,8 +1883,10 @@ export function createDemoApi(): Api {
           targetName: pending.actorName,
           targetType: 'pc',
           attackName: pending.attackName,
+          die: r.die,
           total: r.total,
           dc: pending.dc,
+          ability: pending.ability,
           outcome: r.saved ? 'saved' : 'failed',
           source: 'dm',
         });

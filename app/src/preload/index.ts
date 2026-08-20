@@ -142,7 +142,7 @@ const api = {
   kickPlayer: (pcId: string): Promise<void> => ipcRenderer.invoke('playerWeb:kick', pcId),
   resolvePlayerSave: (
     id: string,
-    results: Array<{ targetId: string; saved: boolean; total?: number }>,
+    results: Array<{ targetId: string; saved: boolean; total?: number; die?: number }>,
   ): Promise<void> => ipcRenderer.invoke('playerWeb:resolveSave', { id, results }),
   dismissPlayerSave: (id: string): Promise<void> => ipcRenderer.invoke('playerWeb:dismissSave', id),
   onPlayerSavePending: (cb: (pending: PlayerSavePendingInfo) => void): (() => void) => {

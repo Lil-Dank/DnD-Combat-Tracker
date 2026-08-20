@@ -240,6 +240,9 @@ function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
         math: attackComposition(e),
       };
     }
+    // Saves keep their total — that one is announced at the table — but not
+    // the d20 behind it, which would hand out the roller's ability modifier.
+    if (e.kind === 'save') return { ...e, die: undefined, dice: undefined };
     if (e.math === undefined) return e;
     // mathTypes stays: the damage TYPE is table knowledge too.
     return { ...e, die: undefined, dice: undefined, math: stripDiceResults(e.math) };
@@ -723,7 +726,7 @@ function startPendingSave(socket: WebSocket, ctx: AttackContext, cmd: PlayerComm
 /** DM modal resolution: full damage on failure; half or none on success. */
 export async function resolvePendingSave(
   id: string,
-  results: Array<{ targetId: string; saved: boolean; total?: number }>,
+  results: Array<{ targetId: string; saved: boolean; total?: number; die?: number }>,
 ): Promise<void> {
   const pending = pendingSaves.get(id);
   if (!pending) return;
@@ -742,8 +745,10 @@ export async function resolvePendingSave(
       targetName: pending.actorName,
       targetType: 'pc',
       attackName: pending.attackName,
+      die: r.die,
       total: r.total,
       dc: pending.dc,
+      ability: pending.ability,
       outcome: r.saved ? 'saved' : 'failed',
       source: 'dm',
     });
@@ -792,6 +797,7 @@ async function resolveConcSave(pending: ConcSave, die: number | null, total: num
     die: die ?? undefined,
     total,
     dc: pending.dc,
+    ability: 'CON',
     outcome: saved ? 'saved' : 'failed',
     source: 'player',
     sourceName: sourceNameOf(sockets.get(pending.socket)),

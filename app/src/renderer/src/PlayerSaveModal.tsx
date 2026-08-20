@@ -63,7 +63,9 @@ export function PlayerSaveModal({
   const apply = async () => {
     const results = targets.map((c) => {
       const total = parsed(c.id) ?? 0;
-      return { targetId: c.id, saved: total >= pending.dc, total };
+      // The die rides along so the log can show the throw, not just its sum.
+      // Null on a manually entered total — there is no d20 to report.
+      return { targetId: c.id, saved: total >= pending.dc, total, die: rows[c.id]?.die ?? undefined };
     });
     await api.resolvePlayerSave(pending.id, results);
     onClose();

@@ -10,7 +10,7 @@ import {
   rollMathSegments,
   type LogSegment,
 } from '../shared/logText';
-import { damageTypeLabel, type Lang } from '../shared/i18n';
+import { abilityCodeLabel, damageTypeLabel, type Lang } from '../shared/i18n';
 import { displayDice } from '../shared/dice';
 import { LogCardEditor } from './LogCardEditor';
 
@@ -281,7 +281,13 @@ export function LogCards({
     return (
       <div key={b.key} className="log-block lb-save" data-kind="save">
         {tools(e)}
-        <div className="save-label sc">🛡 {e.attackName}</div>
+        <div className="save-label sc">
+          🛡{' '}
+          {t(e.ability ? 'log.card.savingThrowOf' : 'log.card.savingThrow', {
+            attack: e.attackName ?? '',
+            ability: e.ability ? abilityCodeLabel(lang, e.ability) : '',
+          })}
+        </div>
         <div className="lb-roll save noclick">
           <span className="lbl">{t('log.card.save')}</span>
           {e.die !== undefined && <span className="die tnum">{e.die}</span>}

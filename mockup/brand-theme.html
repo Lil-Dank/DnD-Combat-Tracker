@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deck of Many Turns — brand + theme mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================================
+   THE DERIVATION BLOCK — this exact text is what ships in styles.css.
+   Each palette sets only its seeds (--brand-*, --brand-accent, --brand-turn);
+   all 26 UI variables fall out of these rules. A palette may pin any of them.
+   ========================================================================= */
+.ui {
+  --bg:           var(--brand-ground);
+  --bg-panel:     color-mix(in oklab, var(--brand-ground) 93%, var(--brand-text));
+  --bg-panel-2:   color-mix(in oklab, var(--brand-ground) 86%, var(--brand-text));
+  --border:       color-mix(in oklab, var(--brand-ground) 74%, var(--brand-text));
+  --border-soft:  color-mix(in oklab, var(--brand-text) 12%, transparent);
+  --row-hover:    color-mix(in oklab, var(--brand-text) 6%, transparent);
+  --text:         var(--brand-text);
+  --text-muted:   var(--brand-text-muted);
+  --accent:       var(--brand-accent);
+  --accent-dim:   color-mix(in oklab, var(--brand-accent) 76%, var(--brand-ground));
+  /* Current turn keeps its own colour so it never collapses into the accent. */
+  --gold:            var(--brand-turn);
+  --current-border:  var(--brand-turn);
+  --current-tint:    color-mix(in oklab, var(--brand-turn) 12%, transparent);
+  --current-shadow:  color-mix(in oklab, var(--brand-turn) 15%, transparent);
+  --badge-bg:     color-mix(in oklab, var(--accent-dim) 42%, var(--bg-panel));
+  --badge-border: var(--accent-dim);
+  --badge-text:   color-mix(in oklab, var(--brand-accent) 60%, var(--brand-text));
+  --font-ui: Inter, "Segoe UI", system-ui, sans-serif;
+  /* Phone aliases — emitted once, so mobile/styles.css keeps its own names. */
+  --panel: var(--bg-panel); --panel-2: var(--bg-panel-2);
+  --muted: var(--text-muted); --good: var(--success); --bad: var(--danger);
+}
+/* Semantic colours are meaning, not brand: they hold steady across palettes
+   and step only for light vs dark grounds. */
+.ui[data-scheme="dark"] {
+  --danger: #ef4444; --danger-soft: #fca5a5; --success: #22c55e; --heal-color: #86efac;
+  --pc-color: #6ea8fa; --monster-color: #e08c2e; --warn: #f59e0b; --miss: #a03d3d;
+  --conc: #a98be0;
+}
+.ui[data-scheme="light"] {
+  --danger: #c02626; --danger-soft: #a41c1c; --success: #16803c; --heal-color: #15803d;
+  --pc-color: #2158c8; --monster-color: #a85a0e; --warn: #a35709; --miss: #8f2f2f;
+  --conc: #6d4bb0;
+}
+
+/* ---- mockup chrome (never ships) ---------------------------------------- */
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: #0e0e11; color: #e8eaed;
+  font: 13px/1.45 Inter, "Segoe UI", system-ui, sans-serif;
+  padding: 22px 26px 80px;
+}
+h1 { font-size: 21px; margin: 0 0 6px; }
+.lede { color: #9aa0aa; max-width: 78ch; margin: 0 0 16px; }
+.lede b { color: #d6dae0; font-weight: 600; }
+.bar {
+  position: sticky; top: 0; z-index: 50; margin: 0 -26px 18px; padding: 11px 26px;
+  background: rgba(14,14,17,.95); border-bottom: 1px solid #26262c;
+  display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+  backdrop-filter: blur(6px);
+}
+.bar fieldset { border: 0; margin: 0; padding: 0; display: flex; gap: 9px; align-items: center; }
+.bar b { color: #7f858f; font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .7px; }
+.bar label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; color: #c8ccd2; }
+.pals { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.pals label {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px solid #33343b; border-radius: 999px; padding: 4px 11px 4px 7px; font-size: 12px;
+}
+.pals label.off { opacity: .35; }
+.pals i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.count { color: #7f858f; font-size: 12px; align-self: center; margin-left: 6px; }
+h2.sec { font-size: 11.5px; letter-spacing: 1.2px; text-transform: uppercase; color: #7f858f;
+         margin: 32px 0 11px; border-bottom: 1px solid #26262c; padding-bottom: 7px; }
+
+.pal { margin: 0 0 26px; }
+.pal.hidden { display: none; }
+.pal-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 7px; }
+.pal-head h3 { margin: 0; font-size: 15px; }
+.pal-head code { color: #7f858f; font-size: 11.5px; }
+.pal-head .note { color: #7f858f; font-size: 12px; }
+.pal-head .chips { margin-left: auto; display: flex; gap: 4px; }
+.pal-head .chips i { width: 24px; height: 13px; border-radius: 3px; display: block; border: 1px solid rgba(255,255,255,.12); }
+
+/* ---- app fragment: mirrors the real 188px sidebar layout exactly --------- */
+.app {
+  display: flex; height: 452px; overflow: hidden;
+  border: 1px solid #2a2a31; border-radius: 10px;
+  background: var(--bg); color: var(--text); font-family: var(--font-ui);
+}
+.sidebar {
+  width: 188px; flex-shrink: 0; background: var(--bg-panel);
+  border-right: 1px solid var(--border); padding: 14px 10px; display: flex;
+  flex-direction: column; gap: 4px;
+}
+.lockup { display: flex; align-items: center; gap: 8px; padding: 0 2px 12px; }
+.lockup svg { flex-shrink: 0; display: block; }
+.wordmark { display: flex; flex-direction: column; line-height: 1; }
+.wordmark .l1 { font-size: 8.5px; font-weight: 600; letter-spacing: 1.35px; color: var(--text-muted); }
+.wordmark .l2 { font-size: 15.5px; font-weight: 800; letter-spacing: 1.2px; color: var(--accent); margin-top: 3px; }
+.camp {
+  height: 26px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-panel-2);
+  color: var(--text); font-size: 12.5px; padding: 0 8px; display: flex; align-items: center;
+  margin-bottom: 8px;
+}
+.nav-btn {
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 0;
+  background: transparent; color: var(--text); border-radius: 6px; font: inherit;
+  font-size: 14px; cursor: pointer; text-align: left; width: 100%;
+}
+.nav-btn:hover { background: var(--bg-panel-2); }
+.nav-icon { width: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+.nav-icon svg { width: 20px; height: 20px; display: block; }
+/* treatment A — today's solid fill */
+[data-nav="fill"] .nav-btn.active { background: var(--accent-dim); color: var(--on-accent); font-weight: 600; }
+/* treatment B — accent tint + left bar; icon and label take the accent */
+[data-nav="tint"] .nav-btn.active {
+  background: color-mix(in oklab, var(--accent) 15%, var(--bg-panel));
+  color: var(--accent); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent);
+}
+.sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
+.bridge { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 14px; color: var(--text-muted); }
+.bridge.on { color: var(--success); }
+
+.content { flex: 1; min-width: 0; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; overflow: hidden; }
+.screen-head { display: flex; align-items: center; gap: 10px; }
+.screen-head h4 { margin: 0; font-size: 19px; }
+.round-badge {
+  background: var(--accent-dim); color: var(--on-accent); border-radius: 999px;
+  padding: 2px 11px; font-size: 12px; font-weight: 600;
+}
+.screen-head .btns { margin-left: auto; display: flex; gap: 6px; }
+.btn {
+  height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg-panel-2); color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.btn.primary { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--on-accent); font-weight: 600; }
+.btn.danger { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 45%, transparent); }
+
+.row {
+  display: flex; align-items: center; gap: 9px; padding: 8px 11px;
+  background: var(--bg-panel); border: 1px solid var(--border-soft);
+  border-left: 3px solid transparent; border-radius: 8px;
+}
+.row.current { border-color: var(--current-border); background: var(--current-tint); box-shadow: 0 0 0 1px var(--current-shadow); }
+.row .init { width: 24px; text-align: center; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.row .nm { font-weight: 600; white-space: nowrap; }
+.row .nm.pc { color: var(--pc-color); }
+.row .nm.mon { color: var(--monster-color); }
+.row .hp { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--success); }
+.row .hp.hurt { color: var(--warn); }
+.row .ac { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cond {
+  display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  background: var(--badge-bg); border: 1px solid var(--badge-border); color: var(--badge-text);
+}
+.cond.conc { background: color-mix(in oklab, var(--conc) 18%, transparent); border-color: color-mix(in oklab, var(--conc) 55%, transparent); color: var(--conc); }
+
+.logcard { background: var(--bg-panel-2); border: 1px solid var(--border-soft); border-left: 3px solid var(--monster-color); border-radius: 9px; overflow: hidden; margin-top: 3px; }
+.logcard .lh { display: flex; align-items: baseline; padding: 6px 10px 5px; border-bottom: 1px solid var(--border-soft); }
+.logcard .lh b { font-size: 13.5px; font-variant-caps: all-small-caps; letter-spacing: .45px; color: var(--monster-color); }
+.logcard .lh span { margin-left: auto; font-size: 10.5px; color: var(--text-muted); }
+.logcard .lb { padding: 6px 10px 8px; }
+.logcard .act { font-variant-caps: all-small-caps; letter-spacing: .5px; font-weight: 700; font-size: 15.5px; }
+.logcard .act .to { color: var(--text-muted); font-weight: 400; font-size: 12.5px; }
+.logcard .act .to b { color: var(--pc-color); font-size: 13.5px; }
+.roll { display: flex; align-items: center; gap: 8px; margin-top: 5px; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 7px; padding: 4px 8px; }
+.roll .lbl { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; min-width: 46px; }
+.roll .die { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.roll .tot { margin-left: auto; font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.roll .vd { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--danger); }
+
+/* ---- specimen strips ---------------------------------------------------- */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(600px, 1fr)); gap: 16px; }
+.grid .gcap { font-size: 12px; color: #9aa0aa; margin: 0 0 5px; }
+.grid .gcap b { color: #e8eaed; font-weight: 600; }
+.grid .app { height: 300px; }
+.grid .content { padding: 12px 13px; gap: 8px; }
+.grid .screen-head h4 { font-size: 17px; }
+.strip { display: flex; gap: 26px; align-items: flex-end; flex-wrap: wrap;
+         background: var(--bg); border: 1px solid #2a2a31; border-radius: 10px; padding: 18px 20px; }
+.spec { margin: 0; text-align: center; }
+.spec figcaption { margin-top: 8px; font-size: 10.5px; color: var(--text-muted); }
+.iconwall { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 12px;
+            background: var(--bg); border: 1px solid #2a2a31; border-radius: 10px; padding: 16px; }
+.iconwall figure { margin: 0; text-align: center; color: var(--text); }
+.iconwall figure.on { color: var(--accent); }
+.iconwall svg { display: block; margin: 0 auto 7px; }
+.iconwall figcaption { font-size: 10px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<h1>Deck of Many Turns — brand + theme mockup</h1>
+<p class="lede">Every palette below is the <b>same drawing and the same UI</b> with different colour seeds —
+nothing but colour and iconography changes, the layout is the shipped one. Judge the sidebar at 100% zoom,
+and check the <b>current-turn row against the active nav item</b>: those two must never read as the same thing.
+Untick palettes to cut the set down to eight.</p>
+
+<div class="bar">
+  <fieldset><b>Active nav</b>
+    <label><input type="radio" name="nav" value="fill"> solid fill</label>
+    <label><input type="radio" name="nav" value="tint" checked> accent tint + bar</label>
+  </fieldset>
+  <fieldset><b>Sidebar icons</b>
+    <label><input type="radio" name="ico" value="svg" checked> monoline</label>
+    <label><input type="radio" name="ico" value="emoji"> today's emoji</label>
+  </fieldset>
+  <fieldset><b>Lock-up mark</b>
+    <label><input type="radio" name="lock" value="tile" checked> on tile</label>
+    <label><input type="radio" name="lock" value="bare"> bare</label>
+  </fieldset>
+  <fieldset><b>Monsters glyph</b>
+    <label><input type="radio" name="mon" value="horns" checked> horned head</label>
+    <label><input type="radio" name="mon" value="claw"> claw</label>
+    <label><input type="radio" name="mon" value="eye"> slit eye</label>
+  </fieldset>
+</div>
+
+<div class="pals" id="pals"></div>
+
+<h2 class="sec">The mark — at the sizes it actually ships</h2>
+<div class="strip ui" id="marks"></div>
+
+<h2 class="sec">Sidebar icon set — 20px, the size that ships, and 32px to check the drawing</h2>
+<div class="iconwall ui" id="icons"></div>
+
+<h2 class="sec">All palettes side by side — sidebar, active nav, current turn</h2>
+<div class="grid" id="grid"></div>
+
+<h2 class="sec">Every palette, full width</h2>
+<div id="out"></div>
+
+<script>
+/* ==========================================================================
+   PALETTES — extracted verbatim from the branding session's proof sheet.
+   `turn` is the one new token: the current-turn highlight, deliberately the
+   palette's other pole so it never collides with the accent.
+   ========================================================================== */
+const PALETTES = [
+  { id:'arcane-gold', label:'Arcane gold', note:'Deep violet stack, gold on the active turn', scheme:'dark',
+    tile:'#F4EFE4', ground:'#1B1730', back1:'#5A52A0', back2:'#443C7E', front:'#2A2450',
+    dot:'#8B84C4', accent:'#E0A33A', bar2:'#6B62A8', text:'#EFECFA', textMuted:'#A9A2D6', turn:'#A99BE8' },
+  { id:'ember-slate', label:'Ember slate', note:'Cold slate, one ember', scheme:'dark',
+    tile:'#EDEAE4', ground:'#1A1D21', back1:'#6E7783', back2:'#4A5058', front:'#2E333A',
+    dot:'#9AA3AD', accent:'#E2603A', bar2:'#6E7783', text:'#EDF1F4', textMuted:'#98A2AC', turn:'#6EA8D8' },
+  { id:'verdant-brass', label:'Verdant brass', note:'Deep green field, brass fittings', scheme:'dark',
+    tile:'#E9F0EA', ground:'#12261F', back1:'#3F7461', back2:'#2F5C4C', front:'#1C3E34',
+    dot:'#7FB49B', accent:'#D9A441', bar2:'#4E8570', text:'#E6F1EA', textMuted:'#9FCBB6', turn:'#7FD4B0' },
+  { id:'crimson-ink', label:'Crimson ink', note:'Near-black paper, red ink', scheme:'dark',
+    tile:'#F2EDE6', ground:'#171413', back1:'#6A5F5C', back2:'#3D3533', front:'#1F1A19',
+    dot:'#9A8D8A', accent:'#C8362F', bar2:'#6A5F5C', text:'#EDE7E1', textMuted:'#A2958F', turn:'#D9A441' },
+  { id:'midnight-cyan', label:'Midnight cyan', note:'Navy depth, cyan signal', scheme:'dark',
+    tile:'#E8EDF2', ground:'#0F1E2B', back1:'#3C5877', back2:'#27405C', front:'#142639',
+    dot:'#7FA0C0', accent:'#3FC8D9', bar2:'#3C5877', text:'#E4ECF3', textMuted:'#8FAEC9', turn:'#F2A81E' },
+  { id:'parchment-inverted', label:'Parchment inverted', note:'Cream cards on a dark table', scheme:'dark',
+    tile:'#241F2E', ground:'#241F2E', back1:'#8A7F66', back2:'#C4B99E', front:'#F2E9D4',
+    dot:'#8A7F66', accent:'#B5433A', bar2:'#C4B99E', text:'#F2E9D4', textMuted:'#B3A88E', turn:'#C4B99E' },
+  { id:'copper-teal', label:'Copper teal', note:'Warm copper, cold teal', scheme:'dark',
+    tile:'#F3EDE7', ground:'#211611', back1:'#A9714A', back2:'#86532F', front:'#54321A',
+    dot:'#D9A87E', accent:'#2FB0A0', bar2:'#A9714A', text:'#F6EBDF', textMuted:'#C6A084', turn:'#D9A87E' },
+  { id:'steel-amber', label:'Steel amber', note:'Blue-grey steel, amber warning light', scheme:'dark',
+    tile:'#ECEEF0', ground:'#1B222B', back1:'#566575', back2:'#3B4757', front:'#232C38',
+    dot:'#93A3B4', accent:'#F2A81E', bar2:'#566575', text:'#EAEFF4', textMuted:'#9BAABA', turn:'#93C3E4' },
+  { id:'ink-bone', label:'Ink and bone', note:'Monochrome — accent is bone white', scheme:'dark',
+    tile:'#EFEDE8', ground:'#141312', back1:'#8E8B84', back2:'#57544E', front:'#1B1A18',
+    dot:'#A8A49C', accent:'#F5F2EA', bar2:'#57544E', text:'#F2EFE8', textMuted:'#9A968E', turn:'#C9A227' },
+  { id:'plum-mint', label:'Plum and mint', note:'Plum stack, mint highlight', scheme:'dark',
+    tile:'#F0EBF2', ground:'#1E1226', back1:'#6B4677', back2:'#4E2F5A', front:'#2E1A38',
+    dot:'#A588B0', accent:'#4FD3A0', bar2:'#6B4677', text:'#F1E9F4', textMuted:'#B9A0C3', turn:'#C79BD6' },
+];
+
+/* ---- colour maths (mirrors what build-themes.mjs will do) ---------------- */
+const rgb = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16));
+const lum = c => { const f = v => (v/=255) <= .03928 ? v/12.92 : ((v+.055)/1.055)**2.4;
+                   return .2126*f(c[0]) + .7152*f(c[1]) + .0722*f(c[2]); };
+const contrast = (a,b) => { const [x,y] = [lum(rgb(a)), lum(rgb(b))].sort((p,q)=>q-p);
+                            return (x+.05)/(y+.05); };
+const mix = (a,b,t) => '#' + rgb(a).map((v,i) => Math.round(v + (rgb(b)[i]-v)*t)
+                        .toString(16).padStart(2,'0')).join('');
+/** Ink that reads on a filled accent: the palette's own text or its ground. */
+const onColor = (bg, p) => contrast(bg, p.text) >= contrast(bg, p.ground) ? p.text : p.ground;
+
+/* ---- the mark ------------------------------------------------------------ */
+/* Full form ≥40px: three fanned cards, avatar dot, accent name bar, HP bar.
+   Simple form ≤32px: two cards, fatter dot, one bar — the fan and the second
+   bar close up below ~36px, so they go. */
+function markSvg(size, opts = {}) {
+  const full = size >= 40;
+  const tile = opts.tile !== false;
+  const card = (fill, rot) =>
+    `<rect x="14" y="35" width="72" height="26" rx="4" fill="${fill}"` +
+    (rot ? ` transform="rotate(${rot} 18 48)"` : '') + '/>';
+  const art = full
+    ? card('var(--brand-back-1)', -19) + card('var(--brand-back-2)', 19) + card('var(--brand-front)', 0) +
+      '<circle cx="28" cy="48" r="6.5" fill="var(--brand-dot)"/>' +
+      '<rect x="40" y="41" width="34" height="5" rx="2.5" fill="var(--brand-accent)"/>' +
+      '<rect x="40" y="50" width="21" height="5" rx="2.5" fill="var(--brand-bar-2)"/>'
+    : card('var(--brand-back-1)', 17) + card('var(--brand-front)', 0) +
+      '<circle cx="30" cy="48" r="8" fill="var(--brand-dot)"/>' +
+      '<rect x="44" y="43" width="32" height="10" rx="5" fill="var(--brand-accent)"/>';
+  // Framing copied from the signed-off proof sheet: a square viewport centred
+  // on the stack, NOT a tight bbox — the air around the fan is part of the mark.
+  const pad = tile ? 0 : 0.06;
+  const box = full ? [8.14, 6.14, 83.73, 83.73] : [8.14, 16.15, 83.77, 83.77];
+  const s = (size * (1 - pad * 2)) / Math.max(box[2], box[3]);
+  const tx = size / 2 - (box[0] + box[2] / 2) * s;
+  const ty = size / 2 - (box[1] + box[3] / 2) * s;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deck of Many Turns">` +
+    (tile ? `<rect width="${size}" height="${size}" rx="${(size * 0.21).toFixed(2)}" fill="var(--brand-tile)"/>` : '') +
+    `<g transform="translate(${tx.toFixed(3)},${ty.toFixed(3)}) scale(${s.toFixed(4)})">${art}</g></svg>`;
+}
+
+/* ---- monoline icon set --------------------------------------------------- */
+/* 24 grid, 1.75 stroke, round caps/joins. Everything must survive 20px, so
+   no detail smaller than ~2px of gap. */
+const ICONS = {
+  /* Two crossed swords: long blades, short guards, stubby handles. The guards
+     are what stop it reading as a plain X at 20px. */
+  swords:   '<path d="M4.4 4.4 17.6 17.6M13.6 17.6 17.6 13.6M19.6 4.4 6.4 17.6M10.4 17.6 6.4 13.6"/>',
+  shield:   '<path d="M12 3.6 19.4 6.5V12c0 4.3-2.9 7.4-7.4 8.8C7.5 19.4 4.6 16.3 4.6 12V6.5Z"/><path d="M9.4 11.9 11.5 14l3.1-3.6"/>',
+  horns:    '<path d="M7.3 10.5c0-2.8 2-4.8 4.7-4.8s4.7 2 4.7 4.8c0 3.9-1.9 6.9-4.7 8.4-2.8-1.5-4.7-4.5-4.7-8.4Z"/><path d="M7.5 8.7C5.7 7.9 4.5 6.3 4.3 4.3c2 .2 3.6 1 4.5 2.5M16.5 8.7c1.8-.8 3-2.4 3.2-4.4-2 .2-3.6 1-4.5 2.5"/><path d="M10.2 11.4h.01M13.8 11.4h.01"/>',
+  claw:     '<path d="M5.4 4.4c1.7 3.2 2.5 6 2.5 8.5M10 3.7c.9 3.5 1.3 6.4 1.1 8.9M14.6 4.1c-.1 3.6-.7 6.5-1.6 8.7M19 5.7c-1 3.4-2.3 6-3.7 7.9"/><path d="M6.4 13.1c1.5 4.5 4.1 6.7 6.6 6.7 2.6 0 4.6-1.7 5.4-4"/>',
+  eye:      '<path d="M2.8 12S6.6 6.3 12 6.3 21.2 12 21.2 12 17.4 17.7 12 17.7 2.8 12 2.8 12Z"/><path d="M12 8.5c1 1.5 1.5 2.9 1.5 3.5s-.5 2-1.5 3.5c-1-1.5-1.5-2.9-1.5-3.5s.5-2 1.5-3.5Z"/>',
+  book:     '<path d="M12 6.6C10 5.1 7.6 4.4 4.6 4.4v13c3 0 5.4.7 7.4 2.2 2-1.5 4.4-2.2 7.4-2.2v-13c-3 0-5.4.7-7.4 2.2Z"/><path d="M12 6.6v13M7.3 9.3h2.3M14.4 9.3h2.3"/>',
+  map:      '<path d="M3.6 6.6 9 4.5v13l-5.4 2.1Z"/><path d="M9 4.5l6 2.1v13l-6-2.1M15 6.6l5.4-2.1v13L15 19.6"/>',
+  archive:  '<path d="M3.6 8.6h16.8v9.3a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6Z"/><path d="M3.6 8.6 5.6 4.5h12.8l2 4.1M9.6 12.4h4.8"/>',
+  /* Rails break around each knob so the glyph needs no opaque fill and works
+     on any background (including the tinted active row). */
+  sliders:  '<path d="M3.9 7.1h2.7M11.4 7.1h8.7M3.9 12h9.1M17.8 12h2.3M3.9 16.9h1.1M9.8 16.9h10.3"/><circle cx="9" cy="7.1" r="1.9"/><circle cx="15.4" cy="12" r="1.9"/><circle cx="7.4" cy="16.9" r="1.9"/>',
+  equalizer:'<path d="M6.8 15.6V8.4M12 18.6V5.4M17.2 13.8v-3.6"/>',
+  phone:    '<rect x="6" y="3.6" width="12" height="16.8" rx="1.8"/><path d="M10.4 6.5h3.2M12 17.4h.01"/>',
+  monitor:  '<rect x="3.6" y="5.2" width="16.8" height="10.2" rx="1.4"/><path d="M9.4 19.2h5.2M12 15.4v3.8"/>',
+  expand:   '<path d="M4 9V5.6A1.6 1.6 0 0 1 5.6 4H9M15 4h3.4A1.6 1.6 0 0 1 20 5.6V9M20 15v3.4a1.6 1.6 0 0 1-1.6 1.6H15M9 20H5.6A1.6 1.6 0 0 1 4 18.4V15"/>',
+  /* Four-point impact spark — a 12-point burst turns to fuzz at 20px. */
+  burst:    '<path d="M12 3.4c.9 4.7 3.9 7.7 8.6 8.6-4.7.9-7.7 3.9-8.6 8.6-.9-4.7-3.9-7.7-8.6-8.6 4.7-.9 7.7-3.9 8.6-8.6Z"/>',
+  plus:     '<path d="M12 4.8v14.4M4.8 12h14.4"/>',
+  dotOn:    '<circle cx="12" cy="12" r="4.6" fill="currentColor" stroke="none"/>',
+  dotOff:   '<circle cx="12" cy="12" r="4.4"/>',
+};
+const iconSvg = (name, size = 20) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
+  `stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">` +
+  `${ICONS[name]}</svg>`;
+
+/* ---- sidebar contents ---------------------------------------------------- */
+const NAV = [
+  { icon: 'swords',  emoji: '⚔', label: 'Combat', active: true },
+  { icon: 'shield',  emoji: '🛡', label: 'Party' },
+  { icon: 'MONSTER', emoji: '🐉', label: 'Monsters' },
+  { icon: 'book',    emoji: '📖', label: 'Spellbook' },
+  { icon: 'map',     emoji: '🗺', label: 'Encounters' },
+  { icon: 'archive', emoji: '🗄', label: 'Archive' },
+  { icon: 'sliders', emoji: '⚙', label: 'Settings' },
+];
+const FOOT = [
+  { icon: 'equalizer', emoji: '🎵', label: 'Soundboard' },
+  { icon: 'phone',     emoji: '📱', label: 'Player Access' },
+  { icon: 'monitor',   emoji: '🖥', label: 'Open Player View' },
+];
+
+/* ---- render -------------------------------------------------------------- */
+let monsterGlyph = 'horns';
+let lockupTile = true;
+const seedCss = p => [
+  `--brand-tile:${p.tile}`, `--brand-ground:${p.ground}`, `--brand-back-1:${p.back1}`,
+  `--brand-back-2:${p.back2}`, `--brand-front:${p.front}`, `--brand-dot:${p.dot}`,
+  `--brand-accent:${p.accent}`, `--brand-bar-2:${p.bar2}`, `--brand-text:${p.text}`,
+  `--brand-text-muted:${p.textMuted}`, `--brand-turn:${p.turn}`,
+  `--on-accent:${onColor(mix(p.accent, p.ground, 0.24), p)}`,
+].join(';');
+
+const resolveIcon = n => (n === 'MONSTER' ? monsterGlyph : n);
+
+function appFragment(p, compact) {
+  const nav = NAV.map(n => `
+      <button class="nav-btn ${n.active ? 'active' : ''}">
+        <span class="nav-icon" data-svg='${iconSvg(resolveIcon(n.icon))}' data-emoji="${n.emoji}"></span>
+        <span>${n.label}</span>
+      </button>`).join('');
+  const foot = FOOT.map(n => `
+        <button class="nav-btn">
+          <span class="nav-icon" data-svg='${iconSvg(n.icon)}' data-emoji="${n.emoji}"></span>
+          <span>${n.label}</span>
+        </button>`).join('');
+  return `
+  <div class="app ui" data-scheme="${p.scheme}" style="${seedCss(p)}">
+    <nav class="sidebar">
+      <div class="lockup">${markSvg(28, { tile: lockupTile })}
+        <span class="wordmark"><span class="l1">DECK OF MANY</span><span class="l2">TURNS</span></span>
+      </div>
+      <div class="camp">Main Campaign</div>
+      ${nav}
+      <div class="sidebar-footer">${foot}
+        <div class="bridge on"><span class="nav-icon">${iconSvg('dotOn')}</span><span>Stream Deck connected</span></div>
+      </div>
+    </nav>
+    <div class="content">
+      <div class="screen-head">
+        <h4>Combat</h4><span class="round-badge">Round 3</span>
+        <span class="btns"><button class="btn">⬅ Prev</button><button class="btn primary">Next Turn ➜</button></span>
+      </div>
+      <div class="row"><span class="init">19</span><span class="nm mon">Goblin Warrior 2</span><span class="cond">Prone</span><span class="hp hurt">4/10</span><span class="ac">AC 15</span></div>
+      <div class="row current"><span class="init">15</span><span class="nm pc">Seraphina Dawnbringer</span><span class="cond conc">Concentration (Bless)</span><span class="hp">45/45</span><span class="ac">AC 17</span></div>
+      <div class="row"><span class="init">8</span><span class="nm mon">Bugbear Warrior</span><span class="hp">33/33</span><span class="ac">AC 14</span></div>
+      ${compact ? '' : `<div class="logcard">
+        <div class="lh"><b>Goblin Warrior 2</b><span>Deck · 2m ago</span></div>
+        <div class="lb">
+          <div class="act">Scimitar <span class="to">→ <b>Seraphina Dawnbringer</b></span></div>
+          <div class="roll"><span class="lbl">Attack</span><span class="die">17</span><span class="tot">21</span><span class="vd">hit</span></div>
+        </div>
+      </div>`}
+    </div>
+  </div>`;
+}
+
+function render() {
+  const on = new Set([...document.querySelectorAll('#pals input:checked')].map(i => i.value));
+  const shown = PALETTES.filter(p => on.has(p.id));
+  document.getElementById('out').innerHTML =
+    shown.map(p => `
+      <section class="pal" data-shot="${p.id}">
+        <div class="pal-head">
+          <h3>${p.label}</h3><code>${p.id}</code><span class="note">${p.note}</span>
+          <span class="chips">
+            <i style="background:${p.ground}" title="ground ${p.ground}"></i>
+            <i style="background:${p.front}" title="front ${p.front}"></i>
+            <i style="background:${p.dot}" title="dot ${p.dot}"></i>
+            <i style="background:${p.accent}" title="accent ${p.accent}"></i>
+            <i style="background:${p.turn}" title="turn ${p.turn}"></i>
+          </span>
+        </div>
+        ${appFragment(p)}
+      </section>`).join('');
+
+  document.getElementById('grid').innerHTML = shown.map(p => `
+    <div>
+      <p class="gcap"><b>${p.label}</b> · accent ${p.accent} · turn ${p.turn}</p>
+      ${appFragment(p, true)}
+    </div>`).join('');
+
+  // Mark + icon strips follow the first visible palette.
+  const lead = shown[0] ?? PALETTES[0];
+  const style = seedCss(lead);
+  const marks = document.getElementById('marks');
+  marks.setAttribute('style', style);
+  marks.dataset.scheme = lead.scheme;
+  marks.innerHTML = [16, 20, 26, 32, 48, 64, 128].map(s =>
+    `<figure class="spec">${markSvg(s)}<figcaption>${s} px · tile</figcaption></figure>`).join('') +
+    [20, 28, 44].map(s =>
+      `<figure class="spec">${markSvg(s, { tile: false })}<figcaption>${s} px · bare</figcaption></figure>`).join('');
+
+  const wall = document.getElementById('icons');
+  wall.setAttribute('style', style);
+  wall.dataset.scheme = lead.scheme;
+  const all = [...NAV.map(n => [resolveIcon(n.icon), n.label]), ...FOOT.map(n => [n.icon, n.label]),
+               ['expand', 'Fullscreen'], ['dotOn', 'Deck on'], ['dotOff', 'Deck off'],
+               ['burst', 'Damage (phone)'], ['plus', 'Heal (phone)']];
+  wall.innerHTML = all.map(([n, label], i) =>
+    `<figure class="${i === 0 ? 'on' : ''}">${iconSvg(n, 32)}${iconSvg(n, 20)}<figcaption>${label}</figcaption></figure>`).join('');
+
+  applyToggles();
+}
+
+function applyToggles() {
+  const nav = document.querySelector('input[name=nav]:checked').value;
+  const ico = document.querySelector('input[name=ico]:checked').value;
+  document.querySelectorAll('.app').forEach(a => a.dataset.nav = nav);
+  document.querySelectorAll('.nav-icon[data-svg]').forEach(el => {
+    el.innerHTML = ico === 'svg' ? el.dataset.svg : el.dataset.emoji;
+  });
+}
+
+// palette toggles
+document.getElementById('pals').innerHTML = PALETTES.map(p =>
+  `<label><input type="checkbox" value="${p.id}" checked>
+     <i style="background:${p.accent}"></i>${p.label}</label>`).join('') +
+  `<span class="count" id="count"></span>`;
+
+function refreshCount() {
+  const n = document.querySelectorAll('#pals input:checked').length;
+  const el = document.getElementById('count');
+  el.textContent = `${n} shown${n === 8 ? ' — that is the target' : n > 8 ? ` — cut ${n - 8} more` : ''}`;
+  document.querySelectorAll('#pals label').forEach(l =>
+    l.classList.toggle('off', !l.querySelector('input').checked));
+}
+
+document.getElementById('pals').addEventListener('change', () => { refreshCount(); render(); });
+document.querySelectorAll('input[name=nav], input[name=ico]').forEach(r =>
+  r.addEventListener('change', applyToggles));
+document.querySelectorAll('input[name=lock]').forEach(r =>
+  r.addEventListener('change', e => { lockupTile = e.target.value === 'tile'; render(); }));
+document.querySelectorAll('input[name=mon]').forEach(r =>
+  r.addEventListener('change', e => { monsterGlyph = e.target.value; render(); }));
+
+refreshCount();
+render();
+</script>
+</body>
+</html>

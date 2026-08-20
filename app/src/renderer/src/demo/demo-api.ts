@@ -1206,6 +1206,8 @@ export function createDemoApi(): Api {
     attackerName?: string;
     spellName?: string;
     damage?: number;
+    /** A pickup off a deferred card stays with whoever reached for it. */
+    pickedUpBy?: 'dm' | 'phone';
     targets: DemoThrowTarget[];
   }
   interface DemoSaveRequestInput {
@@ -1216,6 +1218,7 @@ export function createDemoApi(): Api {
     attackerName?: string;
     spellName?: string;
     damage?: number;
+    pickedUpBy?: 'dm' | 'phone';
     combatantIds: string[];
     onResolved?: (req: DemoSaveRequest) => void;
   }
@@ -1231,6 +1234,12 @@ export function createDemoApi(): Api {
     string,
     { id: string; requestId: string; combatantId: string; session: PlayerSession }
   >();
+
+  /** The DM hears about it unless a player picked it up for themselves. */
+  function announceRequest(req: DemoSaveRequest): void {
+    if (req.pickedUpBy === 'phone') return;
+    for (const cb of saveReqListeners) cb(req);
+  }
 
   function openSaveRequest(input: DemoSaveRequestInput): DemoSaveRequest | null {
     const combat = cur().combat;
@@ -1263,10 +1272,13 @@ export function createDemoApi(): Api {
     const req: DemoSaveRequest = { id: uuid(), ...input, targets };
     saveRequests.set(req.id, req);
     if (input.onResolved) saveFinishers.set(req.id, input.onResolved);
-    for (const t of req.targets) {
-      if (t.pcId) t.awaiting = promptPhoneForThrow(req, t);
+    // A DM pickup is answered by the DM; do not light up a phone for it.
+    if (req.pickedUpBy !== 'dm') {
+      for (const t of req.targets) {
+        if (t.pcId) t.awaiting = promptPhoneForThrow(req, t);
+      }
     }
-    for (const cb of saveReqListeners) cb(req);
+    announceRequest(req);
     return req;
   }
 
@@ -1314,7 +1326,7 @@ export function createDemoApi(): Api {
     target.result = result;
     target.awaiting = null;
     cancelPhonePrompt(requestId, combatantId);
-    for (const cb of saveReqListeners) cb(req);
+    announceRequest(req);
     if (req.targets.every((t) => t.result)) {
       const done = saveFinishers.get(requestId);
       closeSaveRequest(requestId);
@@ -1335,30 +1347,45 @@ export function createDemoApi(): Api {
     for (const cb of saveReqClosedListeners) cb(requestId);
   }
 
-  function resumeSaveRequest(requestId: string): DemoSaveRequest | null {
-    const req = parkedRequests.get(requestId);
+  /** Drop deferred cards for a request — all, or just one target's. */
+  function clearDeferredCards(requestId: string, combatantId: string | null): void {
+    const combat = cur().combat;
+    if (!combat) return;
+    let removed = false;
+    for (const e of [...combat.log]) {
+      if (e.kind !== 'saveDeferred' || e.requestId !== requestId) continue;
+      if (combatantId !== null && e.combatantId !== combatantId) continue;
+      if (applyLogEntryDelete(combat, e.id)) removed = true;
+    }
+    if (removed) {
+      combat.log = [...combat.log];
+      save();
+    }
+  }
+
+  /**
+   * Mirror of saveRequests.ts: a deferred throw comes back for whoever picked
+   * it up, and only them. The DM taking a card gets every row still owed; a
+   * player taking their own leaves everyone else's screen alone.
+   */
+  function resumeSaveRequest(
+    requestId: string,
+    by: { surface: 'dm' } | { surface: 'phone'; pcId: string },
+  ): DemoSaveRequest | null {
+    const req = parkedRequests.get(requestId) ?? saveRequests.get(requestId);
     if (!req) return null;
     parkedRequests.delete(requestId);
     saveRequests.set(requestId, req);
-    // An area save files one card per target, all pointing at this request.
-    // Resuming answers all of them, so none may be left behind as an orphan.
-    const combat = cur().combat;
-    if (combat) {
-      let removed = false;
-      for (const e of [...combat.log]) {
-        if (e.kind === 'saveDeferred' && e.requestId === requestId) {
-          if (applyLogEntryDelete(combat, e.id)) removed = true;
-        }
-      }
-      if (removed) {
-        combat.log = [...combat.log];
-        save();
-      }
+    req.pickedUpBy = by.surface;
+    if (by.surface === 'dm') {
+      clearDeferredCards(requestId, null);
+      announceRequest(req);
+      return req;
     }
-    for (const t of req.targets) {
-      if (t.pcId && !t.result) t.awaiting = promptPhoneForThrow(req, t);
-    }
-    for (const cb of saveReqListeners) cb(req);
+    const own = req.targets.find((t) => t.pcId === by.pcId && !t.result);
+    if (!own) return null;
+    clearDeferredCards(requestId, own.combatantId);
+    own.awaiting = promptPhoneForThrow(req, own);
     return req;
   }
 
@@ -1393,14 +1420,19 @@ export function createDemoApi(): Api {
     save();
   }
 
-  function reopenDeferredThrow(entry: LogEntry): boolean {
+  function reopenDeferredThrow(
+    entry: LogEntry,
+    by: { surface: 'dm' } | { surface: 'phone'; pcId: string },
+  ): boolean {
     // The parked original first: it still carries what the throw decides.
-    if (entry.requestId && resumeSaveRequest(entry.requestId)) return true;
+    if (entry.requestId && resumeSaveRequest(entry.requestId, by)) return true;
     if (!entry.combatantId || !entry.ability || entry.dc === undefined) return false;
     const combatantId = entry.combatantId;
     const isConc = entry.conc === true;
     return (
       openSaveRequest({
+        // Rebuilt rather than resumed, but still a pickup.
+        pickedUpBy: by.surface,
         kind: isConc ? 'concentration' : 'save',
         ability: entry.ability,
         dc: entry.dc,
@@ -2031,7 +2063,8 @@ export function createDemoApi(): Api {
       if (!combat || !entry || entry.kind !== 'saveDeferred' || !entry.combatantId) return;
       const target = combat.combatants.find((c) => c.id === entry.combatantId);
       if (!target || target.type !== 'pc' || target.sourceId !== session.pcId) return;
-      if (reopenDeferredThrow(entry)) {
+      // Picked up by this player: the prompt lands on their phone only.
+      if (reopenDeferredThrow(entry, { surface: 'phone', pcId: session.pcId! })) {
         if (applyLogEntryDelete(combat, entry.id)) combat.log = [...combat.log];
         save();
       }
@@ -2528,7 +2561,7 @@ export function createDemoApi(): Api {
       resolveThrow(id, combatantId, result as DemoThrowResult),
     closeSaveRequest: async (id) => closeSaveRequest(id),
     deferSaveRequest: async (id) => deferSaveRequest(id),
-    reopenDeferredThrow: async (entry) => reopenDeferredThrow(entry),
+    reopenDeferredThrow: async (entry) => reopenDeferredThrow(entry, { surface: 'dm' }),
     onSaveRequest: (cb) => {
       const wrapped = (req: DemoSaveRequest) => cb(req as never);
       saveReqListeners.add(wrapped);

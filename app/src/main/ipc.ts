@@ -97,7 +97,9 @@ export function registerIpc(): void {
   );
   ipcMain.handle('saveRequest:close', (_e, id) => closeRequest(id));
   ipcMain.handle('saveRequest:defer', (_e, id) => deferRequest(id));
-  ipcMain.handle('saveRequest:reopen', (_e, entry) => reopenDeferredThrow(entry));
+  ipcMain.handle('saveRequest:reopen', (_e, entry) =>
+    reopenDeferredThrow(entry, { surface: 'dm' }),
+  );
   ipcMain.handle('log:save', (_e, p) =>
     store.appendLog({
       kind: 'save',

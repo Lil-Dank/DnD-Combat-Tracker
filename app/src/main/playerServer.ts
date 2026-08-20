@@ -1195,7 +1195,11 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
       if (!entry || entry.kind !== 'saveDeferred' || !entry.combatantId) return;
       const target = combat!.combatants.find((c) => c.id === entry.combatantId);
       if (!target || target.type !== 'pc' || target.sourceId !== info.pcId) return;
-      if (reopenDeferredThrow(entry)) await store.deleteLogEntry(entry.id);
+      // Picked up by this player: the prompt lands on their phone only, and
+      // nobody else's screen changes.
+      if (reopenDeferredThrow(entry, { surface: 'phone', pcId: info.pcId! })) {
+        await store.deleteLogEntry(entry.id);
+      }
       return;
     }
 

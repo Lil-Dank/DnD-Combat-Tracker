@@ -57,6 +57,13 @@ export interface SaveRequest {
   spellName?: string;
   /** Concentration: the damage that forced the check. */
   damage?: number;
+  /**
+   * Set when this request was picked up off a deferred card. A fresh throw is
+   * announced to everyone who can answer it; picking one back up is one person
+   * saying "I've got this", so it stays with them and does not reopen a prompt
+   * on anybody else's screen.
+   */
+  pickedUpBy?: 'dm' | 'phone';
   targets: ThrowTarget[];
 }
 
@@ -69,6 +76,8 @@ export interface SaveRequestInput {
   spellName?: string;
   damage?: number;
   combatantIds: string[];
+  /** See SaveRequest.pickedUpBy: a rebuilt pickup stays with its picker. */
+  pickedUpBy?: 'dm' | 'phone';
   /**
    * Runs once every target has an answer. Concentration uses it to log the
    * throw and drop the spell; the DM's attack flow resolves its own damage in
@@ -113,6 +122,12 @@ export function onSaveRequestChanged(cb: (req: SaveRequest) => void): void {
 
 export function onSaveRequestClosed(cb: (requestId: string) => void): void {
   closeListener = cb;
+}
+
+/** The DM hears about a request unless a player picked it up for themselves. */
+function announce(req: SaveRequest): void {
+  if (req.pickedUpBy === 'phone') return;
+  changeListener?.(req);
 }
 
 // ---- lifecycle --------------------------------------------------------------
@@ -161,6 +176,7 @@ export function openSaveRequest(input: SaveRequestInput): SaveRequest | null {
     attackerName: input.attackerName,
     spellName: input.spellName,
     damage: input.damage,
+    pickedUpBy: input.pickedUpBy,
     targets,
   };
   requests.set(req.id, req);
@@ -168,10 +184,13 @@ export function openSaveRequest(input: SaveRequestInput): SaveRequest | null {
 
   // Ask every phone that can answer for itself. A target with no claim, or one
   // whose phone is offline, simply stays with the DM.
-  for (const t of req.targets) {
-    if (t.pcId) t.awaiting = phonePrompter?.(req, t) ?? null;
+  // A DM pickup is answered by the DM; do not light up a phone for it.
+  if (req.pickedUpBy !== 'dm') {
+    for (const t of req.targets) {
+      if (t.pcId) t.awaiting = phonePrompter?.(req, t) ?? null;
+    }
   }
-  changeListener?.(req);
+  announce(req);
   return req;
 }
 
@@ -194,7 +213,7 @@ export function resolveThrow(
   target.awaiting = null;
   // Whoever else was holding this prompt can put it away.
   phoneCanceller?.(requestId, combatantId);
-  changeListener?.(req);
+  announce(req);
   if (req.targets.every((t) => t.result)) void finish(requestId, revealMs);
   return true;
 }
@@ -225,19 +244,33 @@ export function closeRequest(requestId: string): void {
   closeListener?.(requestId);
 }
 
-/** Put a parked request back on the table, re-prompting anyone who can answer. */
-export function resumeRequest(requestId: string): SaveRequest | null {
-  const req = parked.get(requestId);
+/**
+ * Put a deferred request back on the table for whoever picked it up — and only
+ * them. The DM taking a card gets the modal with every row still owed; a player
+ * taking their own gets the prompt on their phone and leaves everyone else's
+ * screen alone, along with any other cards from the same request.
+ */
+export function resumeRequest(
+  requestId: string,
+  by: { surface: 'dm' } | { surface: 'phone'; pcId: string },
+): SaveRequest | null {
+  const req = parked.get(requestId) ?? requests.get(requestId);
   if (!req) return null;
   parked.delete(requestId);
   requests.set(requestId, req);
-  // An area save files one card per target, all pointing at this request.
-  // Resuming answers all of them, so none may be left behind as an orphan.
-  clearDeferredCards(requestId);
-  for (const t of req.targets) {
-    if (t.pcId && !t.result) t.awaiting = phonePrompter?.(req, t) ?? null;
+  req.pickedUpBy = by.surface;
+
+  if (by.surface === 'dm') {
+    // The DM adjudicates the lot, so every card from this request is spent.
+    clearDeferredCards(requestId, null);
+    announce(req);
+    return req;
   }
-  changeListener?.(req);
+
+  const own = req.targets.find((t) => t.pcId === by.pcId && !t.result);
+  if (!own) return null;
+  clearDeferredCards(requestId, own.combatantId);
+  own.awaiting = phonePrompter?.(req, own) ?? null;
   return req;
 }
 
@@ -284,13 +317,16 @@ export function openRequestIds(): string[] {
   return [...new Set([...requests.keys(), ...parked.keys()])];
 }
 
-/** Drop every deferred card filed from one request. */
-function clearDeferredCards(requestId: string): void {
+/**
+ * Drop deferred cards filed from one request — all of them, or just the one
+ * belonging to a single target when only that row is being picked up.
+ */
+function clearDeferredCards(requestId: string, combatantId: string | null): void {
   const log = store.getState().combat?.log ?? [];
   for (const e of log) {
-    if (e.kind === 'saveDeferred' && e.requestId === requestId) {
-      void store.deleteLogEntry(e.id);
-    }
+    if (e.kind !== 'saveDeferred' || e.requestId !== requestId) continue;
+    if (combatantId !== null && e.combatantId !== combatantId) continue;
+    void store.deleteLogEntry(e.id);
   }
 }
 

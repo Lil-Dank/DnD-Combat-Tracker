@@ -36,22 +36,28 @@ export function startConcentrationChecks(): void {
  * concentration card keeps its consequence: throwing it later still ends the
  * spell on a failure.
  */
-export function reopenDeferredThrow(entry: {
-  combatantId?: string;
-  ability?: string;
-  dc?: number;
-  attackName?: string;
-  amount?: number;
-  conc?: boolean;
-  requestId?: string;
-}): boolean {
+export function reopenDeferredThrow(
+  entry: {
+    combatantId?: string;
+    ability?: string;
+    dc?: number;
+    attackName?: string;
+    amount?: number;
+    conc?: boolean;
+    requestId?: string;
+  },
+  by: { surface: 'dm' } | { surface: 'phone'; pcId: string },
+): boolean {
   // The parked original first: it still carries what the throw decides. Only
   // when it is gone (a restart, a finished combat) do we rebuild a bare one.
-  if (entry.requestId && resumeRequest(entry.requestId)) return true;
+  if (entry.requestId && resumeRequest(entry.requestId, by)) return true;
   if (!entry.combatantId || !entry.ability || entry.dc === undefined) return false;
   const combatantId = entry.combatantId;
   const isConc = entry.conc === true;
   const req = openSaveRequest({
+    // Rebuilt rather than resumed, but still a pickup: it belongs to whoever
+    // reached for it, not to everyone.
+    pickedUpBy: by.surface,
     kind: isConc ? 'concentration' : 'save',
     ability: entry.ability,
     dc: entry.dc,

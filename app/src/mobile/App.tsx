@@ -27,8 +27,8 @@ import type {
   ArchiveEntryMsg,
   AttackResultMsg,
   AttackRollResultMsg,
-  ConcSaveMsg,
-  ConcSaveResultMsg,
+  ThrowPromptMsg,
+  ThrowResultMsg,
   DamageResultMsg,
   HealResultMsg,
   SavePendingMsg,
@@ -73,8 +73,8 @@ export function App() {
   /** Session cache of the on-demand spellbook reference. */
   const [spellList, setSpellList] = useState<WireSpell[] | null>(null);
   /** Pending Concentration checks (queued: several hits, several saves). */
-  const [concQueue, setConcQueue] = useState<ConcSaveMsg[]>([]);
-  const [concResult, setConcResult] = useState<ConcSaveResultMsg | null>(null);
+  const [throwQueue, setThrowQueue] = useState<ThrowPromptMsg[]>([]);
+  const [throwResult, setThrowResult] = useState<ThrowResultMsg | null>(null);
   const socketRef = useRef<PlayerSocket | null>(null);
 
   const lang: Lang = state?.language ?? 'en';
@@ -115,15 +115,16 @@ export function App() {
         case 'castResult':
           // Slot spend confirmed; the state push updates the pips.
           break;
-        case 'concSave':
-          setConcQueue((q) => [...q, msg]);
+        case 'throwPrompt':
+          setThrowQueue((q) => [...q, msg]);
           break;
-        case 'concSaveResult':
+        case 'throwResult':
+          // cancelled = the DM (or another surface) answered it first.
           if (msg.cancelled) {
-            setConcQueue((q) => q.filter((x) => x.id !== msg.id));
-            setConcResult((r) => (r?.id === msg.id ? null : r));
+            setThrowQueue((q) => q.filter((x) => x.id !== msg.id));
+            setThrowResult((r) => (r?.id === msg.id ? null : r));
           } else {
-            setConcResult(msg);
+            setThrowResult(msg);
           }
           break;
         case 'kicked':
@@ -361,16 +362,17 @@ export function App() {
             </Sheet>
           )}
 
-          {concQueue.length > 0 && (
-            <ConcSaveOverlay
-              msg={concQueue[0]}
-              result={concResult?.id === concQueue[0].id ? concResult : null}
+          {throwQueue.length > 0 && (
+            <ThrowPromptOverlay
+              msg={throwQueue[0]}
+              result={throwResult?.id === throwQueue[0].id ? throwResult : null}
+              pending={throwQueue.length - 1}
               lang={lang}
               t={t}
               send={send}
               onDone={() => {
-                setConcQueue((q) => q.slice(1));
-                setConcResult(null);
+                setThrowQueue((q) => q.slice(1));
+                setThrowResult(null);
               }}
             />
           )}
@@ -380,23 +382,31 @@ export function App() {
   );
 }
 
-// ---- concentration check ------------------------------------------------------
+// ---- saving throws you can answer -------------------------------------------
 
 /**
- * Your concentrating character just took damage: a Constitution saving throw
- * decides whether the spell holds. Rolls digitally (d20 + CON) or takes a
- * manually rolled total, with the hint of what to throw.
+ * A saving throw is owed and you can answer it: the Constitution check that
+ * keeps a spell after damage, or an ordinary save the DM or the deck aimed at
+ * you. Rolls digitally (d20 + your modifier) or takes a manually rolled total,
+ * with the hint of what to throw.
+ *
+ * The DM is prompted for the same throw at the same time and can answer it if
+ * the player is stuck — that arrives here as a `cancelled` result and takes the
+ * sheet away. Unskippable while it is yours to answer: the fight waits on it.
  */
-function ConcSaveOverlay({
+function ThrowPromptOverlay({
   msg,
   result,
+  pending,
   lang,
   t,
   send,
   onDone,
 }: {
-  msg: ConcSaveMsg;
-  result: ConcSaveResultMsg | null;
+  msg: ThrowPromptMsg;
+  result: ThrowResultMsg | null;
+  /** How many more throws are queued behind this one. */
+  pending: number;
   lang: Lang;
   t: (k: string, p?: Record<string, string | number>) => string;
   send: (m: Record<string, unknown>) => void;
@@ -410,13 +420,16 @@ function ConcSaveOverlay({
   // tumble has run its course and the server has answered.
   const [tumbling, setTumbling] = useState(false);
   const [tumbleDone, setTumbleDone] = useState(false);
-  const spell = lang === 'de' && msg.deName ? msg.deName : msg.spellName;
-  const modStr =
-    msg.conMod === null ? '' : ` ${msg.conMod >= 0 ? '+' : '−'}${Math.abs(msg.conMod)}`;
+  const isConc = msg.kind === 'concentration';
+  // attackName is the log label, "Concentration (Bless)". The heading wants the
+  // spell on its own next to the \u24b8 glyph.
+  const spell = msg.spellName ?? msg.attackName;
+  const title = isConc ? `\u24b8 ${spell}` : msg.attackName;
+  const modStr = msg.mod === null ? '' : ` ${msg.mod >= 0 ? '+' : '\u2212'}${Math.abs(msg.mod)}`;
 
   if (tumbling && !(tumbleDone && result)) {
     return (
-      <Sheet title={`Ⓒ ${spell}`} onClose={() => undefined} t={t} noBack>
+      <Sheet title={title} onClose={() => undefined} t={t} noBack>
         <RollingDice label={t('mob.rolling')} sizes={[20]} />
       </Sheet>
     );
@@ -424,11 +437,13 @@ function ConcSaveOverlay({
 
   if (result) {
     return (
-      <Sheet title={`Ⓒ ${spell}`} onClose={onDone} t={t}>
+      <Sheet title={title} onClose={onDone} t={t}>
         <div className="result">
           {result.die != null && <DiceValues dice={[result.die]} size={80} settled />}
           <div className={`verdict ${result.saved ? 'hit' : 'miss'}`}>
-            {t(result.saved ? 'mob.concKept' : 'mob.concLost', { spell })}
+            {isConc
+              ? t(result.saved ? 'mob.concKept' : 'mob.concLost', { spell })
+              : t(result.saved ? 'mob.throwSaved' : 'mob.throwFailed')}
           </div>
           <p className="atk-math tnum">
             {result.total} {t('mob.concVs', { dc: result.dc ?? msg.dc })}
@@ -442,10 +457,17 @@ function ConcSaveOverlay({
   }
 
   return (
-    <Sheet title={`Ⓒ ${spell}`} onClose={() => undefined} t={t} noBack>
+    <Sheet title={title} onClose={() => undefined} t={t} noBack>
       <p className="conc-info">
-        {t('mob.concInfo', { damage: msg.damage, dc: msg.dc, spell })}
+        {isConc
+          ? t('mob.concInfo', { damage: msg.damage ?? 0, dc: msg.dc, spell })
+          : t('mob.throwInfo', {
+              ability: abilityCodeLabel(lang, msg.ability),
+              dc: msg.dc,
+              actor: msg.attackerName ?? msg.attackName,
+            })}
       </p>
+      {pending > 0 && <p className="muted tnum">{t('mob.throwMore', { count: pending })}</p>}
       <div className="mode-toggle">
         <button className={manual ? '' : 'selected'} onClick={() => setManual(false)}>
           {t('mob.digital')}
@@ -463,10 +485,10 @@ function ConcSaveOverlay({
             setTumbling(true);
             setTumbleDone(false);
             setTimeout(() => setTumbleDone(true), 3000);
-            send({ type: 'concSaveDigital', id: msg.id });
+            send({ type: 'throwDigital', id: msg.id });
           }}
         >
-          🎲 {displayDice(lang, 'd20')}
+          \ud83c\udfb2 {displayDice(lang, 'd20')}
           {modStr}
         </button>
       ) : (
@@ -474,7 +496,7 @@ function ConcSaveOverlay({
           <label>
             {t('mob.d20Total')}
             <span className="roll-hint tnum">
-              🎲 {displayDice(lang, 'd20')}
+              \ud83c\udfb2 {displayDice(lang, 'd20')}
               {modStr}
             </span>
             <input
@@ -489,7 +511,7 @@ function ConcSaveOverlay({
             disabled={sent || total.trim() === ''}
             onClick={() => {
               setSent(true);
-              send({ type: 'concSaveManual', id: msg.id, total: parseInt(total, 10) || 0 });
+              send({ type: 'throwManual', id: msg.id, total: parseInt(total, 10) || 0 });
             }}
           >
             {t('mob.resolve')}

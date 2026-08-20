@@ -328,6 +328,7 @@ export type LogKind =
   | 'heal'
   | 'attackRoll'
   | 'save'
+  | 'saveDeferred'
   | 'cast'
   | 'conditionAdded'
   | 'conditionRemoved'
@@ -368,6 +369,13 @@ export interface LogEntry {
   dc?: number;
   /** save entries: the ability code thrown against it ("DEX"). */
   ability?: string;
+  /**
+   * saveDeferred entries: the target that still owes the throw, so the card's
+   * "throw it" button can rebuild the request the DM waved away. Paired with
+   * `conc`, which marks it as a concentration check so throwing it later can
+   * still drop the spell.
+   */
+  combatantId?: string;
   /** damage entries: the dice composition ("2d6 [3+5] +4 = 12"), DM-only. */
   math?: string;
   /** Damage type per bracket group of `math`, for type-tinted rendering. */
@@ -403,6 +411,7 @@ export type LogEntryPatch = Partial<
     | 'slotLevel'
     | 'dc'
     | 'ability'
+    | 'combatantId'
     | 'condition'
     | 'damageType'
   >

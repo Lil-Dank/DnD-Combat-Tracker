@@ -8,6 +8,15 @@ import { store } from './state';
 import { JsonValue } from './storage';
 import { handleAttackEvent } from './kenku';
 import { logAttackEvent } from './combatLog';
+import {
+  closeRequest,
+  getSaveRequest,
+  openRequestIds,
+  resolveThrow,
+  setPhoneSurface,
+  type SaveRequest,
+  type ThrowTarget,
+} from './saveRequests';
 import { rollD20, rollPool, stripDiceResults, type RollMode } from '../shared/dice';
 import { monsterName } from '../shared/i18n';
 import { spellActionName } from '../shared/spellAction';
@@ -66,21 +75,18 @@ interface PendingSave {
   sourceName?: string;
 }
 
-/** A pending Constitution save to keep Concentration after taking damage. */
-interface ConcSave {
+/**
+ * Prompts this server has put on a phone, keyed by prompt id. The throw itself
+ * belongs to saveRequests.ts — this is only what is on screen and where to
+ * route the answer back to.
+ */
+interface PhonePrompt {
   id: string;
-  pcId: string;
+  requestId: string;
   combatantId: string;
-  spellName: string;
-  deName: string | null;
-  dc: number;
-  damage: number;
-  /** CON modifier for the digital roll and the manual hint (null = unknown). */
-  conMod: number | null;
   socket: WebSocket;
 }
-
-const concSaves = new Map<string, ConcSave>();
+const phonePrompts = new Map<string, PhonePrompt>();
 
 let httpServer: Server | null = null;
 let wss: WebSocketServer | null = null;
@@ -219,7 +225,7 @@ function isBloodied(c: Combatant): boolean {
   return c.currentHp < c.maxHp * 0.5;
 }
 
-function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
+function filterLogForPlayers(log: LogEntry[], viewerCombatantId: string | null): LogEntry[] {
   // One rule: players never see a dice-throw BREAKDOWN, but they always see
   // its COMPOSITION.
   //   composition — what was thrown:            2d8 +2
@@ -230,22 +236,30 @@ function filterLogForPlayers(log: LogEntry[]): LogEntry[] {
   //
   // This is live combat only. Archived fights skip the filter entirely: once
   // the fight is over, players may browse the full breakdowns in Past Combats.
-  return log.map((e) => {
+  // A deferred throw is addressed to one character. The DM sees every one; the
+  // phone that owns it sees its own and nobody else's — the first per-viewer
+  // rule in the log, hence the explicit parameter rather than a module global.
+  return log.flatMap<LogEntry>((e) => {
+    if (e.kind === 'saveDeferred') {
+      return e.combatantId && e.combatantId === viewerCombatantId ? [e] : [];
+    }
     if (e.kind === 'attackRoll') {
-      return {
-        ...e,
-        die: undefined,
-        dice: undefined,
-        total: undefined,
-        math: attackComposition(e),
-      };
+      return [
+        {
+          ...e,
+          die: undefined,
+          dice: undefined,
+          total: undefined,
+          math: attackComposition(e),
+        },
+      ];
     }
     // Saves keep their total — that one is announced at the table — but not
     // the d20 behind it, which would hand out the roller's ability modifier.
-    if (e.kind === 'save') return { ...e, die: undefined, dice: undefined };
-    if (e.math === undefined) return e;
+    if (e.kind === 'save') return [{ ...e, die: undefined, dice: undefined }];
+    if (e.math === undefined) return [e];
     // mathTypes stays: the damage TYPE is table knowledge too.
-    return { ...e, die: undefined, dice: undefined, math: stripDiceResults(e.math) };
+    return [{ ...e, die: undefined, dice: undefined, math: stripDiceResults(e.math) }];
   });
 }
 
@@ -317,7 +331,7 @@ function playerStateMessage(state: AppState, info: SocketInfo): string {
         }
       : null,
     combatants,
-    log: active ? filterLogForPlayers(combat!.log).slice(-200) : [],
+    log: active ? filterLogForPlayers(combat!.log, ownCombatant?.id ?? null).slice(-200) : [],
     archive: store.listArchive().map((a) => ({
       id: a.id,
       templateName: a.templateName,
@@ -534,6 +548,11 @@ function sourceNameOf(info: SocketInfo | undefined): string | undefined {
   if (!info) return undefined;
   const claimed = info.pcId ? claimsMap()[info.pcId]?.playerName : null;
   return claimed || info.device || undefined;
+}
+
+/** Who answered a throw, for the DM's row and the log's attribution. */
+function answeredBy(info: SocketInfo | undefined): string {
+  return sourceNameOf(info) ?? 'phone';
 }
 
 /** Shared validation for all attack commands. */
@@ -781,64 +800,45 @@ export function dismissPendingSave(id: string): void {
 }
 
 /**
- * Verdict on a Concentration check: log it, break the spell on a failure.
- *
- * `revealMs` holds the table-visible half back while the roller's own dice are
- * still in the air, the same contract attackRollDigital keeps. The roller gets
- * their result immediately — their phone owns the suspense — but the log entry
- * and the spell dropping off the DM's combat row wait, so the table doesn't
- * learn the outcome before the player does.
+ * saveRequests.ts asks us to put a throw on the phone that claims this target.
+ * Returns the label to show the DM while we wait, or null when nobody can be
+ * asked — an unclaimed PC, or a claim whose phone is not connected.
  */
-async function resolveConcSave(
-  pending: ConcSave,
-  die: number | null,
-  total: number,
-  revealMs = 0,
-): Promise<void> {
-  concSaves.delete(pending.id);
-  const saved = total >= pending.dc;
-  send(pending.socket, {
-    type: 'concSaveResult',
-    id: pending.id,
-    die,
-    total,
-    dc: pending.dc,
-    saved,
-    spellName: pending.spellName,
-    deName: pending.deName,
-  });
-  const lang = store.getState().settings.language;
-  const label = `${translate(lang, 'spellbook.concentration')} (${
-    lang === 'de' && pending.deName ? pending.deName : pending.spellName
-  })`;
-  const pc = store.getState().pcs.find((p) => p.id === pending.pcId);
-  const sourceName = sourceNameOf(sockets.get(pending.socket));
-  const commit = async (): Promise<void> => {
-    await store.appendLog({
-      kind: 'save',
-      actorName: pc?.name ?? '?',
-      actorType: 'pc',
-      attackName: label,
-      die: die ?? undefined,
-      total,
-      dc: pending.dc,
-      ability: 'CON',
-      outcome: saved ? 'saved' : 'failed',
-      source: 'player',
-      sourceName,
-    });
-    if (!saved) await store.setConcentration(pending.combatantId, null);
+function promptPhoneForThrow(req: SaveRequest, target: ThrowTarget): string | null {
+  const entry = [...sockets.entries()].find(([, info]) => info.pcId === target.pcId);
+  if (!entry) return null;
+  const [socket, info] = entry;
+  if (socket.readyState !== WebSocket.OPEN) return null;
+  const prompt: PhonePrompt = {
+    id: randomUUID(),
+    requestId: req.id,
+    combatantId: target.combatantId,
+    socket,
   };
-  if (revealMs > 0) setTimeout(() => void commit(), revealMs);
-  else await commit();
+  phonePrompts.set(prompt.id, prompt);
+  send(socket, {
+    type: 'throwPrompt',
+    id: prompt.id,
+    kind: req.kind,
+    attackName: req.attackName,
+    attackerName: req.attackerName,
+    spellName: req.spellName,
+    ability: req.ability,
+    dc: req.dc,
+    damage: req.damage,
+    mod: target.mod,
+  });
+  return sourceNameOf(info) ?? info.device ?? 'phone';
 }
 
-/** Combat ended or campaign switched before the player answered. */
-function dismissConcSave(id: string): void {
-  const pending = concSaves.get(id);
-  if (!pending) return;
-  concSaves.delete(id);
-  send(pending.socket, { type: 'concSaveResult', id, cancelled: true });
+/** Someone else answered: take the prompt off the phone still holding it. */
+function cancelPhonePrompt(requestId: string, combatantId: string | null): void {
+  for (const [id, prompt] of [...phonePrompts]) {
+    if (prompt.requestId !== requestId) continue;
+    if (combatantId !== null && prompt.combatantId !== combatantId) continue;
+    phonePrompts.delete(id);
+    send(prompt.socket, { type: 'throwResult', id, cancelled: true });
+  }
 }
 
 // ---- command handling --------------------------------------------------------
@@ -1171,21 +1171,33 @@ async function handleCommand(socket: WebSocket, cmd: PlayerCommand): Promise<voi
       return;
     }
 
-    case 'concSaveDigital': {
-      // Concentration check, app-rolled: d20 + CON modifier vs the DC.
-      const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
-      if (!pending || pending.socket !== socket) return;
+    case 'throwDigital': {
+      // App-rolled saving throw: d20 + the target's modifier vs the DC.
+      const prompt = typeof cmd.id === 'string' ? phonePrompts.get(cmd.id) : undefined;
+      if (!prompt || prompt.socket !== socket) return;
+      const req = getSaveRequest(prompt.requestId);
+      const target = req?.targets.find((t) => t.combatantId === prompt.combatantId);
+      if (!req || !target) return;
       const die = Math.floor(Math.random() * 20) + 1;
+      const total = die + (target.mod ?? 0);
+      phonePrompts.delete(prompt.id);
+      send(socket, { type: 'throwResult', id: prompt.id, die, total, dc: req.dc, saved: total >= req.dc });
       // Digital only: the phone tumbles, so hold the table-visible half back.
-      await resolveConcSave(pending, die, die + (pending.conMod ?? 0), ATTACK_REVEAL_MS);
+      resolveThrow(req.id, target.combatantId, { die, total, by: answeredBy(info) }, ATTACK_REVEAL_MS);
       return;
     }
 
-    case 'concSaveManual': {
+    case 'throwManual': {
       // The player rolled physical dice and typed the total.
-      const pending = typeof cmd.id === 'string' ? concSaves.get(cmd.id) : undefined;
-      if (!pending || pending.socket !== socket || typeof cmd.total !== 'number') return;
-      await resolveConcSave(pending, null, Math.floor(cmd.total));
+      const prompt = typeof cmd.id === 'string' ? phonePrompts.get(cmd.id) : undefined;
+      if (!prompt || prompt.socket !== socket || typeof cmd.total !== 'number') return;
+      const req = getSaveRequest(prompt.requestId);
+      const target = req?.targets.find((t) => t.combatantId === prompt.combatantId);
+      if (!req || !target) return;
+      const total = Math.floor(cmd.total);
+      phonePrompts.delete(prompt.id);
+      send(socket, { type: 'throwResult', id: prompt.id, die: null, total, dc: req.dc, saved: total >= req.dc });
+      resolveThrow(req.id, target.combatantId, { die: null, total, by: answeredBy(info) });
       return;
     }
 
@@ -1280,7 +1292,7 @@ export async function remountClaims(filePath: string): Promise<void> {
 export async function handleCampaignSwitch(id: string): Promise<void> {
   if (id === store.activeCampaignId || !store.hasCampaign(id)) return;
   for (const pid of [...pendingSaves.keys()]) dismissPendingSave(pid);
-  for (const pid of [...concSaves.keys()]) dismissConcSave(pid);
+  for (const rid of openRequestIds()) closeRequest(rid);
   await remountClaims(store.campaignFilePath(id, 'player-claims.json'));
   await store.mountCampaign(id);
   publishClaims();
@@ -1298,32 +1310,15 @@ export function startPlayerServer(): void {
       // Combat over → any save the DM never adjudicated is moot.
       if (!state.combat || state.combat.phase !== 'active') {
         for (const id of [...pendingSaves.keys()]) dismissPendingSave(id);
-        for (const id of [...concSaves.keys()]) dismissConcSave(id);
+        for (const rid of openRequestIds()) closeRequest(rid);
       }
       const { enabled, port } = state.settings.playerWeb;
       if (enabled !== currentlyEnabled || (enabled && port !== currentPort)) {
         restart();
       }
     });
-    // Damage hit a concentrating PC → prompt the phone that claims it.
-    store.onConcentrationCheck((check) => {
-      const entry = [...sockets.entries()].find(([, info]) => info.pcId === check.pcId);
-      if (!entry) return; // unclaimed: the DM adjudicates via the chip
-      const [socket] = entry;
-      const pc = store.getState().pcs.find((p) => p.id === check.pcId);
-      const conMod = pc?.abilities ? abilityMod(pc.abilities.con) : null;
-      const pending: ConcSave = { id: randomUUID(), ...check, conMod, socket };
-      concSaves.set(pending.id, pending);
-      send(socket, {
-        type: 'concSave',
-        id: pending.id,
-        spellName: check.spellName,
-        deName: check.deName,
-        dc: check.dc,
-        damage: check.damage,
-        conMod,
-      });
-    });
+    // The throw itself lives in saveRequests.ts; we are only the phone half.
+    setPhoneSurface(promptPhoneForThrow, cancelPhonePrompt);
   }
   restart();
 }

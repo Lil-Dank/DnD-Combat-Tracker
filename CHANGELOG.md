@@ -7,6 +7,51 @@ to its GitHub release, where the installer and the packed plugin are attached.
 
 ## [Unreleased]
 
+### Added
+
+- **A new identity.** The d20 is replaced by a fanned stack of cards whose front
+  card carries an initiative row — an avatar dot, a name bar, an HP bar. It ships
+  everywhere the old icon did: window and taskbar, the installer, the README, the
+  GitHub social banner and the Stream Deck plugin's store and category icons. The
+  sidebar's logo and text are now one drawn lock-up that recolours with the theme.
+- **Ten themes instead of four.** Eight brand palettes — Violet ink (the new
+  default), Arcane gold, Ember slate, Verdant brass, Midnight cyan, Parchment
+  inverted, Steel amber, Plum and mint — plus PHB Style and Light, which keep
+  their exact colours. Each palette declares ten colours and the rest of the UI
+  is derived from them, so a theme recolours the whole window *and* the logo.
+- **A theme picker you can see.** Settings shows a swatch grid, each swatch
+  rendered in its own palette with a live copy of the mark, grouped into Brand
+  and Paper — instead of a dropdown that showed one name at a time.
+- **A monoline icon set** across the sidebar, its footer and the phone, replacing
+  the emoji. Icons inherit their row's colour, so the active tab tints its icon
+  with the palette accent.
+
+### Changed
+
+- The current-turn highlight has a colour of its own on every theme, separate
+  from the accent. On PHB Style and Light the two used to be the same colour, so
+  whose turn it was never stood out; now it does.
+- The active navigation item is an accent tint with a left bar rather than a
+  solid fill, so it stops competing with the current-turn row.
+- PHB Style and Light gained real borders and a subtle lift under rows, cards and
+  buttons — a hairline at 12% alpha disappeared against their bright grounds.
+- On the phone, "My attacks" became "My attacks…" in the lighter outline style,
+  since it opens a sheet rather than doing something.
+- Text that carries the brand colour (headings, totals, the active tab, dice
+  notation) uses a variant pulled toward the body colour, so it clears contrast
+  on every palette; fills keep the accent at full strength.
+
+### Fixed
+
+- The Player View no longer inherits anything from the DM's theme. It sits on the
+  body, which carries the UI font and background, so PHB Style's serif and its
+  parchment ground reached the projector. It is now byte-identical under every
+  theme.
+- Damage-type inks, the monster colour and several button labels missed WCAG AA
+  on one ground or another; an audit across all ten themes brought them up.
+- The DM window no longer flashes the old purple before painting: it opens on the
+  stored theme's own background.
+
 ## [3.4.0] — 2026-08-20
 
 ### Added

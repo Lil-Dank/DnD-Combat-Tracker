@@ -47,6 +47,20 @@
   --conc: #6d4bb0;
 }
 
+/* Separation levels for the bright grounds, switchable in the toolbar so the
+   right amount can be picked by eye rather than guessed. */
+.ui[data-scheme="light"][data-sep="strong"], .ui[data-scheme="light"][data-sep="shadow"] {
+  --border-soft: color-mix(in oklab, var(--brand-text) 42%, transparent);
+  --border:      color-mix(in oklab, var(--brand-ground) 52%, var(--brand-text));
+}
+[data-sep="shadow"] .row,
+[data-sep="shadow"] .logcard,
+[data-sep="shadow"] .camp,
+[data-sep="shadow"] .btn {
+  box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 1px 1px rgba(0,0,0,.05);
+}
+[data-sep="shadow"] .row.current { box-shadow: 0 0 0 1px var(--current-shadow), 0 1px 3px rgba(0,0,0,.13); }
+
 /* ---- mockup chrome (never ships) ---------------------------------------- */
 * { box-sizing: border-box; }
 body {
@@ -175,6 +189,13 @@ h2.sec { font-size: 11.5px; letter-spacing: 1.2px; text-transform: uppercase; co
 .roll .vd { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--danger); }
 
 /* ---- specimen strips ---------------------------------------------------- */
+.ilab { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 8px; }
+.ilab .col { border: 1px solid #2a2a31; border-radius: 9px; overflow: hidden; }
+.ilab .col h5 { margin: 0; padding: 5px 9px; font-size: 10.5px; letter-spacing: .6px;
+  text-transform: uppercase; color: #7f858f; background: #16161a; font-weight: 600; }
+.ilab .strip3 { display: flex; align-items: center; gap: 16px; padding: 12px 14px; }
+.ilab .strip3 + .strip3 { border-top: 1px solid #2a2a31; }
+.ilab .strip3 span { font-size: 10px; color: #8d8d96; margin-left: auto; }
 .lab { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
 .lab .cell { border: 1px solid #2a2a31; border-radius: 9px; overflow: hidden; }
 .lab .cell h5 { margin: 0; padding: 5px 9px; font-size: 10.5px; letter-spacing: .6px;
@@ -216,11 +237,16 @@ Untick palettes to cut the set down to eight.</p>
     <label><input type="radio" name="ico" value="emoji"> today's emoji</label>
   </fieldset>
   <fieldset><b>Lock-up mark</b>
-    <label><input type="radio" name="lock" value="tile" checked> tile</label>
-    <label><input type="radio" name="lock" value="inverse"> inverse</label>
+    <label><input type="radio" name="lock" value="tile"> tile</label>
+    <label><input type="radio" name="lock" value="inverse" checked> inverse</label>
     <label><input type="radio" name="lock" value="shadow"> shadow</label>
     <label><input type="radio" name="lock" value="stroke"> stroke</label>
     <label><input type="radio" name="lock" value="bare"> bare</label>
+  </fieldset>
+  <fieldset><b>Light separation</b>
+    <label><input type="radio" name="sep" value="soft"> soft</label>
+    <label><input type="radio" name="sep" value="strong" checked> strong</label>
+    <label><input type="radio" name="sep" value="shadow"> strong + shadow</label>
   </fieldset>
   <fieldset><b>Monsters glyph</b>
     <label><input type="radio" name="mon" value="horns" checked> horned head</label>
@@ -236,6 +262,11 @@ Untick palettes to cut the set down to eight.</p>
 
 <h2 class="sec">Sidebar icon set — 20px, the size that ships, and 32px to check the drawing</h2>
 <div class="iconwall ui" id="icons"></div>
+
+<h2 class="sec">App icon — the same mark on a dark, light and mid taskbar</h2>
+<p class="lede" style="margin-bottom:12px">The shipped icon has no panel behind it, so whatever
+survives all three strips is the one that works in a taskbar, an installer and a favicon.</p>
+<div id="iconlab"></div>
 
 <h2 class="sec">Lock-up treatments — 28px as it ships, and 2× to inspect</h2>
 <div id="locklab"></div>
@@ -296,8 +327,8 @@ PALETTES.push(
     dot:'#8a7f66', accent:'#58180d', bar2:'#a08a63', text:'#23180f', textMuted:'#6f5b3e', turn:'#8a5a12',
     on:{back1:'#c9ad6a',back2:'#a08a63',front:'#58180d',dot:'#f9f2e2',accent:'#f2c14e',bar2:'#c9ad6a'},
     pin: {
-      '--bg':'#eee5ce', '--bg-panel':'#fdf1dc', '--bg-panel-2':'#e9dbbd', '--border':'#c9ad6a',
-      '--border-soft':'rgba(121,94,45,.5)', '--row-hover':'rgba(201,173,106,.18)',
+      '--bg':'#eee5ce', '--bg-panel':'#fdf1dc', '--bg-panel-2':'#e9dbbd',
+      '--row-hover':'rgba(201,173,106,.18)',
       '--text':'#23180f', '--text-muted':'#6f5b3e', '--accent':'#58180d', '--accent-dim':'#722f1e',
       '--danger':'#9c2b1b', '--danger-soft':'#9c2b1b', '--success':'#2f6b31', '--heal-color':'#2f6b31',
       '--pc-color':'#2a4b8d', '--monster-color':'#8a4b12', '--badge-bg':'#58180d',
@@ -310,8 +341,8 @@ PALETTES.push(
     dot:'#6b6b76', accent:'#2563eb', bar2:'#a1a1aa', text:'#1b1b1f', textMuted:'#6b6b76', turn:'#b45309',
     on:{back1:'#a1a1aa',back2:'#6b6b76',front:'#1b1b1f',dot:'#d4d4dc',accent:'#2563eb',bar2:'#6b6b76'},
     pin: {
-      '--bg':'#f4f4f6', '--bg-panel':'#ffffff', '--bg-panel-2':'#ececf1', '--border':'#d4d4dc',
-      '--border-soft':'rgba(0,0,0,.2)', '--row-hover':'rgba(0,0,0,.045)',
+      '--bg':'#f4f4f6', '--bg-panel':'#ffffff', '--bg-panel-2':'#ececf1',
+      '--row-hover':'rgba(0,0,0,.045)',
       '--text':'#1b1b1f', '--text-muted':'#6b6b76', '--accent':'#2563eb', '--accent-dim':'#1d4ed8',
       '--danger':'#dc2626', '--danger-soft':'#b91c1c', '--success':'#16a34a', '--heal-color':'#15803d',
       '--pc-color':'#2563eb', '--monster-color':'#c2600e', '--badge-bg':'#e0e7ff',
@@ -339,7 +370,7 @@ function markSvg(size, opts = {}) {
   const full = size >= 40;
   // treatment: tile | inverse | shadow | stroke | bare
   const tr = opts.treatment ?? (opts.tile === false ? 'bare' : 'tile');
-  const tile = tr === 'tile';
+  const tile = tr === 'tile' || tr === 'tileshadow';
   const inv = tr === 'inverse';
   // `inverse` uses the palette's on-panel role set — light cards on a dark
   // sidebar, dark cards on a light one. Straight from the proof sheet.
@@ -364,10 +395,12 @@ function markSvg(size, opts = {}) {
   const s = (size * (1 - pad * 2)) / Math.max(box[2], box[3]);
   const tx = size / 2 - (box[0] + box[2] / 2) * s;
   const ty = size / 2 - (box[1] + box[3] / 2) * s;
-  const shadow = tr === 'shadow' ? ' style="filter:drop-shadow(0 1.5px 2.5px rgba(0,0,0,.5))"' : '';
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"${shadow} xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deck of Many Turns">` +
+  // The shadow belongs to the cards, not the tile behind them.
+  const shadow = (tr === 'shadow' || tr === 'tileshadow')
+    ? ` filter="drop-shadow(0 ${(size * 0.012).toFixed(2)}px ${(size * 0.022).toFixed(2)}px rgba(0,0,0,.45))"` : '';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deck of Many Turns">` +
     (tile ? `<rect width="${size}" height="${size}" rx="${(size * 0.21).toFixed(2)}" fill="var(--brand-tile)"/>` : '') +
-    `<g transform="translate(${tx.toFixed(3)},${ty.toFixed(3)}) scale(${s.toFixed(4)})">${art}</g></svg>`;
+    `<g${shadow} transform="translate(${tx.toFixed(3)},${ty.toFixed(3)}) scale(${s.toFixed(4)})">${art}</g></svg>`;
 }
 
 /* ---- monoline icon set --------------------------------------------------- */
@@ -423,7 +456,8 @@ const FOOT = [
 
 /* ---- render -------------------------------------------------------------- */
 let monsterGlyph = 'horns';
-let lockupTr = 'tile';
+let lockupTr = 'inverse';
+let sepLevel = 'strong';
 const seedCss = p => [
   `--brand-tile:${p.tile}`, `--brand-ground:${p.ground}`, `--brand-back-1:${p.back1}`,
   `--brand-back-2:${p.back2}`, `--brand-front:${p.front}`, `--brand-dot:${p.dot}`,
@@ -499,7 +533,19 @@ function render() {
         ${appFragment(p)}
       </section>`).join('');
 
+  const lead = shown[0] ?? PALETTES[0];
+  const ICON_TR = [['tile','flat tile'], ['tileshadow','tile + shadow'], ['shadow','bare + shadow']];
+  const GROUNDS = [['#202020','dark taskbar'], ['#f3f3f3','light taskbar'], ['#7c7c84','mid wallpaper']];
   const TREATMENTS = ['tile', 'inverse', 'shadow', 'stroke', 'bare'];
+  document.getElementById('iconlab').innerHTML =
+    `<div class="ilab ui" data-scheme="${lead.scheme}" style="${seedCss(lead)}">` +
+    ICON_TR.map(([tr, label]) => `
+      <div class="col"><h5>${label}</h5>
+        ${GROUNDS.map(([bg, gl]) => `<div class="strip3" style="background:${bg}">
+          ${[16, 32, 48, 128].map(n => markSvg(n, { treatment: tr })).join('')}
+          <span>${gl}</span></div>`).join('')}
+      </div>`).join('') + '</div>';
+
   document.getElementById('locklab').innerHTML = shown.slice(0, 4).map(p => `
     <p class="labname"><b>${p.label}</b></p>
     <div class="lab ui" data-scheme="${p.scheme}" style="${seedCss(p)}">
@@ -519,7 +565,6 @@ function render() {
     </div>`).join('');
 
   // Mark + icon strips follow the first visible palette.
-  const lead = shown[0] ?? PALETTES[0];
   const style = seedCss(lead);
   const marks = document.getElementById('marks');
   marks.setAttribute('style', style);
@@ -542,6 +587,7 @@ function render() {
 }
 
 function applyToggles() {
+  document.querySelectorAll('.ui').forEach(a => a.dataset.sep = sepLevel);
   const nav = document.querySelector('input[name=nav]:checked').value;
   const ico = document.querySelector('input[name=ico]:checked').value;
   document.querySelectorAll('.app').forEach(a => a.dataset.nav = nav);
@@ -567,6 +613,8 @@ function refreshCount() {
 document.getElementById('pals').addEventListener('change', () => { refreshCount(); render(); });
 document.querySelectorAll('input[name=nav], input[name=ico]').forEach(r =>
   r.addEventListener('change', applyToggles));
+document.querySelectorAll('input[name=sep]').forEach(r =>
+  r.addEventListener('change', e => { sepLevel = e.target.value; render(); }));
 document.querySelectorAll('input[name=lock]').forEach(r =>
   r.addEventListener('change', e => { lockupTr = e.target.value; render(); }));
 document.querySelectorAll('input[name=mon]').forEach(r =>

@@ -391,15 +391,18 @@ const ICONS = {
   phone:    '<rect x="6" y="3.6" width="12" height="16.8" rx="1.8"/><path d="M10.4 6.5h3.2M12 17.4h.01"/>',
   monitor:  '<rect x="3.6" y="5.2" width="16.8" height="10.2" rx="1.4"/><path d="M9.4 19.2h5.2M12 15.4v3.8"/>',
   expand:   '<path d="M4 9V5.6A1.6 1.6 0 0 1 5.6 4H9M15 4h3.4A1.6 1.6 0 0 1 20 5.6V9M20 15v3.4a1.6 1.6 0 0 1-1.6 1.6H15M9 20H5.6A1.6 1.6 0 0 1 4 18.4V15"/>',
-  /* Four-point impact spark — a 12-point burst turns to fuzz at 20px. */
-  burst:    '<path d="M12 3.4c.9 4.7 3.9 7.7 8.6 8.6-4.7.9-7.7 3.9-8.6 8.6-.9-4.7-3.9-7.7-8.6-8.6 4.7-.9 7.7-3.9 8.6-8.6Z"/>',
-  plus:     '<path d="M12 4.8v14.4M4.8 12h14.4"/>',
+  /* Explosion: an irregular 8-point burst. Regular spacing reads as a
+     sparkle, so both the radii and the angles are jittered. */
+  burst:    '<path d="M12.0 2.4L13.6 8.1L18.6 6.0L16.3 10.4L21.5 11.7L15.7 13.5L17.9 18.4L13.6 16.2L12.5 21.7L10.5 16.0L5.5 18.3L7.6 13.8L2.6 11.7L8.2 10.4L5.7 5.9L10.3 7.9Z"/>',
+  plus:     '<path d="M12 5.4v13.2M5.4 12h13.2"/>',
   dotOn:    '<circle cx="12" cy="12" r="4.6" fill="currentColor" stroke="none"/>',
   dotOff:   '<circle cx="12" cy="12" r="4.4"/>',
 };
+/* Most glyphs share one weight; a couple carry more presence on purpose. */
+const ICON_STROKE = { plus: 3.1 };
 const iconSvg = (name, size = 20) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
-  `stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">` +
+  `stroke-width="${ICON_STROKE[name] ?? 1.75}" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">` +
   `${ICONS[name]}</svg>`;
 
 /* ---- sidebar contents ---------------------------------------------------- */
